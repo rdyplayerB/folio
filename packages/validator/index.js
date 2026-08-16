@@ -152,6 +152,23 @@ function validate(game, opts) {
     try { def = JSON.parse(game.files['logic/world.json'].toString('utf8')); }
     catch (e) { err('E211', 'logic/world.json is not valid JSON: ' + e.message); }
 
+    // Shape before meaning. The graph analyser assumes a well-formed world, so a
+    // typo in a field name used to surface as a confusing semantic complaint two
+    // tiers later, or as nothing at all. The schema is the published contract
+    // other people's tools are told to trust, so it is also what we check against.
+    if (def) {
+      const shape = require('../format/schema.js').validateWorld(def);
+      for (const e of shape.errors.slice(0, 12)) {
+        err('E212', 'world.json ' + e.path + ' ' + e.msg,
+          'Checked against the published schema, packages/format/world.schema.json.');
+      }
+      if (shape.errors.length > 12) {
+        err('E212', 'world.json has ' + (shape.errors.length - 12) + ' further schema problems',
+          'Fix the ones above first; many are usually one cause.');
+      }
+      if (!shape.ok) def = null;      // do not run graph analysis on a broken shape
+    }
+
     if (def) {
       const g = require('./graph.js').analyse(def);
       f.push(...g.findings);

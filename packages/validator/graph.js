@@ -28,6 +28,7 @@ function analyse(world) {
 
   const rooms = index(world.rooms);
   const items = index(world.items);
+  const actors = index(world.actors || []);
   const rules = world.rules || [];
   const start = world.meta && world.meta.start;
 
@@ -75,6 +76,10 @@ function analyse(world) {
   const flags = new Set(
     Object.keys(world.flags || {}).filter(k => world.flags[k]));
   const firedRules = new Set();
+  // Every noun that was reachable at any point in the analysis. Reachability is
+  // not monotonic once actors and items start moving, so the final state is not a
+  // safe thing to conclude "never" from.
+  const everPresent = new Set();
   let won = false;
 
   const canSatisfy = (c) => {
@@ -108,8 +113,30 @@ function analyse(world) {
     return false;
   }
 
+  // Actors are nouns too, and this analysis used to forget that entirely.
+  //
+  // The effect was not subtle: every rule whose trigger named a character was
+  // reported as unfireable, so the flag it set was unreachable, so every room
+  // behind that flag was unreachable, and a perfectly good game came back with a
+  // cascade of E311s and an unreachable win. Any world with an NPC puzzle in it
+  // was rejected. Found by writing a game against the published spec rather than
+  // against the engine, which is exactly what that exercise is for.
+  function actorReachable(id) {
+    if (!actors[id]) return false;
+    const where = actorLoc[id];
+    if (where === 'NOWHERE') return false;
+    return rooms[where] ? reachRooms.has(where) : false;
+  }
+
+  /** Anything the player could name in a command: an item or an actor. */
+  function nounReachable(id) {
+    return held.has(id) || itemReachable(id) || actorReachable(id);
+  }
+
   const itemLoc = {};
   for (const it of world.items) itemLoc[it.id] = it.location;
+  const actorLoc = {};
+  for (const a of (world.actors || [])) actorLoc[a.id] = a.location;
 
   let changed = true;
   let guard = 0;
@@ -133,6 +160,10 @@ function analyse(world) {
       if (itemReachable(it.id)) { held.add(it.id); changed = true; }
     }
 
+    // 2b. Remember what was reachable this round, before any rule moves it.
+    for (const it of world.items) if (nounReachable(it.id)) everPresent.add(it.id);
+    for (const a of (world.actors || [])) if (nounReachable(a.id)) everPresent.add(a.id);
+
     // 3. Fire every rule whose trigger is now performable and whose conditions hold.
     for (let i = 0; i < rules.length; i++) {
       if (firedRules.has(i)) continue;
@@ -140,7 +171,7 @@ function analyse(world) {
       const on = r.on || {};
       if (on.room && !reachRooms.has(on.room)) continue;
       // The noun must be present for the player to act on it at all.
-      if (on.noun && !(held.has(on.noun) || itemReachable(on.noun))) continue;
+      if (on.noun && !nounReachable(on.noun)) continue;
       if (r.if && !r.if.every(canSatisfy)) continue;
 
       firedRules.add(i);
@@ -152,6 +183,7 @@ function analyse(world) {
           case 'light': flags.add('_lit_' + e.item); break;
           case 'take': held.add(e.item); break;
           case 'move-item': itemLoc[e.item] = e.to; break;
+          case 'move-actor': actorLoc[e.actor] = e.to; break;
           case 'goto': reachRooms.add(e.room); break;
           case 'win': won = true; break;
           default: break;
@@ -194,11 +226,19 @@ function analyse(world) {
   //
   // A rule is genuinely dead only when the player can never even attempt it:
   // its room is unreachable, or its noun can never be present.
+  //
+  // "Can never be present" also has to mean EVER, not "at the end of the
+  // analysis". The fixpoint moves things: feeding the dog sends it to NOWHERE, so
+  // by the last round the dog is unreachable and the unguarded "it shows you its
+  // teeth" fallback looked dead. A player meets that line every time they try the
+  // dog empty-handed. Same failure as the ordering one above, arriving by a
+  // different route, so the test is against everything that was reachable at any
+  // point rather than against the final state.
   for (let i = 0; i < rules.length; i++) {
     if (firedRules.has(i)) continue;
     const on = rules[i].on || {};
     const roomDead = on.room && !reachRooms.has(on.room);
-    const nounDead = on.noun && !held.has(on.noun) && !itemReachable(on.noun);
+    const nounDead = on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun);
     if (roomDead || nounDead) {
       warn('W313', 'rule ' + i + ' (' + (on.verb || '?') + ' ' + (on.noun || '') +
         ') can never fire',

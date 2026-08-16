@@ -74,5 +74,45 @@ w = good();
 w.rules.push({ on: { verb: 'BURN', noun: 'KEY' }, do: [{ type: 'destroy', item: 'KEY' }] });
 expect('an item that can be destroyed but is still required', w, 'W314');
 
+
+// --- actors are nouns ------------------------------------------------------
+// Regression. The analysis knew about items and forgot actors entirely, so any
+// rule triggered by a character was reported unfireable, and everything behind
+// the flag it set became unreachable. A whole class of game, the kind with a
+// person in it, could not certify. Found by writing a game from the published
+// spec rather than from the engine, which is what that exercise is for.
+const npc = {
+  meta: { start: 'GATE' },
+  flags: { paid: false },
+  rooms: [
+    { id: 'GATE', exits: [{ dir: 'NORTH', to: 'CITY',
+        condition: { type: 'flag', flag: 'paid' } }] },
+    { id: 'CITY', exits: [{ dir: 'SOUTH', to: 'GATE' }] }
+  ],
+  items: [{ id: 'COIN', location: 'GATE', attributes: { TAKEBIT: true } }],
+  actors: [{ id: 'GUARD', location: 'GATE' }],
+  rules: [
+    { on: { verb: 'GIVE', noun: 'GUARD' },
+      if: [{ type: 'carrying', item: 'COIN' }],
+      do: [{ type: 'destroy', item: 'COIN' },
+           { type: 'move-actor', actor: 'GUARD', to: 'NOWHERE' },
+           { type: 'set-flag', flag: 'paid', value: true }] },
+    // Unguarded fallback on the same trigger. A player meets this every time they
+    // try the guard empty-handed, so it is not dead code.
+    { on: { verb: 'GIVE', noun: 'GUARD' },
+      do: [{ type: 'print', text: 'He does not move.' }] },
+    { on: { verb: 'LOOK', noun: 'COIN' }, if: [{ type: 'at', room: 'CITY' }],
+      do: [{ type: 'win', text: 'done' }] }
+  ]
+};
+const g = analyse(npc);
+const gErr = g.findings.filter(f => f.level === 'error');
+check('a puzzle gated on an actor is not reported unreachable',
+  !gErr.some(e => e.code === 'E310' || e.code === 'E311'),
+  gErr.map(e => e.code + ' ' + e.msg).join(' | ') || 'no errors');
+check('a fallback whose noun a later rule removes is not called dead code',
+  !g.findings.some(f => f.code === 'W313' && /GUARD/.test(f.msg)),
+  (g.findings.find(f => f.code === 'W313') || {}).msg || 'no W313');
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

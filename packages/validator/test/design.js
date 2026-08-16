@@ -94,5 +94,20 @@ check('a looping map is not flagged', !audit(looped).findings.some(f => f.code =
 
 check('a world with no death state is flagged', c.findings.some(f => f.code === 'W505'));
 
+
+// A hazard on a clock is the commonest way a world kills you, and often the only
+// one. Looking at rules alone told an author with a drowning timer that nothing
+// in their world had any stakes.
+const timed = {
+  meta: { start: 'A' },
+  rooms: [{ id: 'A', exits: [] }],
+  items: [],
+  rules: [{ on: { verb: 'WAIT' }, do: [{ type: 'win', text: 'out' }] }],
+  timers: [{ turns: 40, do: [{ type: 'lose', text: 'The sea takes you.' }] }]
+};
+check('a lose that only a timer can reach still counts as stakes',
+  !audit(timed).findings.some(f => f.code === 'W505'),
+  (audit(timed).findings.find(f => f.code === 'W505') || {}).msg || 'no W505');
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

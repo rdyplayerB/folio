@@ -138,6 +138,17 @@
       <dd><b>Declared <code>world</code> but no <code>logic/world.json</code>.</b></dd>
       <dt><span class="code e">E211</span></dt>
       <dd><b><code>world.json</code> is not valid JSON.</b> The message carries the parser's position.</dd>
+      <dt><span class="code e">E212</span></dt>
+      <dd>
+        <b><code>world.json</code> violates the schema.</b> Checked against
+        <a href="https://folio.games/schema/world-0.1.0.json">the published schema</a>,
+        and the message names the exact path, as in
+        <code>rooms[0].descriptoin is not a known field</code>. Unknown fields are
+        errors rather than warnings because at this size they are always typos, and a
+        field nothing reads is indistinguishable from a feature that does not work.
+        Shape is checked before meaning, so a game failing here has not had its graph
+        analysed yet and may have further problems behind these.
+      </dd>
       <dt><span class="code e">E220</span></dt>
       <dd>
         <b>Unknown capability.</b> The game is asking for an engine feature this format

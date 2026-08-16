@@ -120,6 +120,36 @@ for (const [f, src] of html) {
 ok('every page can reach every other page from its sidebar',
   navMissing.length === 0, navMissing.slice(0, 4).join(' | '));
 
+// ------------------------------------------- the published spec and schema
+// Other people's tools and other people's models are pointed at these URLs, so a
+// stale copy is worse than no copy: it is a contract that silently disagrees with
+// the engine.
+const pkgSchema = fs.readFileSync(path.join(ROOT, 'packages/format/world.schema.json'), 'utf8');
+const pubPath = path.join(ROOT, 'site/schema/world-0.1.0.json');
+ok('the published schema matches the package schema',
+  fs.existsSync(pubPath) && fs.readFileSync(pubPath, 'utf8') === pkgSchema,
+  fs.existsSync(pubPath) ? '' : 'site/schema/world-0.1.0.json is missing');
+
+const llmsPath = path.join(ROOT, 'site/llms.txt');
+const llms = fs.existsSync(llmsPath) ? fs.readFileSync(llmsPath, 'utf8') : '';
+ok('the agent-facing spec exists', llms.length > 0, llms.length + ' bytes');
+
+// llms.txt is the one document an agent is expected to read INSTEAD of the
+// manual, so a vocabulary missing from it is a vocabulary that does not exist as
+// far as that agent is concerned.
+const { vocabulary } = require(path.join(ROOT, 'packages/format/schema.js'));
+const vocab = vocabulary();
+const absent = (list) => list.filter(v => !new RegExp('`' + v.replace(/[-]/g, '\\-') + '`').test(llms));
+const missingCond = absent(vocab.conditions);
+const missingEff = absent(vocab.effects);
+ok('the spec lists every condition', missingCond.length === 0,
+  vocab.conditions.length + ' conditions' + (missingCond.length ? ', missing ' + missingCond.join(', ') : ''));
+ok('the spec lists every effect', missingEff.length === 0,
+  vocab.effects.length + ' effects' + (missingEff.length ? ', missing ' + missingEff.join(', ') : ''));
+const missingDefaults = vocab.defaults.filter(d => !llms.includes('`' + d + '`'));
+ok('the spec lists every response override', missingDefaults.length === 0,
+  missingDefaults.join(', '));
+
 // -------------------------------------------------------------- referenced images
 const imgMissing = [];
 for (const src of html.values()) {

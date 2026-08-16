@@ -36,6 +36,7 @@
       <a href="#paths">Two logic paths</a>
       <a href="#loop">The authoring loop</a>
       <a href="#today">What exists today</a>
+      <a href="#agents">From another tool</a>
     </div>
     <a href="/docs/quickstart/">Your first game</a>
     <p class="grp">Making games</p>
@@ -211,6 +212,39 @@
         <strong>The gallery backend.</strong> Uploads, accounts and moderation.
       </li>
     </ul>
+
+    <h2 id="agents">Using Folio from another tool</h2>
+    <p>
+      Nothing needs to connect to us. The format is JSON with a closed vocabulary and
+      the checker is a command, which is all another program or another model needs to
+      produce a working game.
+    </p>
+    <dl class="fields">
+      <dt>the schema</dt>
+      <dd>
+        <a href="https://folio.games/schema/world-0.1.0.json">world-0.1.0.json</a>,
+        served with permissive CORS. Editor autocomplete, constrained generation, and
+        validation from any language. The validator checks against this same file.
+      </dd>
+      <dt>the compact spec</dt>
+      <dd>
+        <a href="/llms.txt">folio.games/llms.txt</a> is the whole authoring format in
+        one file, written to be read by a model in a single fetch rather than by a
+        person across seven pages. It carries the vocabularies, a complete worked
+        example, and the failures worth expecting.
+      </dd>
+      <dt>the checker</dt>
+      <dd>
+        <code>npm i -g folio-engine</code>, then <code>folio validate</code>. Exits
+        non-zero on error and names the exact path of the problem, which is what makes
+        a generate-and-check loop possible.
+      </dd>
+    </dl>
+    <p>
+      A world is data and cannot contain executable code, so validating or playing one
+      from a stranger is safe. A Path A game contains a compiled program by definition,
+      and anything running games automatically should treat the two differently.
+    </p>
 
     <h2 id="next">Where to go next</h2>
     <p>

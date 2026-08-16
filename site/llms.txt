@@ -1,0 +1,346 @@
+# Folio Game Engine
+
+> Text adventures rendered as point-and-click graphic adventures that run in a
+> browser. A game is one `.folio` file. This document is the complete authoring
+> spec: an agent that reads it should be able to produce a valid game without
+> fetching anything else.
+
+Schema: https://folio.games/schema/world-0.1.0.json
+Manual: https://folio.games/docs/
+Source: https://github.com/rdyplayerB/folio
+
+## Before you start
+
+Two things are worth knowing because they change how you should work.
+
+1. **You cannot ship a broken game.** `folio validate` replays your walkthrough
+   from a cold start and requires it to reach the ending. It also computes the
+   dependency graph and rejects worlds with dead ends. Write the walkthrough as
+   you build, not at the end.
+2. **The vocabulary is closed.** Ten conditions, fourteen effects. There is no
+   scripting and no escape hatch. If you find yourself wanting one, the answer is
+   almost always a flag.
+
+## The loop
+
+```
+npm i -g folio-engine
+folio pack my-game/ my-game.folio     # assemble
+folio validate my-game.folio          # check. do this constantly
+folio play my-game.folio              # play in the terminal
+```
+
+## A game is a directory
+
+```
+my-game/
+  manifest.json             required
+  walkthrough.folioscript   required, the proof it can be finished
+  brief.json                optional, what you were aiming for
+  logic/world.json          required for logicType "world"
+  presentation/*.js         optional, the pictures
+```
+
+### manifest.json
+
+All seven fields are mandatory.
+
+```json
+{
+  "id": "my-game",
+  "title": "My Game",
+  "author": "Name",
+  "folioVersion": "0.1.0",
+  "logicType": "world",
+  "license": "MIT",
+  "contentRating": "all-ages",
+  "capabilities": ["darkness", "timed-events", "score"],
+  "aiDisclosure": { "prose": "generated", "art": "none", "note": "Reviewed by a human." }
+}
+```
+
+- `logicType`: `world` (you write the world) or `zmachine` (an existing story file)
+- `contentRating`: `all-ages` | `teen` | `mature`
+- `license`: SPDX id, or `unknown` (playable, not hostable)
+- `capabilities`: any of `darkness`, `timed-events`, `combat`, `containers`,
+  `npc-dialogue`, `multi-save`, `custom-verbs`, `sound`, `score`
+- `aiDisclosure`: state precisely what was generated. Do not overclaim.
+
+### walkthrough.folioscript
+
+One command per line. `#` starts a comment. Runs cold, no state injection.
+
+```
+# reach the ending
+north
+take key
+expect: room HALL
+south
+unlock cellar-door
+expect: score 5
+```
+
+Assertions: `expect: room ID`, `expect: score N`, `expect: moves N`.
+Failure line numbers count **commands**, not file lines.
+
+## logic/world.json
+
+```
+{
+  "meta":   { ... },   required
+  "flags":  { ... },   optional, your named booleans
+  "rooms":  [ ... ],   required
+  "items":  [ ... ],   required, may be empty
+  "actors": [ ... ],   optional
+  "rules":  [ ... ],   optional
+  "timers": [ ... ]    optional
+}
+```
+
+### meta
+
+- `start` (required): room id the player begins in
+- `title`, `seed`, `magicWords[]`
+- `defaults`: overrides for built-in responses. Keys:
+  `blocked`, `dark`, `what`, `already`, `absent`, `fixed`, `taken`, `nothave`,
+  `dropped`, `alreadyOpen`, `locked`, `empty`, `unknown`.
+  `unknown` is the most-heard line in most games. Write it.
+
+### rooms
+
+`id` (required), `name`, `prose`, `dark`, `exits[]`
+
+### exits
+
+One way only. A return journey is a second exit on the other room.
+
+- `dir` (required): `NORTH SOUTH EAST WEST NE NW SE SW UP DOWN IN OUT`
+- `to` (required): room id
+- `condition`: blocked until it passes
+- `door`: item id, blocked while that item is closed
+- `hidden`: while blocked, vanish rather than show as blocked
+
+Three states reach the compass: a room id (open), `false` (blocked but visible),
+absent (nothing there).
+
+### items
+
+`id`, `location` (required), plus `name`, `roomProse`, `attributes`, `fuel`.
+
+`location` is a room id, another item's id (inside a container), `"PLAYER"`, or
+`"NOWHERE"`. `roomProse` appears in the room description until the item moves.
+
+Attributes the engine understands: `TAKEBIT` (can be picked up), `LIGHTSOURCE`,
+`ONBIT` (starts lit), `OPENBIT` (starts open), `TRANSPARENT` (see inside without
+opening).
+
+### actors
+
+`id`, `location` (required), plus `name`, `hostile`, `attributes`. A hostile actor
+in the room sets `fighting` in the state. It does no harm by itself.
+
+### rules
+
+The only place anything interesting happens.
+
+```json
+{
+  "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR", "room": "PORCH" },
+  "if": [ { "type": "carrying", "item": "KEY" } ],
+  "do": [ { "type": "set-flag", "flag": "doorUnlocked", "value": true } ]
+}
+```
+
+**Rules are tried in array order and the first match wins.** Put the specific case
+above the general one. A rule whose conditions fail does not block later rules, so
+the standard shape is a guarded rule followed by an unguarded fallback for the same
+trigger. That fallback is where the writing goes.
+
+### conditions (all ten)
+
+| type | fields | true when |
+|---|---|---|
+| `flag` | `flag`, `value` | flag equals value (default true) |
+| `carrying` | `item` | player holds it |
+| `in-room` | `item` | lying in the current room |
+| `present` | `item` | carried or in the room |
+| `at` | `room` | player is there |
+| `visited` | `room` | player has been there |
+| `open` | `item` | it is open |
+| `lit` | `item` | it is alight |
+| `score-at-least` | `value` | score >= value |
+| `not` | `condition` | nested condition is false |
+
+### effects (all fourteen)
+
+| type | fields | does |
+|---|---|---|
+| `print` | `text` | adds a line to the response |
+| `set-flag` | `flag`, `value` | sets a flag (default true) |
+| `take` | `item` | move to player, ignoring TAKEBIT |
+| `move-item` | `item`, `to` | to a room, `PLAYER`, a container, or `NOWHERE` |
+| `destroy` | `item` | remove from play |
+| `open` / `close` | `item` | mark open or closed |
+| `light` / `extinguish` | `item` | light it or put it out |
+| `goto` | `room` | move the player |
+| `score` | `value` | add to score (negative works) |
+| `move-actor` | `actor`, `to` | move an actor |
+| `win` | `text` | end as a win. At least one must be reachable |
+| `lose` | `text` | end as a loss |
+
+### timers
+
+Tick once per move, after the command's rule.
+
+`turns` (required), `do` (required), plus `startFlag` (do not tick until true),
+`repeat`, `fuelFor` (publish elapsed as an item's fuel used, driving the lamp gauge).
+
+### internal flags
+
+The engine keeps state in your flag namespace. Read them in conditions; do not
+write them directly.
+
+- `_open_<ITEM>` set by `open` / `close`
+- `_lit_<ITEM>` set by `light` / `extinguish`
+- `_fuelUsed_<ITEM>` maintained by a timer's `fuelFor`
+
+### built-in verbs
+
+The engine answers only: the twelve directions, `LOOK`, `TAKE`, `DROP`, `OPEN`
+(refuses or reports; cannot actually open anything), `INVENTORY`.
+
+**The player is shown eight verbs: `LOOK TAKE DROP OPEN CLOSE USE HIT SPEAK`.
+Four of them (CLOSE, USE, HIT, SPEAK) do nothing without rules.** Assume every
+verb needs writing, or half the buttons read as broken.
+
+## Complete worked example
+
+Three rooms, a locked door, a lamp that runs out, and a win. This validates.
+
+```json
+{
+  "meta": {
+    "title": "Cellar Door",
+    "start": "PORCH",
+    "defaults": {
+      "blocked": "There is no way through.",
+      "absent": "You don't see that here.",
+      "dark": "It is pitch black. Something down here does not want to be seen.",
+      "unknown": "Nothing happens."
+    }
+  },
+  "flags": { "doorUnlocked": false },
+  "rooms": [
+    { "id": "PORCH", "name": "The Porch",
+      "prose": "Paint curls off the boards. A cellar door lies flat against the ground.",
+      "exits": [
+        { "dir": "NORTH", "to": "HALL" },
+        { "dir": "DOWN", "to": "CELLAR",
+          "condition": { "type": "flag", "flag": "doorUnlocked" } }
+      ] },
+    { "id": "HALL", "name": "The Hall",
+      "prose": "A narrow hall. A hook by the door holds nothing. A side table does.",
+      "exits": [ { "dir": "SOUTH", "to": "PORCH" } ] },
+    { "id": "CELLAR", "name": "The Cellar", "dark": true,
+      "prose": "Earth floor, stone walls, and a smell like old coins.",
+      "exits": [ { "dir": "UP", "to": "PORCH" } ] }
+  ],
+  "items": [
+    { "id": "KEY", "name": "iron key", "location": "HALL",
+      "roomProse": "An iron key lies on the side table.",
+      "attributes": { "TAKEBIT": true } },
+    { "id": "LANTERN", "name": "lantern", "location": "HALL",
+      "roomProse": "A lantern hangs from the hook after all.",
+      "attributes": { "TAKEBIT": true, "LIGHTSOURCE": true }, "fuel": 40 },
+    { "id": "CELLAR-DOOR", "name": "cellar door", "location": "PORCH",
+      "attributes": {} },
+    { "id": "LOCKET", "name": "silver locket", "location": "CELLAR",
+      "roomProse": "A silver locket lies half-buried in the earth.",
+      "attributes": { "TAKEBIT": true } }
+  ],
+  "rules": [
+    { "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+      "if": [ { "type": "carrying", "item": "KEY" } ],
+      "do": [
+        { "type": "set-flag", "flag": "doorUnlocked", "value": true },
+        { "type": "print", "text": "The key turns with a sound like a cough." },
+        { "type": "score", "value": 5 }
+      ] },
+    { "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+      "do": [ { "type": "print", "text": "It is locked, and you have nothing to turn." } ] },
+    { "on": { "verb": "LIGHT", "noun": "LANTERN" },
+      "if": [ { "type": "carrying", "item": "LANTERN" } ],
+      "do": [
+        { "type": "light", "item": "LANTERN" },
+        { "type": "print", "text": "The lantern catches, and the dark backs off a step." }
+      ] },
+    { "on": { "verb": "TAKE", "noun": "LOCKET" },
+      "if": [
+        { "type": "in-room", "item": "LOCKET" },
+        { "type": "not", "condition": { "type": "flag", "flag": "_lit_LANTERN", "value": true } }
+      ],
+      "do": [ { "type": "print", "text": "You grope in the dark and find only cold earth." } ] },
+    { "on": { "verb": "TAKE", "noun": "LOCKET" },
+      "if": [ { "type": "in-room", "item": "LOCKET" } ],
+      "do": [
+        { "type": "take", "item": "LOCKET" },
+        { "type": "score", "value": 10 },
+        { "type": "win", "text": "*** You have won ***" }
+      ] }
+  ],
+  "timers": [
+    { "startFlag": "_lit_LANTERN", "fuelFor": "LANTERN", "turns": 40,
+      "do": [
+        { "type": "extinguish", "item": "LANTERN" },
+        { "type": "print", "text": "The lantern gutters once and goes out." }
+      ] }
+  ]
+}
+```
+
+Its walkthrough:
+
+```
+north
+take key
+take lantern
+south
+unlock cellar-door
+light lantern
+down
+take locket
+```
+
+## What validation will tell you
+
+Errors block; warnings are advice. Full list: https://folio.games/docs/errors/
+
+The ones you will actually hit:
+
+- `E212` your world violates the schema. The message names the exact path
+- `E310` **the win state is not reachable**. The most common first failure.
+  Either nothing declares a `win`, or a puzzle in the chain cannot be solved from
+  the start. Work backwards from the win
+- `E311` a room is unreachable. Usually a missing return exit
+- `E410` the walkthrough ran out without winning. The hint says where it stopped
+- `W500`–`W507` design opinions: too few rooms, shallow chains, a map with no
+  loops, nothing that can kill you, keys sitting next to their locks
+
+Thresholds come from measuring Zork I (82 rooms, 0.67 loops per room, 43% of
+objects takeable, a reward about every 11.5 moves). If your game is deliberately
+small or linear, ship `brief.json` and it is graded against your own intent:
+
+```json
+{ "length": "short", "difficulty": "gentle", "deadliness": "none",
+  "sprawl": "balanced", "density": "sparse" }
+```
+
+## Writing advice that the validator cannot check
+
+- Most of the world should be scenery. Zork keeps over half its objects as pure
+  texture, and that is what makes the useful ones feel chosen. A world where
+  everything matters reads as a shopping list.
+- Failure branches are where the prose lives. A guarded rule with no fallback
+  means the player who tries the right idea at the wrong time hears nothing.
+- Distance makes a puzzle. A key in the same room as its lock is a formality.
+- Foreshadow deaths. An unannounced instant death is an ambush, not a hazard.

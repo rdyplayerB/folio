@@ -1,0 +1,11 @@
+{
+  "id": "lighthouse",
+  "title": "The Lighthouse",
+  "author": "Spec eval",
+  "folioVersion": "0.1.0",
+  "logicType": "world",
+  "license": "MIT",
+  "contentRating": "all-ages",
+  "capabilities": ["darkness", "timed-events", "containers", "score"],
+  "aiDisclosure": { "prose": "generated", "art": "none", "note": "Written from llms.txt alone to test whether the spec is sufficient." }
+}

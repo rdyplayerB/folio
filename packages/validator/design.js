@@ -102,7 +102,11 @@ function audit(world, opts) {
     ? Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10 : 0;
 
   // --------------------------------------------------------------- 5. stakes
-  const hasDeath = rules.some(r => (r.do || []).some(e => e.type === 'lose'));
+  // Timers count. A hazard on a clock is the commonest way a world kills you and
+  // often the only one, so looking at rules alone told an author with a drowning
+  // timer that nothing in their world had any stakes.
+  const killsIn = (list) => (list || []).some(x => (x.do || []).some(e => e.type === 'lose'));
+  const hasDeath = killsIn(rules) || killsIn(world.timers);
   const scoringRules = rules.filter(r => (r.do || []).some(e => e.type === 'score')).length;
 
   const metrics = {

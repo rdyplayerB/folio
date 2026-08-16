@@ -1,0 +1,16 @@
+# Written against the spec, not against the engine.
+open crate
+take biscuit
+take torch
+north
+expect: room PATH
+give dog
+north
+expect: room BASE
+down
+light torch
+take oil
+expect: score 15
+up
+up
+use lamp
