@@ -1,0 +1,8 @@
+{
+  "name": "@folio/zmachine",
+  "version": "0.0.1",
+  "description": "Z-machine logic backend for the Folio engine — runs unmodified story files and projects them into the World State Contract.",
+  "license": "MIT",
+  "main": "index.js",
+  "files": ["index.js", "src/"]
+}
