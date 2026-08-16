@@ -1,0 +1,9 @@
+# Cellar Door — the proof of completability, cold start, no state injection.
+north
+take key
+take lantern
+south
+unlock cellar-door
+light lantern
+down
+take locket

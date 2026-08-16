@@ -1,0 +1,11 @@
+{
+  "id": "cellar-door",
+  "title": "Cellar Door",
+  "author": "Folio conformance suite",
+  "folioVersion": "0.1.0",
+  "logicType": "world",
+  "license": "MIT",
+  "contentRating": "all-ages",
+  "capabilities": ["darkness", "timed-events", "score"],
+  "aiDisclosure": { "prose": "none", "art": "none", "note": "Hand-authored fixture." }
+}

@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "title": "Cellar Door",
+    "start": "PORCH",
+    "seed": 1234,
+    "defaults": {
+      "blocked": "There is no way through.",
+      "absent": "You don't see that here.",
+      "taken": "Taken.",
+      "dark": "It is pitch black. Something down here does not want to be seen.",
+      "unknown": "Nothing happens."
+    }
+  },
+
+  "flags": { "doorUnlocked": false },
+
+  "rooms": [
+    {
+      "id": "PORCH",
+      "name": "The Porch",
+      "prose": "Paint curls off the boards. The front door stands open behind you; ahead, a cellar door lies flat against the ground.",
+      "exits": [
+        { "dir": "NORTH", "to": "HALL" },
+        { "dir": "DOWN", "to": "CELLAR", "condition": { "type": "flag", "flag": "doorUnlocked" } }
+      ]
+    },
+    {
+      "id": "HALL",
+      "name": "The Hall",
+      "prose": "A narrow hall, papered in a pattern that was probably flowers. A hook by the door holds nothing. A side table does.",
+      "exits": [{ "dir": "SOUTH", "to": "PORCH" }]
+    },
+    {
+      "id": "CELLAR",
+      "name": "The Cellar",
+      "prose": "Earth floor, stone walls, and a smell like old coins. Something glints in the corner.",
+      "dark": true,
+      "exits": [{ "dir": "UP", "to": "PORCH" }]
+    }
+  ],
+
+  "items": [
+    {
+      "id": "KEY",
+      "name": "iron key",
+      "location": "HALL",
+      "roomProse": "An iron key lies on the side table.",
+      "attributes": { "TAKEBIT": true }
+    },
+    {
+      "id": "LANTERN",
+      "name": "lantern",
+      "location": "HALL",
+      "roomProse": "A lantern hangs from the hook after all, half-hidden by the door.",
+      "attributes": { "TAKEBIT": true, "LIGHTSOURCE": true },
+      "fuel": 40
+    },
+    {
+      "id": "CELLAR-DOOR",
+      "name": "cellar door",
+      "location": "PORCH",
+      "attributes": {}
+    },
+    {
+      "id": "LOCKET",
+      "name": "silver locket",
+      "location": "CELLAR",
+      "roomProse": "A silver locket lies half-buried in the earth.",
+      "attributes": { "TAKEBIT": true }
+    }
+  ],
+
+  "rules": [
+    {
+      "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+      "if": [{ "type": "carrying", "item": "KEY" }],
+      "do": [
+        { "type": "set-flag", "flag": "doorUnlocked", "value": true },
+        { "type": "print", "text": "The key turns with a sound like a cough. The cellar door swings up and back." },
+        { "type": "score", "value": 5 }
+      ]
+    },
+    {
+      "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+      "do": [{ "type": "print", "text": "It is locked, and you have nothing to turn." }]
+    },
+    {
+      "on": { "verb": "LIGHT", "noun": "LANTERN" },
+      "if": [{ "type": "carrying", "item": "LANTERN" }],
+      "do": [
+        { "type": "light", "item": "LANTERN" },
+        { "type": "print", "text": "The lantern catches, and the dark backs off a step." }
+      ]
+    },
+    {
+      "on": { "verb": "TAKE", "noun": "LOCKET" },
+      "if": [
+        { "type": "in-room", "item": "LOCKET" },
+        { "type": "not", "condition": { "type": "flag", "flag": "_lit_LANTERN", "value": true } }
+      ],
+      "do": [{ "type": "print", "text": "You grope in the dark and find only cold earth." }]
+    },
+    {
+      "on": { "verb": "TAKE", "noun": "LOCKET" },
+      "if": [{ "type": "in-room", "item": "LOCKET" }],
+      "do": [
+        { "type": "take", "item": "LOCKET" },
+        { "type": "score", "value": 10 },
+        { "type": "print", "text": "You lift the locket. It is warm, which it should not be." },
+        { "type": "win", "text": "You climb back into the light holding something that was waiting for you.\n\n*** You have won ***" }
+      ]
+    }
+  ],
+
+  "timers": [
+    {
+      "startFlag": "_lit_LANTERN",
+      "fuelFor": "LANTERN",
+      "turns": 40,
+      "do": [
+        { "type": "extinguish", "item": "LANTERN" },
+        { "type": "print", "text": "The lantern gutters once and goes out." }
+      ]
+    }
+  ]
+}

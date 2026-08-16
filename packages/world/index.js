@@ -1,0 +1,357 @@
+//  @folio/world — Path B logic backend: a declarative world interpreter.
+//
+//  Runs a world.json directly. This is how a story that was never a game becomes
+//  one: there is no compiler and no scripting language, only data. A .folio can
+//  therefore never contain executable code, which is a security property worth
+//  advertising and the reason a game is safe to open from a stranger.
+//
+//  Deliberately less expressive than ZIL or Inform. A bounded model is what makes
+//  generation reliable and validation tractable: because every effect comes from a
+//  closed vocabulary, the validator can see statically everything a game can ever
+//  do. When the vocabulary genuinely cannot express something the community needs,
+//  it grows in a spec revision — with conformance fixtures keeping old games alive.
+//
+//  It emits the same World State Contract as @folio/zmachine. That is the whole
+//  point: one shell, two backends, and a cross-path parity suite to keep them
+//  honest as both evolve.
+
+'use strict';
+
+const DIRS = ['NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW', 'UP', 'DOWN', 'IN', 'OUT'];
+
+class World {
+  constructor(world, opts) {
+    opts = opts || {};
+    this.def = world;
+    this.rng = mulberry32(opts.seed !== undefined ? opts.seed : (world.meta && world.meta.seed) || 1);
+
+    this.rooms = index(world.rooms);
+    this.items = index(world.items);
+    this.actors = index(world.actors || []);
+    this.rules = world.rules || [];
+    this.timers = (world.timers || []).map(t => Object.assign({ elapsed: 0 }, t));
+
+    this.flags = Object.assign({}, world.flags);
+    this.here = world.meta.start;
+    this.moves = 0;
+    this.score = 0;
+    this.ended = null;             // null | {win:boolean, reason:string}
+    this.visited = new Set([this.here]);
+
+    // Live location per item: room id, 'PLAYER', or a container's id.
+    this.loc = {};
+    for (const it of world.items) this.loc[it.id] = it.location;
+    this.actorLoc = {};
+    for (const a of (world.actors || [])) this.actorLoc[a.id] = a.location;
+
+    this.log = [];
+  }
+
+  // -------------------------------------------------------------- contract
+  /** Project into the World State Contract — identical shape to @folio/zmachine. */
+  state() {
+    const room = this.rooms[this.here] || {};
+    const objects = [];
+    const contents = {};
+    const flags = {};
+
+    for (const id of Object.keys(this.loc)) {
+      const where = this.loc[id];
+      const item = this.items[id];
+      if (!item) continue;
+      if (where === this.here) {
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+      } else if (this.items[where] && this.loc[where] === this.here && this.isOpen(where)) {
+        // One level into open containers, matching the Z-machine projection.
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+        (contents[where] = contents[where] || []).push(id);
+      }
+    }
+    for (const id of Object.keys(this.actorLoc)) {
+      if (this.actorLoc[id] === this.here) { objects.push(id); flags[id] = this.flagsOf(id); }
+    }
+
+    const inventory = Object.keys(this.loc).filter(id => this.loc[id] === 'PLAYER');
+    for (const id of inventory) flags[id] = this.flagsOf(id);
+
+    return {
+      roomId: this.here,
+      roomName: room.name || this.here,
+      score: this.score,
+      moves: this.moves,
+      dark: this.isDark(),
+      objects,
+      inventory,
+      contents,
+      flags,
+      exits: this.exits(),
+      globals: Object.assign({}, this.flags),
+      fighting: objects.some(id => this.actors[id] && this.actors[id].hostile),
+      lampTurns: this.lampTurns()
+    };
+  }
+
+  /**
+   * Live exits, keyed by direction. Three states, not two:
+   *   "ROOM-ID"  passable now
+   *   false      the passage exists but is blocked (locked door, boarded window)
+   *   absent     no passage in that direction at all
+   *
+   * The middle state is the one worth having: it lets the compass grey out a door
+   * the player can see but cannot yet use, which is information the player needs.
+   * Path A emits it natively (Zork's boarded front door reports EAST: false), and
+   * cross-path parity is what surfaced that Path B was collapsing it. An author who
+   * genuinely wants a passage concealed marks the exit `hidden` and it disappears
+   * entirely until its condition is met.
+   */
+  exits() {
+    const room = this.rooms[this.here];
+    const out = {};
+    if (!room) return out;
+    for (const ex of (room.exits || [])) {
+      if (!DIRS.includes(ex.dir)) continue;
+      const blocked = (ex.condition && !this.test(ex.condition)) ||
+                      (ex.door && !this.isOpen(ex.door));
+      if (blocked) {
+        if (!ex.hidden) out[ex.dir] = false;
+      } else {
+        out[ex.dir] = ex.to;
+      }
+    }
+    return out;
+  }
+
+  flagsOf(id) {
+    const thing = this.items[id] || this.actors[id] || {};
+    const a = Object.assign({}, thing.attributes);
+    if (this.flags['_open_' + id] !== undefined) a.OPENBIT = !!this.flags['_open_' + id];
+    if (this.flags['_lit_' + id] !== undefined) a.ONBIT = !!this.flags['_lit_' + id];
+    return a;
+  }
+
+  isOpen(id) {
+    if (this.flags['_open_' + id] !== undefined) return !!this.flags['_open_' + id];
+    const it = this.items[id] || {};
+    return !!(it.attributes && (it.attributes.OPENBIT || it.attributes.TRANSPARENT));
+  }
+
+  isLit(id) {
+    if (this.flags['_lit_' + id] !== undefined) return !!this.flags['_lit_' + id];
+    const it = this.items[id] || {};
+    return !!(it.attributes && it.attributes.ONBIT);
+  }
+
+  isDark() {
+    const room = this.rooms[this.here] || {};
+    if (!room.dark) return false;
+    // A lit light source in the room or carried defeats the dark.
+    for (const id of Object.keys(this.loc)) {
+      const it = this.items[id];
+      if (!it || !it.attributes || !it.attributes.LIGHTSOURCE) continue;
+      if (!this.isLit(id)) continue;
+      if (this.loc[id] === 'PLAYER' || this.loc[id] === this.here) return false;
+    }
+    return true;
+  }
+
+  lampTurns() {
+    const lamp = Object.keys(this.items).find(id =>
+      this.items[id].attributes && this.items[id].attributes.LIGHTSOURCE &&
+      this.items[id].fuel !== undefined);
+    if (!lamp) return null;
+    const used = this.flags['_fuelUsed_' + lamp] || 0;
+    return Math.max(0, this.items[lamp].fuel - used);
+  }
+
+  // ---------------------------------------------------------------- command
+  /**
+   * Submit a command. Returns verbatim authored prose plus the new state.
+   * Rules are consulted first; the engine's default responses only speak when no
+   * rule matched, so authors write the interesting cases and nothing else.
+   */
+  submit(verb, noun, indirect) {
+    if (this.ended) return { prose: this.endText(), state: this.state() };
+    verb = String(verb || '').toUpperCase();
+    noun = noun ? String(noun).toUpperCase() : null;
+
+    let prose = null;
+    for (const rule of this.rules) {
+      if (!this.matches(rule, verb, noun, indirect)) continue;
+      if (rule.if && !rule.if.every(c => this.test(c))) continue;
+      prose = this.apply(rule.do || []);
+      break;
+    }
+    if (prose === null) prose = this.builtin(verb, noun);
+
+    this.moves++;
+    const timed = this.tickTimers();
+    if (timed) prose += '\n\n' + timed;
+    if (this.ended) prose += '\n\n' + this.endText();
+
+    this.log.push({ verb, noun, prose });
+    return { prose, state: this.state() };
+  }
+
+  matches(rule, verb, noun) {
+    const on = rule.on || {};
+    if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
+    if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
+    if (on.room && on.room !== this.here) return false;
+    return true;
+  }
+
+  /** Closed condition vocabulary — everything the validator must reason about. */
+  test(c) {
+    switch (c.type) {
+      case 'flag': return !!this.flags[c.flag] === (c.value === undefined ? true : !!c.value);
+      case 'carrying': return this.loc[c.item] === 'PLAYER';
+      case 'in-room': return this.loc[c.item] === this.here;
+      case 'present': return this.loc[c.item] === 'PLAYER' || this.loc[c.item] === this.here;
+      case 'at': return this.here === c.room;
+      case 'visited': return this.visited.has(c.room);
+      case 'open': return this.isOpen(c.item);
+      case 'lit': return this.isLit(c.item);
+      case 'score-at-least': return this.score >= c.value;
+      case 'not': return !this.test(c.condition);
+      default: return false;
+    }
+  }
+
+  /** Closed effect vocabulary. No scripting; a .folio can contain no code. */
+  apply(effects) {
+    const said = [];
+    for (const e of effects) {
+      switch (e.type) {
+        case 'print': said.push(e.text); break;
+        case 'set-flag': this.flags[e.flag] = e.value === undefined ? true : e.value; break;
+        case 'move-item': this.loc[e.item] = e.to; break;
+        case 'take': this.loc[e.item] = 'PLAYER'; break;
+        case 'destroy': this.loc[e.item] = 'NOWHERE'; break;
+        case 'open': this.flags['_open_' + e.item] = true; break;
+        case 'close': this.flags['_open_' + e.item] = false; break;
+        case 'light': this.flags['_lit_' + e.item] = true; break;
+        case 'extinguish': this.flags['_lit_' + e.item] = false; break;
+        case 'goto': this.here = e.room; this.visited.add(e.room); break;
+        case 'score': this.score += e.value; break;
+        case 'move-actor': this.actorLoc[e.actor] = e.to; break;
+        case 'win': this.ended = { win: true, reason: e.text || 'You have won.' }; break;
+        case 'lose': this.ended = { win: false, reason: e.text || 'You have died.' }; break;
+        default: break;   // unknown effects are inert; T1 rejects them at validation
+      }
+    }
+    return said.join('\n');
+  }
+
+  tickTimers() {
+    const fired = [];
+    for (const t of this.timers) {
+      if (t.done) continue;
+      if (t.startFlag && !this.flags[t.startFlag]) continue;
+      t.elapsed++;
+      if (t.fuelFor) this.flags['_fuelUsed_' + t.fuelFor] = t.elapsed;
+      if (t.elapsed >= t.turns) {
+        t.done = !t.repeat;
+        if (!t.repeat) t.elapsed = 0;
+        const text = this.apply(t.do || []);
+        if (text) fired.push(text);
+      }
+    }
+    return fired.join('\n');
+  }
+
+  endText() {
+    return this.ended ? this.ended.reason : '';
+  }
+
+  /** Default responses. Tone is configurable so authors only write what matters. */
+  builtin(verb, noun) {
+    const room = this.rooms[this.here] || {};
+    const tone = (this.def.meta && this.def.meta.defaults) || {};
+    if (DIRS.includes(verb)) {
+      const dest = this.exits()[verb];
+      if (!dest) return tone.blocked || 'You cannot go that way.';
+      this.here = dest;
+      this.visited.add(dest);
+      return this.describe();
+    }
+    switch (verb) {
+      case 'LOOK': return this.describe();
+      case 'TAKE': {
+        if (!noun) return tone.what || 'Take what?';
+        if (this.loc[noun] === 'PLAYER') return tone.already || 'You already have that.';
+        if (this.loc[noun] !== this.here) return tone.absent || 'You do not see that here.';
+        const it = this.items[noun] || {};
+        if (!(it.attributes && it.attributes.TAKEBIT)) return tone.fixed || 'That is not something you can carry.';
+        this.loc[noun] = 'PLAYER';
+        return tone.taken || 'Taken.';
+      }
+      case 'DROP':
+        if (this.loc[noun] !== 'PLAYER') return tone.nothave || 'You are not carrying that.';
+        this.loc[noun] = this.here;
+        return tone.dropped || 'Dropped.';
+      case 'OPEN':
+        if (!this.items[noun]) return tone.absent || 'You do not see that here.';
+        if (this.isOpen(noun)) return tone.alreadyOpen || 'It is already open.';
+        return tone.locked || 'It will not open.';
+      case 'INVENTORY': {
+        const inv = Object.keys(this.loc).filter(i => this.loc[i] === 'PLAYER');
+        if (!inv.length) return tone.empty || 'You are empty-handed.';
+        return 'You are carrying:\n' + inv.map(i => '  ' + ((this.items[i] || {}).name || i)).join('\n');
+      }
+      default:
+        return tone.unknown || 'Nothing happens.';
+    }
+  }
+
+  describe() {
+    if (this.isDark()) {
+      return (this.def.meta && this.def.meta.defaults && this.def.meta.defaults.dark) ||
+        'It is pitch black.';
+    }
+    const room = this.rooms[this.here] || {};
+    const here = Object.keys(this.loc).filter(i => this.loc[i] === this.here);
+    let out = (room.name || this.here) + '\n' + (room.prose || '');
+    for (const id of here) {
+      const it = this.items[id];
+      if (it && it.roomProse) out += '\n' + it.roomProse;
+    }
+    return out;
+  }
+}
+
+function index(list) {
+  const out = {};
+  for (const x of (list || [])) out[x.id] = x;
+  return out;
+}
+
+// Small deterministic PRNG. Determinism is not a nicety here: walkthrough replay,
+// the blind solver, and every regression transcript depend on identical runs.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Create a Path B backend. Mirrors @folio/zmachine's createBackend shape. */
+function createBackend(worldJson, opts) {
+  const def = typeof worldJson === 'string' ? JSON.parse(worldJson) :
+    Buffer.isBuffer(worldJson) ? JSON.parse(worldJson.toString('utf8')) : worldJson;
+  if (!def || !def.meta || !def.meta.start) {
+    throw new Error('@folio/world: world.json needs meta.start');
+  }
+  const w = new World(def, opts);
+  return {
+    world: w,
+    banner: (def.meta.title || 'Untitled') + '\n\n' + w.describe(),
+    state: () => w.state(),
+    submit: (verb, noun, indirect) => w.submit(verb, noun, indirect)
+  };
+}
+
+module.exports = { createBackend, World };
