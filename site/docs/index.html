@@ -246,6 +246,39 @@
       and anything running games automatically should treat the two differently.
     </p>
 
+    <h3>The MCP server</h3>
+    <p>
+      None of the above needs a connection. What a connection buys is the loop: write a
+      world, check it, read the exact failure, fix it, without a person moving files
+      between a chat window and a terminal. <code>folio-mcp</code> is a stdio MCP server
+      exposing eight tools, and it has no dependencies of its own.
+    </p>
+<pre><span class="c">// claude_desktop_config.json, or any MCP client</span>
+{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"folio"</span>: { <span class="k">"command"</span>: <span class="s">"folio-mcp"</span> }
+  }
+}</pre>
+    <div class="scroll">
+    <table>
+      <tr><th>Tool</th><th>Does</th></tr>
+      <tr><td><code>folio_spec</code></td><td>The whole authoring format in one call</td></tr>
+      <tr><td><code>folio_schema</code></td><td>The JSON Schema, for constrained generation</td></tr>
+      <tr><td><code>folio_validate</code></td><td>Check a world inline. Works on a draft with no walkthrough yet</td></tr>
+      <tr><td><code>folio_play_start</code></td><td>Boot a world and get the opening text</td></tr>
+      <tr><td><code>folio_play_send</code></td><td>Send one command, get the response and state</td></tr>
+      <tr><td><code>folio_play_end</code></td><td>Discard a session</td></tr>
+      <tr><td><code>folio_brief</code></td><td>Resolve the dials into targets</td></tr>
+      <tr><td><code>folio_calibrate</code></td><td>Derive a Path A room map from a story file</td></tr>
+    </table>
+    </div>
+    <p>
+      The play tools are the interesting pair. Point an agent at a game with the
+      walkthrough withheld and you have a blind solver, which is the check Folio cannot
+      currently make: a badge can say a path exists and cannot say a person would find
+      it. Anything that runs is Path B only, for the reason above.
+    </p>
+
     <h2 id="next">Where to go next</h2>
     <p>
       If you have never built one, start with

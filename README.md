@@ -170,6 +170,7 @@ packages/
   format/      the .folio container, the contract, the dials
   validator/   T0-T4, the corpus profiler
   cli/         folio
+  mcp/         folio-mcp, the engine as tools an agent can call
 conformance/   fixture games, cross-path parity, the corpus
 site/          folio.games
 ```
@@ -203,6 +204,28 @@ two disagree, the manual is right.
 
 There is no visual editor. You write JSON and run `folio validate`, and the manual
 documents that workflow rather than a tool that does not exist yet.
+
+## Using it from another tool
+
+Nothing needs to connect to Folio to make a Folio game. The format is JSON with a
+closed vocabulary and the checker is a command, which is all another program or
+another model needs.
+
+- **Schema**: [world-0.1.0.json](https://folio.games/schema/world-0.1.0.json), served
+  with permissive CORS. Editor autocomplete, constrained generation, validation from
+  any language. `folio validate` checks against this same file.
+- **Compact spec**: [folio.games/llms.txt](https://folio.games/llms.txt) is the whole
+  authoring format in one fetch.
+- **MCP server**: `folio-mcp` is a stdio server exposing eight tools, with no
+  dependencies. It buys a tight write-check-fix loop, and its play tools let an agent
+  work a game with the walkthrough withheld.
+
+```json
+{ "mcpServers": { "folio": { "command": "folio-mcp" } } }
+```
+
+Anything that executes is Path B only. A world is data and cannot contain code; a
+Z-machine story is a compiled program by definition.
 
 ## Contributing
 
