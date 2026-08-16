@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+
+#  Story files are somebody else's copyright. The engine runs them; the repo
+#  never carries them. Point FOLIO_ORIGIN at your own copy to run Path A tests.
+*.z1
+*.z2
+*.z3
+*.z4
+*.z5
+*.z8
