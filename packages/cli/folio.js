@@ -98,6 +98,19 @@ try {
     }
     process.exit(r.ok ? 0 : 1);
 
+  } else if (cmd === 'profile') {
+    // Reverse-engineer the recipe: replay a game's own walkthrough and measure
+    // what a design that worked actually looks like. This is where T4's thresholds
+    // come from — measured, not invented.
+    const [file] = args;
+    if (!file) throw new Error('usage: folio profile <file.folio>');
+    const { game, backend } = openGame(file);
+    const p = require('../validator/profile.js').profile(backend, game.walkthrough);
+    console.log(C.bold + game.manifest.title + C.off + C.dim + ' — measured profile' + C.off);
+    for (const [k, v] of Object.entries(p)) {
+      console.log('  ' + k.padEnd(22) + C.dim + (Array.isArray(v) ? JSON.stringify(v) : v) + C.off);
+    }
+
   } else if (cmd === 'info') {
     const [file] = args;
     if (!file) throw new Error('usage: folio info <file.folio>');
@@ -136,6 +149,7 @@ try {
     console.log('  folio validate <file.folio>    run the tiered checks');
     console.log('  folio info <file.folio>        what is inside');
     console.log('  folio play <file.folio>        play it in the terminal');
+    console.log('  folio profile <file.folio>     measure its design shape');
     process.exit(cmd ? 1 : 0);
   }
 } catch (e) {

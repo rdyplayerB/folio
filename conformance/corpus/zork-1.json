@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "Zork I, measured — not estimated. Produced by replaying the verified 350-point",
+    "walkthrough through @folio/zmachine and observing the World State Contract every",
+    "turn. Regenerate with: folio profile <game.folio>",
+    "",
+    "Read the scale-free ratios, not the absolute counts. Zork has 82 rooms because",
+    "Zork is Zork; a game adapted from a short story should not be held to that. What",
+    "transfers between games of different sizes is the SHAPE: how interconnected the",
+    "map is, how much of the world is load-bearing, how often the game pays out, and",
+    "how long it dares to make you wait."
+  ],
+
+  "game": "Zork I",
+  "release": "119 / 880429",
+  "source": "walkthrough-350.txt, 428 commands, seed 1234",
+
+  "absolute": {
+    "rooms": 82,
+    "mapEdges": 136,
+    "mapLoops": 55,
+    "objectsSeen": 88,
+    "objectsTaken": 38,
+    "moves": 493,
+    "finalScore": 350,
+    "scoreEvents": 43
+  },
+
+  "shape": {
+    "loopsPerRoom": 0.67,
+    "takeRate": 43,
+    "movesPerScoreEvent": 11.5,
+    "roomsPerScoreEvent": 1.9,
+    "meanRewardGap": 11.3,
+    "longestDrySpell": 69,
+    "pacingQuartiles": [85, 104, 71, 90]
+  },
+
+  "readings": {
+    "loopsPerRoom": "0.67 loops per room is the number that most sharply separates a real adventure map from a generated one. Zork's map is emphatically not a tree: 82 rooms carry 136 connections, so nearly every room sits on a circuit. That is what lets a player build a mental model, take a shortcut, and feel the map as a place rather than a menu.",
+    "takeRate": "Only 43% of objects the player ever sees end up carried. The majority of Zork's world is scenery, and deliberately so — a world where everything is takeable reads as a shopping list. Scenery is what makes the takeable things feel chosen.",
+    "movesPerScoreEvent": "A reward roughly every 11-12 moves across a 493-move game. Fast enough to keep faith, slow enough that arriving somewhere means something.",
+    "longestDrySpell": "69 moves — fully 14% of the game — with no reward at all. This is the single most surprising number in the profile, and the most instructive: a classic asks for far more patience than a modern designer would dare. A generated game tuned to reward constantly would feel less like Zork, not more.",
+    "pacingQuartiles": "Points earned per quarter of the run: 85 / 104 / 71 / 90. Remarkably even, with a dip in the third quarter — the mid-game slog before the endgame pays out. Not a difficulty ramp; a rhythm."
+  }
+}

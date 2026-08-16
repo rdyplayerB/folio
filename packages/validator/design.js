@@ -114,6 +114,7 @@ function audit(world, opts) {
     itemParticipation,
     roomUtility,
     mapLoops: Math.max(0, loops),
+    loopsPerRoom: rooms.length ? Math.round((Math.max(0, loops) / rooms.length) * 100) / 100 : 0,
     meanGateDistance,
     scoringMoments: scoringRules,
     hasDeathState: hasDeath
@@ -121,18 +122,42 @@ function audit(world, opts) {
 
   // ------------------------------------------------------------- the findings
   //
-  // Thresholds below are provisional and explicitly flagged as such: they become
-  // corpus-calibrated once the profiler has replayed the classics. Reporting them
-  // as measured-against-nothing would be the same overclaiming the badge language
-  // is careful to avoid.
+  // Thresholds are calibrated against conformance/corpus/zork-1.json — measured by
+  // replaying the real game, not estimated. Two of my original guesses were wrong
+  // in instructive ways, and the corrections are the point of having a corpus:
+  //
+  //   participation: guessed a 40% floor. Zork's take rate is 43%, meaning most of
+  //     its world is scenery ON PURPOSE. A world where everything is takeable reads
+  //     as a shopping list; scenery is what makes the takeable things feel chosen.
+  //     So the floor drops, and a HIGH ratio becomes its own (gentler) warning.
+  //
+  //   map loops: guessed "at least one". Zork runs 0.67 loops per room — nearly
+  //     every room sits on a circuit. A single loop in a fifty-room map is still a
+  //     corridor, so the test has to be scale-free.
+  //
+  // Scale itself is deliberately NOT taken from the corpus. Zork has 82 rooms
+  // because Zork is Zork; a game adapted from a short story should not be held to
+  // that. Absolute size comes from the source material via the Story Compiler's
+  // budget, and `opts.sourceScale` carries it when the caller knows it.
+  const scale = opts.sourceScale || {};
   const T = Object.assign({
-    minRooms: 8, minDepth: 3, minParticipation: 40, minRoomUtility: 60, minLoops: 1
+    minRooms: scale.expectedRooms ? Math.round(scale.expectedRooms * 0.6) : 8,
+    minDepth: 3,
+    minParticipation: 25,
+    maxParticipation: 90,
+    minRoomUtility: 60,
+    minLoopsPerRoom: 0.15
   }, opts.thresholds);
 
   if (metrics.rooms < T.minRooms) {
-    warn('W500', 'only ' + metrics.rooms + ' rooms',
-      'Short enough to read as a demo. If the source has more places in it, the ' +
-      'adaptation is leaving them on the floor.');
+    warn('W500', 'only ' + metrics.rooms + ' rooms' +
+      (scale.expectedRooms ? ', against ~' + scale.expectedRooms + ' the source suggests' : ''),
+      scale.expectedRooms
+        ? 'The source carries more places than the adaptation used. This is the ' +
+          'characteristic failure of compiling a long book: a hollow game that is ' +
+          'faithful to the plot and ignores the world.'
+        : 'Short enough to read as a demo. Zork I runs 82 rooms; a short story ' +
+          'need not, but a novel should not come out this size.');
   }
   if (metrics.puzzleChainDepth < T.minDepth) {
     warn('W501', 'longest puzzle chain is ' + metrics.puzzleChainDepth,
@@ -141,18 +166,27 @@ function audit(world, opts) {
   }
   if (metrics.itemParticipation < T.minParticipation) {
     warn('W502', 'only ' + metrics.itemParticipation + '% of items do anything',
-      'Most objects are scenery. Either give them a role or cut them — a player ' +
-      'who tries everything and is rewarded for nothing stops trying.');
+      'Almost nothing here is load-bearing. Zork carries a lot of scenery too — ' +
+      'only 43% of what a player sees is ever picked up — but below about a ' +
+      'quarter the world stops rewarding curiosity at all.');
+  }
+  if (metrics.itemParticipation > T.maxParticipation && metrics.items > 6) {
+    warn('W507', metrics.itemParticipation + '% of items are load-bearing — almost no scenery',
+      'A world where everything matters reads as a shopping list. Zork keeps ' +
+      'roughly half its objects as pure scenery, and that is what makes the ' +
+      'useful ones feel chosen rather than issued.');
   }
   if (metrics.roomUtility < T.minRoomUtility) {
     warn('W503', 'only ' + metrics.roomUtility + '% of rooms contain anything',
       'The rest are corridors. Empty rooms are the most common way a generated ' +
       'map inflates its size without adding a game.');
   }
-  if (metrics.mapLoops < T.minLoops) {
-    warn('W504', 'the map is a tree with no loops',
-      'Corridor maps are the signature of generated geography. Real adventure ' +
-      'maps loop, so the player can wander, return, and recognise where they are.');
+  if (metrics.loopsPerRoom < T.minLoopsPerRoom) {
+    warn('W504', 'the map runs ' + metrics.loopsPerRoom + ' loops per room' +
+      (metrics.mapLoops === 0 ? ' (a tree)' : ''),
+      'Corridor maps are the signature of generated geography. Zork runs 0.67 ' +
+      'loops per room — nearly every room sits on a circuit — which is what lets ' +
+      'a player take a shortcut and feel the map as a place rather than a menu.');
   }
   if (!metrics.hasDeathState) {
     warn('W505', 'nothing in this world can kill or defeat the player',

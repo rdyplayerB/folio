@@ -51,17 +51,39 @@ check('a shallow world is flagged as shallow', d.findings.some(f => f.code === '
   d.findings.map(f => f.code).join(','));
 check('the real game is NOT flagged as shallow', !c.findings.some(f => f.code === 'W501'));
 
-// Decorative worlds: lots of stuff, none of it load-bearing.
+// Item economy has a floor AND a ceiling, both taken from Zork's measured 43%
+// take rate. Too little load-bearing and curiosity goes unrewarded; too much and
+// the world reads as a shopping list with no scenery to make choices feel chosen.
 const scenery = cellar();
-for (let i = 0; i < 12; i++) {
+for (let i = 0; i < 20; i++) {
   scenery.items.push({ id: 'DECOR' + i, name: 'thing', location: 'HALL', attributes: {} });
 }
-check('a world of mostly-decorative items is flagged',
-  audit(scenery).findings.some(f => f.code === 'W502'),
-  audit(scenery).metrics.itemParticipation + '% participate');
+const sceneryAudit = audit(scenery);
+check('a world that is almost entirely scenery is flagged',
+  sceneryAudit.findings.some(f => f.code === 'W502'),
+  sceneryAudit.metrics.itemParticipation + '% participate');
+
+// Every item load-bearing, in a world big enough for the judgement to be fair —
+// the >6-item guard exists so a four-object fixture is not nagged about scenery.
+const shoppingList = cellar();
+for (let i = 0; i < 6; i++) {
+  shoppingList.items.push({ id: 'GEM' + i, name: 'gem', location: 'HALL',
+    attributes: { TAKEBIT: true } });
+  shoppingList.rules.push({ on: { verb: 'RUB', noun: 'GEM' + i },
+    do: [{ type: 'print', text: 'It glows.' }] });
+}
+const slAudit = audit(shoppingList);
+check('a world where EVERYTHING is load-bearing is also flagged',
+  slAudit.findings.some(f => f.code === 'W507'),
+  slAudit.metrics.itemParticipation + '% participate across ' + slAudit.metrics.items + ' items');
+
+check('but a small world is not nagged about scenery',
+  !audit(cellar()).findings.some(f => f.code === 'W507'),
+  'only ' + audit(cellar()).metrics.items + ' items — too few to judge');
 
 // Corridor maps: the signature of generated geography.
-check('a map with no loops is flagged', c.findings.some(f => f.code === 'W504'));
+check('a map with no loops is flagged', c.findings.some(f => f.code === 'W504'),
+  c.metrics.loopsPerRoom + ' loops/room vs Zork\'s 0.67');
 const looped = cellar();
 looped.rooms.push({ id: 'YARD', name: 'Yard', prose: 'Grass.', exits: [
   { dir: 'NORTH', to: 'HALL' }, { dir: 'SOUTH', to: 'PORCH' }] });
