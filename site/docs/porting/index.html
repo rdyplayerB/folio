@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Porting a game · Folio Game Engine</title>
+<meta name="description" content="Giving an existing Z-machine story file pictures and a verb grid, and the one piece of that workflow that is not built yet.">
+<link rel="canonical" href="https://folio.games/docs/porting/">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/docs.css">
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap doclayout">
+
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Your first game</a>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/">Writing a world</a>
+    <a href="/docs/porting/" aria-current="page">Porting a game</a>
+    <div class="sub">
+      <a href="#idea">What porting means</a>
+      <a href="#supply">What you supply</a>
+      <a href="#roommap">The room map</a>
+      <a href="#hard">folio calibrate</a>
+      <a href="#validate">What can be proved</a>
+      <a href="#rights">Rights and story files</a>
+    </div>
+    <a href="/docs/scenes/">Scenes and verbs</a>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/">Manifest, CLI, dials</a>
+    <a href="/docs/errors/">Finding codes</a>
+  </aside>
+
+  <article class="doc">
+    <p class="kicker">Making games</p>
+    <h1 class="display">Porting a game</h1>
+    <p class="lede">
+      Path A takes a Z-machine story file that already exists and gives it the pictures
+      and the verb grid it never had. The original binary runs unmodified and stays the
+      referee. Read the section on the room map before you commit to a game, because
+      that is where the work actually is.
+    </p>
+
+    <h2 id="idea">What porting means here</h2>
+    <p>
+      Folio does not reimplement your game, translate it, or paraphrase it. It boots the
+      actual story file in a Z-machine interpreter and reads the interpreter's live
+      memory to work out what to draw. Every parser refusal, every combat roll and every
+      piece of prose is the original's.
+    </p>
+    <p>
+      The engine only ever reads. It never writes to interpreter memory, which is what
+      makes the claim honest: the game underneath is the one people played, and the
+      pictures are a layer on top of it.
+    </p>
+    <figure>
+      <img src="/assets/img/zork-living-room.png" width="1024" height="960"
+           alt="Zork I's living room drawn in the Folio board, showing the trophy case, sword, lamp and rug as clickable pixel art with the original prose in the text pane.">
+      <figcaption>
+        Zork I running its original 1988 story file. The prose in the text pane came out
+        of the binary. The picture, the compass and the verb grid did not.
+      </figcaption>
+    </figure>
+
+    <h2 id="supply">What you supply</h2>
+    <p>A Path A game directory looks like this. The manifest declares <code>"logicType": "zmachine"</code>.</p>
+<pre>my-port/
+├── manifest.json
+├── walkthrough.folioscript
+├── logic/
+│   └── game.z3               <span class="c">the story file, unmodified</span>
+└── presentation/
+    ├── roommap.json          <span class="c">required: binds the binary to stable ids</span>
+    ├── verbmap.js            <span class="c">optional: what the buttons send</span>
+    └── scenes.js             <span class="c">optional: the pictures</span></pre>
+    <p>
+      The story file's extension must match its header. A file named <code>.z3</code>
+      whose header says version 5 is rejected with <span class="code e">E202</span>,
+      because shipping the wrong story is a mistake that otherwise surfaces in front of
+      a player.
+    </p>
+    <p>
+      Versions 3, 5 and 8 are accepted by the validator. The interpreter is a v3
+      implementation, so a v5 or v8 story will pass validation and may still fail to run.
+      Treat v3 as the supported case today.
+    </p>
+    <p>
+      <code>verbmap.js</code> and <code>scenes.js</code> are covered in
+      <a href="/docs/scenes/">Scenes and verbs</a>. They are optional in the sense that
+      the game boots without them and unplayable in the sense that a Z-machine game
+      needs a verb map to turn a click into a command its parser understands.
+    </p>
+
+    <h2 id="roommap">The room map</h2>
+    <p>
+      A Z-machine binary does not know it has rooms called anything. It has numbered
+      objects. The room map is the table that says object 27 is the kitchen, and without
+      it the engine cannot tell which scene to draw.
+    </p>
+    <p>
+      It is game data, not engine data, so it ships inside the <code>.folio</code> at
+      <code>presentation/roommap.json</code> rather than living with the engine.
+    </p>
+    <dl class="fields">
+      <dt>ROOMMAP</dt>
+      <dd>
+        <span class="t">object · checked</span>
+        Z-object number to a stable room id.
+        <code>{ "27": "KITCHEN", "33": "CELLAR" }</code>
+      </dd>
+      <dt>OBJMAP</dt>
+      <dd>
+        <span class="t">object · checked</span>
+        Z-object number to a stable object id, for everything that is not a room.
+      </dd>
+      <dt>ATTR</dt>
+      <dd>
+        <span class="t">object · checked</span>
+        ZIL flag name to attribute bit number.
+        <code>{ "TAKEBIT": 17, "OPENBIT": 11, "ONBIT": 19 }</code>
+      </dd>
+      <dt>ADVENTURER</dt>
+      <dd>
+        <span class="t">number</span>
+        The z-object number of the player object. Needed to work out what is being
+        carried rather than what is lying about.
+      </dd>
+      <dt>DIRPROP</dt>
+      <dd>
+        <span class="t">object</span>
+        Direction name to the property number that holds that exit.
+        <code>{ "NORTH": 31, "SOUTH": 28 }</code>
+      </dd>
+      <dt>EXIT_HAS_ROOM</dt>
+      <dd>
+        <span class="t">number[]</span>
+        Which exit property lengths begin with a destination room number, as opposed to a
+        refusal message or a routine. For Zork I this is <code>[1, 4, 5]</code>.
+      </dd>
+    </dl>
+    <p>
+      The validator checks that <code>ROOMMAP</code>, <code>OBJMAP</code> and
+      <code>ATTR</code> are present, and <span class="code e">E205</span> names whichever
+      is missing. The other three are not checked and their absence shows up as a game
+      that draws the wrong room or reports an empty inventory.
+    </p>
+
+    <h2 id="hard">Building it: folio calibrate</h2>
+    <p>
+      You do not write a room map by hand. <code>folio calibrate</code> reads the story
+      file and derives one, then tells you exactly which parts it could not finish.
+    </p>
+<pre><b>folio calibrate</b> logic/game.z3 -o presentation/roommap.json</pre>
+<pre>game.z3  v3 release 119 serial 880429, 250 objects
+
+  rooms           110   <span class="c">from the containment tree</span>
+  objects         137   <span class="c">3 unnamed internals skipped</span>
+  directions       13   <span class="c">61% of exits lead back, which is what named them</span>
+  player           44   <span class="c">the unplaced actor</span>
+
+  <b>attribute bits</b>
+    ✓ DOORBIT     22   <span class="c">every object named as the door of a DEXIT exit carries it</span>
+    ✓ ACTORBIT    30   <span class="c">the one actor the game never placed, and its name says who it is</span>
+    ? TAKEBIT      —   <span class="c">no reliable static signal; confirm from the census</span>
+    …</pre>
+    <p>
+      Everything structural comes out exact. Checked against Zork I, whose correct map is
+      known independently, calibration recovers all 110 rooms and nothing else, names all
+      13 direction properties correctly, and finds the player object. It is deterministic,
+      so re-running it never shuffles the map out from under your scene art.
+    </p>
+
+    <h3>Why the room ids are minted rather than discovered</h3>
+    <p>
+      This looks like it should be impossible, because short names are not unique. Zork I
+      has fifteen objects called "Maze", five called "Dead End", five stretches of
+      "Frigid River" and four patches of "Forest". Decoding names leaves you with dozens
+      of indistinguishable candidates.
+    </p>
+    <p>
+      It is only impossible if the ids already exist and have to be matched. When nobody
+      has named anything yet, the ids are yours to mint, so the fifteen maze rooms become
+      <code>MAZE-1</code> through <code>MAZE-15</code> and it does not matter which
+      physical room got which number. The numbering is stable for a given binary, which
+      is the property that actually matters.
+    </p>
+    <p>
+      Rooms are found through the containment tree rather than by guessing from exit
+      shape. ZIL declares every room inside one pseudo-object, and its children are the
+      map exactly. Directions are named by reciprocity: under a correct assignment,
+      walking north and then south brings you back most of the time, and under a wrong
+      one it almost never does.
+    </p>
+
+    <h3>The eight flags you finish by hand</h3>
+    <div class="note">
+      <span class="tag">About two minutes of work</span>
+      <p>
+        Attribute bit numbers are assigned per game by the compiler, and nothing in a
+        compiled object table says which bit means "the player may pick this up". Two
+        flags leave a clean trace and are derived. The other eight are reported as a
+        census instead of guessed, because a wrong <code>TAKEBIT</code> means the engine
+        believes nothing in the game can be picked up, and that is not a thing to
+        discover from a player.
+      </p>
+    </div>
+    <p>
+      The census lists every attribute bit with the names of the objects carrying it,
+      which makes the answers obvious on sight:
+    </p>
+<pre>    bit 17  n=60   jade figurine, torch, lunch, matchbook, crystal trident
+    bit 18  n=20   altar, pedestal, brown sack, jewel-encrusted egg, basket
+    bit 19  n=36   Temple, Up a Tree, torch, Land of the Dead, Rocky Ledge
+    bit 12  n=5    wooden door, basket, glass bottle, trophy case
+    bit 31  n=3    torch, pair of candles, brass lantern</pre>
+    <p>
+      That is <code>TAKEBIT</code>, <code>CONTBIT</code>, <code>ONBIT</code>,
+      <code>TRANSBIT</code> and <code>LIGHTBIT</code> in order, and you can read them off
+      without knowing anything about the game. Write the bit numbers into
+      <code>ATTR</code>, delete the <code>_confirm</code> block the tool left in the file,
+      and the map is complete.
+    </p>
+    <div class="gap">
+      <span class="tag">Tested against one game</span>
+      <p>
+        Calibration has been verified against Zork I, because that is the only story file
+        with an independently known-correct map. The techniques it uses are ZIL library
+        conventions rather than Zork facts, so it should hold across Infocom v3 titles,
+        but treat a first run on a new game as something to check rather than trust.
+        Version 3 only.
+      </p>
+    </div>
+
+    <h2 id="validate">What can be proved about a port</h2>
+    <p>
+      Less than for a world you wrote, and the badge says so rather than pretending
+      otherwise.
+    </p>
+    <div class="scroll">
+    <table>
+      <tr><th>Tier</th><th>Path A</th><th>Why</th></tr>
+      <tr><td>T0 schema</td><td>Runs</td><td>The manifest is just data</td></tr>
+      <tr><td>T1 integrity</td><td>Runs</td><td>Story header, room map keys and assets are checkable</td></tr>
+      <tr><td>T2 graph</td><td>Not run</td><td>A compiled binary's dependency graph cannot be read, only explored</td></tr>
+      <tr><td>T3 replay</td><td>Not run</td><td>Depends on T2 having passed</td></tr>
+      <tr><td>T4 design</td><td>Not run</td><td>Depends on a readable world</td></tr>
+    </table>
+    </div>
+    <p>
+      So a Path A game reaches <strong>valid</strong> and not <strong>playable</strong>.
+      Every validate run prints which tiers it actually performed and which it skipped,
+      because a badge implying more verification than was done is the one thing that would
+      discredit certification entirely.
+    </p>
+    <p>
+      Recovering a graph by exploration is real work rather than a shortcut, and it is
+      staged rather than faked. Until it exists, a port carries a walkthrough that a human
+      wrote and nothing mechanical vouches for it.
+    </p>
+
+    <h2 id="rights">Rights, and where story files come from</h2>
+    <p>
+      <strong>Folio ships no game data.</strong> There is no story file in this repository
+      and there never will be. That is the same posture ScummVM has held for twenty years
+      and the reason it survived a legal challenge that a less careful project would not
+      have.
+    </p>
+    <p>
+      You supply the story file, and you are responsible for having the right to. The
+      manifest's <code>license</code> field is where you declare it. A game whose licence
+      is <code>"unknown"</code> is playable locally but the gallery will not host it, and
+      validation warns with <span class="code w">W105</span> rather than failing, because
+      an undeclared licence is a distribution problem and not a broken game.
+    </p>
+    <p>
+      Note that a permissive source licence is not permission to use a name. Some classic
+      games have had their source released while their titles remain live trademarks, so
+      the safe framing for a port is what the game is rather than what it is called.
+    </p>
+    <p>
+      Path A tests in this repository skip loudly when no story file is supplied rather
+      than failing, and print how to point them at one. A suite that silently reports
+      success while testing half of what it claims is worse than one that fails, because
+      nobody investigates a green run.
+    </p>
+
+    <div class="pager">
+      <a href="/docs/world/">← Writing a world</a>
+      <a class="nx" href="/docs/scenes/">Scenes and verbs →</a>
+    </div>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script src="/assets/starfield.js"></script>
+</body>
+</html>

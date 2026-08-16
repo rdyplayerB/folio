@@ -11,9 +11,13 @@
 <link rel="stylesheet" href="/assets/site.css">
 <style>
   .intro{padding:58px 0 10px;max-width:66ch}
-  .steps{counter-reset:s;display:grid;gap:18px;margin-top:6px}
+  /* minmax(0,1fr) and min-width:0 because a grid track defaults to min-content,
+     so the widest <pre> inside a step was propping the whole column open and
+     pushing the page sideways on a phone. The pre scrolls itself; the track has
+     to be allowed to be narrower than it. */
+  .steps{counter-reset:s;display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:6px}
   .step{border:1px solid rgba(232,228,218,.22);background:var(--panel);
-    padding:24px 26px 24px 74px;position:relative;
+    padding:24px 26px 24px 74px;position:relative;min-width:0;
     box-shadow:0 3px 0 rgba(0,0,0,.55), 0 10px 24px rgba(0,0,0,.45)}
   .step::before{counter-increment:s;content:counter(s);position:absolute;left:26px;top:25px;
     width:30px;height:30px;background:var(--gold);color:#20140a;

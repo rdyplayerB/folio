@@ -1,13 +1,13 @@
 {
   "name": "folio",
   "private": true,
-  "description": "Folio Game Engine \u2014 text adventures rendered as point-and-click graphic adventures you play in a browser.",
+  "description": "Folio Game Engine · old and new adventures, rebuilt as point-and-click games you play in a browser.",
   "license": "MIT",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/format/test/brief.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node packages/validator/test/design.js && node conformance/parity.js",
+    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/format/test/brief.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node packages/validator/test/design.js && node conformance/parity.js && node conformance/calibrate.js && node tools/check-docs.js",
     "build": "node tools/build-full-player.js",
     "test:browser": "node tools/build-player.js && node tools/test-player.js",
     "build:lite": "node tools/build-player.js"

@@ -1,0 +1,184 @@
+/*  docs.css — the manual's furniture.
+ *
+ *  The rest of the site is a poster: things are placed to be looked at. The
+ *  manual is the one part that gets read line by line, and it needs different
+ *  rules. Everything here is in service of a developer scanning for the one
+ *  field they need, finding it, and getting back to their editor.
+ *
+ *  Shared by every page under /docs/ so a new page inherits the whole system and
+ *  cannot drift. Page-specific CSS is a smell here; if a page needs something,
+ *  it probably belongs in this file.
+ */
+
+/* ------------------------------------------------------------------ layout */
+.doclayout{
+  display:grid;grid-template-columns:232px minmax(0,1fr);gap:44px;
+  padding:44px 0 0;align-items:start;
+}
+@media (max-width:1000px){
+  .doclayout{grid-template-columns:1fr;gap:20px;padding-top:34px}
+}
+
+/* ----------------------------------------------------------------- sidebar */
+.docnav{position:sticky;top:70px;font-size:14px}
+@media (max-width:1000px){
+  .docnav{position:static;background:var(--panel);border:1px solid rgba(232,228,218,.16);padding:18px 20px}
+}
+.docnav .grp{
+  font:600 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--gold);margin:22px 0 9px;
+}
+.docnav .grp:first-child{margin-top:0}
+.docnav a{
+  display:block;padding:6px 0 6px 13px;color:var(--gray);text-decoration:none;
+  border-left:1px solid rgba(155,155,164,.28);line-height:1.4;
+}
+.docnav a:hover{color:var(--paper);border-left-color:var(--gold)}
+/* The page you are on, and the anchors within it, are the only things indented
+   further. Depth in the nav should mean depth in the document, nothing else. */
+.docnav a[aria-current]{color:var(--paper);border-left-color:var(--gold);font-weight:600}
+.docnav .sub{margin:2px 0 8px}
+.docnav .sub a{
+  padding:4px 0 4px 26px;font-size:13px;border-left-color:rgba(155,155,164,.18);
+}
+
+/* ----------------------------------------------------------------- article */
+/*  Documentation sits on a solid panel rather than directly on the starfield.
+ *  Stars behind running text are atmosphere on a poster and grit in a manual. */
+.doc{
+  max-width:calc(78ch + 80px);min-width:0;
+  background:var(--panel);border:1px solid rgba(232,228,218,.16);
+  padding:36px 40px 48px;
+  box-shadow:0 3px 0 rgba(0,0,0,.55), 0 10px 24px rgba(0,0,0,.45);
+}
+@media (max-width:620px){.doc{padding:26px 20px 34px}}
+
+.doc h2{
+  font:italic 700 25px/1.28 var(--slab);color:var(--palegold);
+  margin:52px 0 15px;padding-top:20px;border-top:1px solid rgba(155,155,164,.28);
+  scroll-margin-top:72px;
+}
+.doc h3{
+  font:italic 700 19px/1.3 var(--slab);color:var(--paper);
+  margin:32px 0 10px;scroll-margin-top:72px;
+}
+.doc h4{
+  font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold);margin:26px 0 10px;
+}
+.doc p,.doc li{font-size:15.5px}
+.doc ul,.doc ol{padding-left:22px;margin:12px 0}
+.doc li{margin:7px 0}
+.doc strong{color:var(--paper)}
+.doc a{color:var(--palegold);text-underline-offset:3px}
+.doc a:hover{color:var(--gold)}
+.doc hr{border:0;border-top:1px solid rgba(155,155,164,.22);margin:34px 0}
+
+/* ------------------------------------------------------------------ tables */
+/*  Wrapped in .scroll so a wide reference table scrolls inside itself. Letting
+ *  it push the page sideways is the failure that makes a docs page unusable on
+ *  a phone, and it is invisible until somebody opens it on one. */
+.scroll{overflow-x:auto;margin:16px 0;-webkit-overflow-scrolling:touch}
+.doc table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:480px}
+.doc th{
+  text-align:left;font:600 10px/1.5 var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--gold);padding:0 16px 9px 0;
+  border-bottom:1px solid rgba(155,155,164,.34);white-space:nowrap;
+}
+.doc td{
+  padding:9px 16px 9px 0;border-bottom:1px solid rgba(155,155,164,.14);
+  vertical-align:top;color:rgba(232,228,218,.82);
+}
+.doc td:first-child{white-space:nowrap;color:var(--paper)}
+.doc tr:last-child td{border-bottom:0}
+.doc td code,.doc th code{white-space:nowrap}
+
+/* --------------------------------------------------------------- callouts */
+.note{
+  border-left:3px solid var(--gold);background:rgba(242,167,27,.07);
+  padding:15px 20px;margin:20px 0;
+}
+/*  A separate colour for "this does not exist yet". Documentation that describes
+ *  an unbuilt feature in the same voice as a built one is how a project loses a
+ *  developer's trust in one afternoon, so the difference is visual, not just
+ *  worded. */
+.gap{
+  border-left:3px solid var(--crimson);background:rgba(163,37,43,.12);
+  padding:15px 20px;margin:20px 0;
+}
+.gap .tag,.note .tag{
+  display:block;font:600 10px/1 var(--mono);letter-spacing:.18em;
+  text-transform:uppercase;margin:0 0 8px;
+}
+.gap .tag{color:#e0666b}
+.note .tag{color:var(--gold)}
+.note p,.gap p{margin:0 0 9px;font-size:14.5px}
+.note p:last-child,.gap p:last-child{margin-bottom:0}
+
+/* ---------------------------------------------------------------- figures */
+figure{margin:24px 0}
+figure img{
+  display:block;width:100%;height:auto;
+  /* These are 8-bit screens. Smoothing them on the way up is the one thing that
+     makes a pixel screenshot look wrong. */
+  image-rendering:pixelated;
+  border:3px solid var(--bezel);border-radius:14px;background:#000;
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.8), 0 3px 0 rgba(0,0,0,.55), 0 10px 26px rgba(0,0,0,.5);
+}
+figcaption{
+  font:12.5px/1.6 var(--mono);color:var(--dimgray);margin-top:11px;
+  letter-spacing:.02em;
+}
+.figs{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin:24px 0}
+.figs figure{margin:0}
+@media (max-width:700px){.figs{grid-template-columns:1fr}}
+
+/* --------------------------------------------------- field reference lists */
+/*  The shape most of this manual is made of: a name, its type, and what it does.
+ *  A table would wrap the description into a two-inch column; this keeps the
+ *  name scannable down the left and gives the prose the full measure. */
+.fields{display:grid;grid-template-columns:auto 1fr;gap:0;margin:16px 0}
+.fields dt{
+  font:13px/1.5 var(--mono);color:var(--gold);padding:10px 20px 10px 0;
+  border-top:1px solid rgba(155,155,164,.16);white-space:nowrap;
+}
+.fields dd{
+  margin:0;padding:10px 0;border-top:1px solid rgba(155,155,164,.16);
+  color:rgba(232,228,218,.82);font-size:14.5px;
+}
+.fields dt:first-of-type,.fields dt:first-of-type + dd{border-top:0}
+.fields dd .t{
+  display:inline-block;font:11px/1 var(--mono);color:var(--dimgray);
+  letter-spacing:.08em;text-transform:uppercase;margin-right:9px;
+}
+.fields dd b{color:var(--paper);font-weight:600}
+@media (max-width:620px){
+  .fields{grid-template-columns:1fr}
+  .fields dt{padding-bottom:2px}
+  .fields dd{padding-top:2px;border-top:0}
+  .fields dt:first-of-type + dd{border-top:0}
+}
+
+/* --------------------------------------------------------------- code bits */
+.doc pre{margin:14px 0 18px}
+.doc pre .c{color:var(--dimgray)}          /* comment */
+.doc pre .s{color:var(--green)}            /* string */
+.doc pre .k{color:var(--palegold)}         /* key */
+
+/* A finding code, used inline and as a heading anchor in the error reference. */
+.code{
+  font:600 12px/1 var(--mono);letter-spacing:.06em;padding:3px 7px;
+  border:1px solid rgba(232,228,218,.28);color:var(--paper);white-space:nowrap;
+}
+.code.e{border-color:rgba(216,85,90,.5);color:#f0a2a5}
+.code.w{border-color:rgba(242,167,27,.45);color:var(--palegold)}
+
+/* ------------------------------------------------------------- next/prev */
+.pager{display:flex;gap:16px;justify-content:space-between;margin-top:54px;
+  padding-top:22px;border-top:1px solid rgba(155,155,164,.28);flex-wrap:wrap}
+.pager a{
+  font:600 11px/1.5 var(--mono);letter-spacing:.13em;text-transform:uppercase;
+  color:var(--gray);text-decoration:none;
+}
+.pager a:hover{color:var(--gold)}
+.pager .nx{margin-left:auto;text-align:right}

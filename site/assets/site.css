@@ -93,6 +93,26 @@ a{color:inherit}
   .banner nav a.hide-sm{display:none}
   .banner .mark{letter-spacing:.2em}
 }
+/* Below this the wordmark and three nav links stop fitting on one line, and the
+   banner was quietly pushing the whole page sideways on a phone. It went unseen
+   for a while because the layout checks only measured inside <main>, where
+   nothing was wrong. Buy the width back from tracking and type size rather than
+   dropping another link, since what is left is already the minimum. */
+@media (max-width:560px){
+  .wrap{padding:0 18px}
+  .banner .wrap{gap:10px}
+  .banner nav{gap:11px}
+  .banner .mark{font-size:11px;letter-spacing:.12em}
+  .banner nav a{font-size:10px;letter-spacing:.1em}
+}
+@media (max-width:400px){
+  .banner .wrap{gap:8px}
+  .banner nav{gap:9px}
+  /* Tracking goes before the links do. Three destinations is already the whole
+     site, so dropping one to save pixels would cost more than it buys. */
+  .banner .mark{font-size:10px;letter-spacing:0}
+  .banner nav a{font-size:9.5px;letter-spacing:.06em}
+}
 
 /* -------------------------------------------------------------------- type */
 h1,h2,h3{text-wrap:balance;margin:0}
@@ -189,9 +209,14 @@ p{color:rgba(232,228,218,.82)}
 }
 .card h3{font:italic 700 20px/1.25 var(--slab);color:var(--palegold);margin:0 0 10px}
 .card p{margin:0 0 14px;font-size:15px}
-.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-.cols-3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-@media (max-width:880px){.cols-2,.cols-3{grid-template-columns:1fr}}
+/* minmax(0,1fr), not 1fr. A grid track is min-content wide by default, so a card
+   holding a wide <pre> props its whole column open and pushes the page sideways.
+   The pre already scrolls itself; the track just has to be allowed to be
+   narrower than its contents. */
+.card{min-width:0}
+.cols-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
+.cols-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+@media (max-width:880px){.cols-2,.cols-3{grid-template-columns:minmax(0,1fr)}}
 
 code,kbd{font-family:var(--mono);font-size:.9em;color:var(--palegold)}
 pre{

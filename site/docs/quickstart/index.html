@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Your first game · Folio Game Engine</title>
+<meta name="description" content="Build a complete, playable, validated Folio game from an empty directory in about ten minutes.">
+<link rel="canonical" href="https://folio.games/docs/quickstart/">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/docs.css">
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap doclayout">
+
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/" aria-current="page">Your first game</a>
+    <div class="sub">
+      <a href="#install">Install</a>
+      <a href="#room">One room</a>
+      <a href="#pack">Pack and play</a>
+      <a href="#second">A second room</a>
+      <a href="#rules">Rules and the win</a>
+      <a href="#lock">A locked door</a>
+      <a href="#dark">Darkness and a lamp</a>
+      <a href="#walkthrough">The walkthrough</a>
+      <a href="#review">Reading the review</a>
+    </div>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/">Writing a world</a>
+    <a href="/docs/porting/">Porting a game</a>
+    <a href="/docs/scenes/">Scenes and verbs</a>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/">Manifest, CLI, dials</a>
+    <a href="/docs/errors/">Finding codes</a>
+  </aside>
+
+  <article class="doc">
+    <p class="kicker">Getting started</p>
+    <h1 class="display">Your first game</h1>
+    <p class="lede">
+      From an empty directory to a playable, validated <code>.folio</code>. Everything
+      here is plain JSON in your own text editor, because that is the whole toolchain
+      today. About ten minutes.
+    </p>
+
+    <h2 id="install">Install</h2>
+<pre><b>npm i -g folio-engine</b>
+<b>folio</b>            <span class="c"># prints the six commands</span></pre>
+    <p>
+      You can also run it out of a clone with
+      <code>node packages/cli/folio.js</code>, which is what the examples in this manual
+      were checked against.
+    </p>
+
+    <h2 id="room">One room</h2>
+    <p>
+      A game is a directory. Two files are mandatory and everything else is optional, so
+      start with the smallest thing that can exist.
+    </p>
+<pre>porch/
+├── manifest.json
+├── walkthrough.folioscript
+└── logic/
+    └── world.json</pre>
+
+    <h4>manifest.json</h4>
+    <p>
+      Seven fields are mandatory. The validator will tell you if you miss one, and
+      <a href="/docs/reference/#manifest">the manifest reference</a> explains each.
+    </p>
+<pre>{
+  <span class="k">"id"</span>: <span class="s">"porch"</span>,
+  <span class="k">"title"</span>: <span class="s">"Porch"</span>,
+  <span class="k">"author"</span>: <span class="s">"You"</span>,
+  <span class="k">"folioVersion"</span>: <span class="s">"0.1.0"</span>,
+  <span class="k">"logicType"</span>: <span class="s">"world"</span>,
+  <span class="k">"license"</span>: <span class="s">"MIT"</span>,
+  <span class="k">"contentRating"</span>: <span class="s">"all-ages"</span>
+}</pre>
+
+    <h4>logic/world.json</h4>
+    <p>
+      This is the game. <code>meta.start</code> names the room the player wakes up in,
+      and it has to be a real room id or nothing will boot.
+    </p>
+<pre>{
+  <span class="k">"meta"</span>: { <span class="k">"title"</span>: <span class="s">"Porch"</span>, <span class="k">"start"</span>: <span class="s">"PORCH"</span> },
+  <span class="k">"rooms"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"PORCH"</span>,
+      <span class="k">"name"</span>: <span class="s">"The Porch"</span>,
+      <span class="k">"prose"</span>: <span class="s">"Paint curls off the boards. A cellar door lies flat against the ground."</span>,
+      <span class="k">"exits"</span>: []
+    }
+  ],
+  <span class="k">"items"</span>: [],
+  <span class="k">"rules"</span>: []
+}</pre>
+
+    <h4>walkthrough.folioscript</h4>
+    <p>One command for now. This file is the proof the game can be finished.</p>
+<pre>look</pre>
+
+    <h2 id="pack">Pack it, and get told off</h2>
+<pre><b>folio pack</b> porch/ porch.folio
+<span class="c">packed porch.folio  947 bytes</span>
+
+<b>folio validate</b> porch.folio</pre>
+<pre>WARNING W106  no aiDisclosure block
+ERROR   E310  the win state is not reachable
+        No sequence of reachable actions fires a "win" effect. Either a puzzle
+        has no solution from the start state, or nothing declares a win.
+
+INVALID  porch.folio  1 error
+  ran T0, T1, T2. Not checked: T3, T4</pre>
+    <p>
+      That is the point of the thing, arriving in the first thirty seconds. A world with
+      no ending is not a game, so the validator refuses it before you have written a
+      second room. It also stops after T2 rather than pretending it checked more.
+    </p>
+    <p>It will still play, though. Validation gates the badge, not the engine.</p>
+<pre><b>folio play</b> porch.folio
+
+<span class="c">Porch
+
+The Porch
+Paint curls off the boards. A cellar door lies flat against the ground.</span>
+
+PORCH  0/0 &gt; </pre>
+    <p>
+      The prompt shows the room id, the score and the move count. Everything you type
+      goes to the same place the verb buttons send in the browser, so the terminal is a
+      real play session and not a debug mode.
+    </p>
+
+    <h2 id="second">A second room, and something to pick up</h2>
+    <p>
+      Exits are declared per room and are one way. If you want to walk back, say so.
+      Items live in a room by id, and <code>TAKEBIT</code> is what makes one portable.
+    </p>
+<pre>  <span class="k">"rooms"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"PORCH"</span>,
+      <span class="k">"name"</span>: <span class="s">"The Porch"</span>,
+      <span class="k">"prose"</span>: <span class="s">"Paint curls off the boards. A cellar door lies flat against the ground."</span>,
+      <span class="k">"exits"</span>: [{ <span class="k">"dir"</span>: <span class="s">"NORTH"</span>, <span class="k">"to"</span>: <span class="s">"HALL"</span> }]
+    },
+    {
+      <span class="k">"id"</span>: <span class="s">"HALL"</span>,
+      <span class="k">"name"</span>: <span class="s">"The Hall"</span>,
+      <span class="k">"prose"</span>: <span class="s">"A narrow hall. A side table holds something."</span>,
+      <span class="k">"exits"</span>: [{ <span class="k">"dir"</span>: <span class="s">"SOUTH"</span>, <span class="k">"to"</span>: <span class="s">"PORCH"</span> }]
+    }
+  ],
+  <span class="k">"items"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"KEY"</span>,
+      <span class="k">"name"</span>: <span class="s">"iron key"</span>,
+      <span class="k">"location"</span>: <span class="s">"HALL"</span>,
+      <span class="k">"roomProse"</span>: <span class="s">"An iron key lies on the side table."</span>,
+      <span class="k">"attributes"</span>: { <span class="k">"TAKEBIT"</span>: <span class="k">true</span> }
+    }
+  ],</pre>
+    <p>
+      <code>name</code> is what the player is shown. <code>roomProse</code> is the line
+      that appears in the room description while the item is still lying there, and it
+      stops appearing once the item moves. Writing both is what makes a room read like
+      prose rather than like an inventory listing.
+    </p>
+
+    <h2 id="rules">Rules, and an ending</h2>
+    <p>
+      A rule is the only place a Folio world does anything interesting. It matches a
+      command, optionally tests some conditions, and then applies effects. Everything you
+      do not write a rule for falls through to the engine's built-in behaviour.
+    </p>
+<pre>  <span class="k">"rules"</span>: [
+    {
+      <span class="k">"on"</span>: { <span class="k">"verb"</span>: <span class="s">"TAKE"</span>, <span class="k">"noun"</span>: <span class="s">"KEY"</span> },
+      <span class="k">"if"</span>: [{ <span class="k">"type"</span>: <span class="s">"in-room"</span>, <span class="k">"item"</span>: <span class="s">"KEY"</span> }],
+      <span class="k">"do"</span>: [
+        { <span class="k">"type"</span>: <span class="s">"take"</span>, <span class="k">"item"</span>: <span class="s">"KEY"</span> },
+        { <span class="k">"type"</span>: <span class="s">"score"</span>, <span class="k">"value"</span>: 10 },
+        { <span class="k">"type"</span>: <span class="s">"print"</span>, <span class="k">"text"</span>: <span class="s">"The key is colder than the room."</span> },
+        { <span class="k">"type"</span>: <span class="s">"win"</span>, <span class="k">"text"</span>: <span class="s">"*** You have won ***"</span> }
+      ]
+    }
+  ]</pre>
+    <p>
+      Update the walkthrough to match, because it now has to reach that ending.
+    </p>
+<pre><span class="c"># north, then take the key</span>
+north
+take key</pre>
+<pre><b>folio validate</b> porch.folio
+
+PLAYABLE  porch.folio  T0+T1+T2+T3+T4 passed with 6 warnings
+  completed in 2 moves for 10 points, 100% of rooms visited
+  ran T0, T1, T2, T3, T4</pre>
+    <p>
+      That is a complete game. It is a bad one, and the six warnings say so, but the
+      engine will run it and the validator will vouch that it can be finished.
+    </p>
+
+    <h2 id="lock">A locked door</h2>
+    <p>
+      Gating is the one pattern worth learning properly, because almost every puzzle is
+      a variation on it. An exit carries a <code>condition</code>, a rule sets the flag
+      that satisfies it, and the flag is the only thing connecting them.
+    </p>
+<pre><span class="c">// at the top level, next to "rooms"</span>
+<span class="k">"flags"</span>: { <span class="k">"doorUnlocked"</span>: <span class="k">false</span> },</pre>
+<pre><span class="c">// on the PORCH room</span>
+<span class="k">"exits"</span>: [
+  { <span class="k">"dir"</span>: <span class="s">"NORTH"</span>, <span class="k">"to"</span>: <span class="s">"HALL"</span> },
+  { <span class="k">"dir"</span>: <span class="s">"DOWN"</span>, <span class="k">"to"</span>: <span class="s">"CELLAR"</span>,
+    <span class="k">"condition"</span>: { <span class="k">"type"</span>: <span class="s">"flag"</span>, <span class="k">"flag"</span>: <span class="s">"doorUnlocked"</span> } }
+]</pre>
+<pre><span class="c">// two rules, and the order matters</span>
+{
+  <span class="k">"on"</span>: { <span class="k">"verb"</span>: <span class="s">"UNLOCK"</span>, <span class="k">"noun"</span>: <span class="s">"CELLAR-DOOR"</span> },
+  <span class="k">"if"</span>: [{ <span class="k">"type"</span>: <span class="s">"carrying"</span>, <span class="k">"item"</span>: <span class="s">"KEY"</span> }],
+  <span class="k">"do"</span>: [
+    { <span class="k">"type"</span>: <span class="s">"set-flag"</span>, <span class="k">"flag"</span>: <span class="s">"doorUnlocked"</span>, <span class="k">"value"</span>: <span class="k">true</span> },
+    { <span class="k">"type"</span>: <span class="s">"print"</span>, <span class="k">"text"</span>: <span class="s">"The key turns with a sound like a cough."</span> },
+    { <span class="k">"type"</span>: <span class="s">"score"</span>, <span class="k">"value"</span>: 5 }
+  ]
+},
+{
+  <span class="k">"on"</span>: { <span class="k">"verb"</span>: <span class="s">"UNLOCK"</span>, <span class="k">"noun"</span>: <span class="s">"CELLAR-DOOR"</span> },
+  <span class="k">"do"</span>: [{ <span class="k">"type"</span>: <span class="s">"print"</span>, <span class="k">"text"</span>: <span class="s">"It is locked, and you have nothing to turn."</span> }]
+}</pre>
+    <div class="note">
+      <span class="tag">The first matching rule wins</span>
+      <p>
+        Rules are tried in array order and the first one whose trigger and conditions all
+        pass is the only one that runs. So the specific case goes first and the general
+        one goes last, exactly like the two rules above. Put them the other way round and
+        the door never unlocks, which is the most common bug in a hand-written world.
+      </p>
+    </div>
+    <p>
+      That second rule is also what stops the game feeling like a form. Without it,
+      trying to unlock the door without the key falls through to
+      <code>"Nothing happens."</code>, and the player learns nothing. The failure branch
+      is where the writing goes.
+    </p>
+
+    <h2 id="dark">Darkness and a lamp</h2>
+    <p>
+      Mark a room <code>dark</code> and it stays unreadable until a lit light source is
+      in it or carried. That is engine behaviour, so all you supply is the lamp.
+    </p>
+<pre><span class="c">// the room</span>
+{ <span class="k">"id"</span>: <span class="s">"CELLAR"</span>, <span class="k">"name"</span>: <span class="s">"The Cellar"</span>, <span class="k">"dark"</span>: <span class="k">true</span>,
+  <span class="k">"prose"</span>: <span class="s">"Earth floor, stone walls, and a smell like old coins."</span>,
+  <span class="k">"exits"</span>: [{ <span class="k">"dir"</span>: <span class="s">"UP"</span>, <span class="k">"to"</span>: <span class="s">"PORCH"</span> }] }
+
+<span class="c">// the lamp: LIGHTSOURCE makes it count, fuel makes it run out</span>
+{ <span class="k">"id"</span>: <span class="s">"LANTERN"</span>, <span class="k">"name"</span>: <span class="s">"lantern"</span>, <span class="k">"location"</span>: <span class="s">"HALL"</span>,
+  <span class="k">"attributes"</span>: { <span class="k">"TAKEBIT"</span>: <span class="k">true</span>, <span class="k">"LIGHTSOURCE"</span>: <span class="k">true</span> },
+  <span class="k">"fuel"</span>: 40 }
+
+<span class="c">// lighting it is a rule, because the engine has no opinion about how</span>
+{ <span class="k">"on"</span>: { <span class="k">"verb"</span>: <span class="s">"LIGHT"</span>, <span class="k">"noun"</span>: <span class="s">"LANTERN"</span> },
+  <span class="k">"if"</span>: [{ <span class="k">"type"</span>: <span class="s">"carrying"</span>, <span class="k">"item"</span>: <span class="s">"LANTERN"</span> }],
+  <span class="k">"do"</span>: [
+    { <span class="k">"type"</span>: <span class="s">"light"</span>, <span class="k">"item"</span>: <span class="s">"LANTERN"</span> },
+    { <span class="k">"type"</span>: <span class="s">"print"</span>, <span class="k">"text"</span>: <span class="s">"The lantern catches, and the dark backs off a step."</span> }
+  ] }
+
+<span class="c">// and a timer burns the fuel down, which drives the gauge in the status bar</span>
+<span class="k">"timers"</span>: [
+  { <span class="k">"startFlag"</span>: <span class="s">"_lit_LANTERN"</span>, <span class="k">"fuelFor"</span>: <span class="s">"LANTERN"</span>, <span class="k">"turns"</span>: 40,
+    <span class="k">"do"</span>: [
+      { <span class="k">"type"</span>: <span class="s">"extinguish"</span>, <span class="k">"item"</span>: <span class="s">"LANTERN"</span> },
+      { <span class="k">"type"</span>: <span class="s">"print"</span>, <span class="k">"text"</span>: <span class="s">"The lantern gutters once and goes out."</span> }
+    ] }
+]</pre>
+    <p>
+      <code>_lit_LANTERN</code> is an engine-managed flag rather than one you declare.
+      Lighting an item sets it, and you can test it like any other flag, which is how you
+      write the branch where the player gropes around in the dark and finds nothing.
+      <a href="/docs/world/#internal">The internal flags</a> are listed in the reference.
+    </p>
+
+    <h2 id="walkthrough">The walkthrough is a test</h2>
+    <p>
+      One command per line, <code>#</code> starts a comment, and blank lines are ignored.
+      It runs from a cold start with no state injected and no privileged verbs, so it is
+      exactly what a player could type.
+    </p>
+<pre><span class="c"># Porch — cold start, no state injection</span>
+north
+take key
+take lantern
+south
+unlock cellar-door
+light lantern
+down
+take locket</pre>
+    <p>
+      You can also pin the shape of the run, so a walkthrough that still finishes by
+      accident gets caught:
+    </p>
+<pre>north
+<b>expect: room HALL</b>
+take key
+<b>expect: score 10</b></pre>
+    <p>
+      Three assertions exist: <code>expect: room ID</code>,
+      <code>expect: score N</code> and <code>expect: moves N</code>. A failure reports
+      like this:
+    </p>
+<pre>ERROR  E403  line 2: expected score 99, got 0</pre>
+    <div class="note">
+      <span class="tag">A rough edge worth knowing</span>
+      <p>
+        That line number counts <strong>commands</strong>, not lines in the file.
+        Comments and blank lines are stripped before anything is numbered, so an
+        assertion sitting on file line 5 can be reported as line 2. Count from the top
+        ignoring comments and you will find it.
+      </p>
+    </div>
+
+    <h2 id="review">Reading the design review</h2>
+    <p>
+      Finish the game and the validator stops reporting errors and starts reporting
+      opinions. This is the real thing, from the worked example that ships in the repo:
+    </p>
+<pre><b>folio validate</b> cellar-door.folio
+
+WARNING W500  only 3 rooms
+        Short enough to read as a demo. Zork I runs 82 rooms; a short story
+        need not, but a novel should not come out this size.
+WARNING W504  the map runs 0 loops per room (a tree)
+        Corridor maps are the signature of generated geography. Zork runs 0.67
+        loops per room, which is what lets a player take a shortcut and feel
+        the map as a place rather than a menu.
+
+PLAYABLE  cellar-door.folio  T0+T1+T2+T3+T4 passed with 2 warnings
+  completed in 8 moves for 15 points, 100% of rooms visited
+  "playable" means a path exists, not that a human can find it.</pre>
+    <p>
+      Those thresholds are measured rather than invented. They come from replaying
+      Zork I and recording what it actually does, and you can point the same measurement
+      at your own game with <code>folio profile</code>. If your game is deliberately
+      small or deliberately linear, ship a <code>brief.json</code> saying so and T4 will
+      grade you against your own intent instead.
+      <a href="/docs/reference/#dials">The dials</a> cover that.
+    </p>
+
+    <h2 id="see">What it looks like</h2>
+    <p>
+      Everything above is logic, and none of it is drawing. Here is that game running in
+      the browser player with no art of any kind supplied.
+    </p>
+    <figure>
+      <img src="/assets/img/cellar-door-start.png" width="1024" height="960"
+           alt="The Folio board running Cellar Door: compass, verb grid, text pane and inventory strip all drawn, with a question mark placeholder where the scene art would be.">
+      <figcaption>
+        Cellar Door, 126 lines of JSON and no artwork. The compass, verbs, text pane,
+        inventory and status bar are engine furniture and you get them for free. The
+        placeholder in the scene pane is the one thing a world does not supply.
+      </figcaption>
+    </figure>
+    <p>
+      Filling that pane in is a separate job with a separate API, covered in
+      <a href="/docs/scenes/">Scenes and verbs</a>. Nothing generates it for you yet.
+    </p>
+
+    <div class="pager">
+      <a href="/docs/">← Overview</a>
+      <a class="nx" href="/docs/world/">Writing a world →</a>
+    </div>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script src="/assets/starfield.js"></script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Reference · Folio Game Engine</title>
+<meta name="description" content="The manifest, the .folio layout, folioscript, the command line, certification tiers, the authoring dials and embedding.">
+<link rel="canonical" href="https://folio.games/docs/reference/">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/docs.css">
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap doclayout">
+
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Your first game</a>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/">Writing a world</a>
+    <a href="/docs/porting/">Porting a game</a>
+    <a href="/docs/scenes/">Scenes and verbs</a>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/" aria-current="page">Manifest, CLI, dials</a>
+    <div class="sub">
+      <a href="#layout">The .folio layout</a>
+      <a href="#manifest">manifest.json</a>
+      <a href="#folioscript">folioscript</a>
+      <a href="#cli">Command line</a>
+      <a href="#tiers">Certification</a>
+      <a href="#dials">The dials</a>
+      <a href="#embed">Embedding</a>
+    </div>
+    <a href="/docs/errors/">Finding codes</a>
+  </aside>
+
+  <article class="doc">
+    <p class="kicker">Reference</p>
+    <h1 class="display">Reference</h1>
+    <p class="lede">
+      The container, the manifest, the walkthrough syntax, every command, the
+      certification tiers, the authoring dials, and how to put a game on your own page.
+    </p>
+
+    <h2 id="layout">The .folio layout</h2>
+    <p>
+      A <code>.folio</code> is a zip with a fixed layout, and nothing inside it points
+      outward. Archives of community work tend to die the same way, by depending on
+      something stored somewhere else, so a game carries everything it needs.
+    </p>
+<pre>my-game.folio
+├── manifest.json            <span class="c">required</span>
+├── walkthrough.folioscript  <span class="c">required: the proof it can be finished</span>
+├── brief.json               <span class="c">optional: what you were aiming for</span>
+├── logic/
+│   ├── game.z3              <span class="c">a Z-machine story, or</span>
+│   └── world.json           <span class="c">a declarative world</span>
+├── presentation/
+│   ├── roommap.json         <span class="c">Path A only, required</span>
+│   ├── scenes.js            <span class="c">optional: the pictures</span>
+│   └── verbmap.js           <span class="c">optional on Path B, needed on Path A</span>
+└── checksums.json           <span class="c">written on pack, verified on load</span></pre>
+    <p>
+      Checksums are SHA-256 per entry, written by <code>folio pack</code> and verified
+      every time a game is loaded. A mismatch or a missing entry refuses to load rather
+      than playing a game that is not the one that was checked.
+    </p>
+    <p>
+      Every <code>presentation/*.js</code> is evaluated when the game boots. On Path B
+      nothing else in the container can contain code, which is what makes a world from a
+      stranger safe to open. A Path A game contains a compiled program by definition.
+    </p>
+
+    <h2 id="manifest">manifest.json</h2>
+    <p>Seven fields are mandatory. Anything missing is <span class="code e">E100</span>.</p>
+    <dl class="fields">
+      <dt>id</dt><dd><span class="t">string · required</span> A short slug, unique to your game.</dd>
+      <dt>title</dt><dd><span class="t">string · required</span> Shown in the gallery and the player.</dd>
+      <dt>author</dt><dd><span class="t">string · required</span> You.</dd>
+      <dt>folioVersion</dt>
+      <dd><span class="t">string · required</span> The format version, semver. <code>"0.1.0"</code> today.</dd>
+      <dt>logicType</dt>
+      <dd><span class="t">string · required</span> <code>"world"</code> or <code>"zmachine"</code>.</dd>
+      <dt>license</dt>
+      <dd>
+        <span class="t">string · required</span> An SPDX identifier, or <code>"unknown"</code>.
+        Unknown is playable but not hostable, and warns with <span class="code w">W105</span>.
+        The interactive fiction archive omitted a licence field from its metadata standard
+        and its curators have been unable to tell mechanically what they may serve ever
+        since, which is why this is mandatory here.
+      </dd>
+      <dt>contentRating</dt>
+      <dd>
+        <span class="t">string · required</span> One of <code>all-ages</code>,
+        <code>teen</code>, <code>mature</code>.
+      </dd>
+      <dt>capabilities</dt>
+      <dd>
+        <span class="t">string[]</span> Engine features the game needs. Anything not on the
+        known list is <span class="code e">E220</span>, because a game asking for an engine
+        we are not should be refused rather than glitched. Known:
+        <code>darkness</code>, <code>timed-events</code>, <code>combat</code>,
+        <code>containers</code>, <code>npc-dialogue</code>, <code>multi-save</code>,
+        <code>custom-verbs</code>, <code>sound</code>, <code>score</code>.
+      </dd>
+      <dt>aiDisclosure</dt>
+      <dd>
+        <span class="t">object</span> What was generated and what a human reviewed.
+        Omitting it warns with <span class="code w">W106</span>. State it precisely: a
+        claim that outruns the pipeline is the failure that costs trust.
+        <code>{ "prose": "none", "art": "none", "note": "…" }</code>
+      </dd>
+    </dl>
+
+    <h2 id="folioscript">walkthrough.folioscript</h2>
+    <p>
+      One command per line. <code>#</code> begins a comment and runs to end of line. Blank
+      lines are ignored. The file is the proof the game can be finished, so it is run from
+      a cold start with nothing injected.
+    </p>
+<pre><span class="c"># Cellar Door — cold start, no state injection</span>
+north
+take key
+<b>expect: room HALL</b>
+south
+unlock cellar-door
+<b>expect: score 5</b></pre>
+    <dl class="fields">
+      <dt>expect: room ID</dt><dd>Assert the player is in that room.</dd>
+      <dt>expect: score N</dt><dd>Assert the score right now.</dd>
+      <dt>expect: moves N</dt><dd>Assert the move count.</dd>
+    </dl>
+    <div class="note">
+      <span class="tag">Line numbers count commands</span>
+      <p>
+        A failure reports as <code>line 2</code> meaning the second <em>command</em>, not
+        the second line of the file. Comments and blanks are stripped before numbering, so
+        an assertion on file line 5 can be reported as line 2.
+      </p>
+    </div>
+
+    <h2 id="cli">The command line</h2>
+    <div class="scroll">
+    <table>
+      <tr><th>Command</th><th>Does</th></tr>
+      <tr><td><code>folio pack &lt;dir&gt; &lt;out.folio&gt;</code></td><td>Assemble a directory into a game, writing checksums</td></tr>
+      <tr><td><code>folio validate &lt;file&gt;</code></td><td>Run the tiers and print what the game may claim. Exits non-zero on error</td></tr>
+      <tr><td><code>folio play &lt;file&gt;</code></td><td>Play in the terminal. Both logic paths, same loop</td></tr>
+      <tr><td><code>folio info &lt;file&gt;</code></td><td>Manifest summary and every entry with its size</td></tr>
+      <tr><td><code>folio profile &lt;file&gt;</code></td><td>Replay the walkthrough and measure the design shape</td></tr>
+      <tr><td><code>folio brief [brief.json]</code></td><td>Resolve authoring dials into concrete targets and thresholds</td></tr>
+      <tr><td><code>folio calibrate &lt;story.z3&gt;</code></td><td>Derive a Path A room map from a story file. <code>-o</code> writes it</td></tr>
+    </table>
+    </div>
+
+    <h2 id="tiers">Certification</h2>
+    <p>Games are checked in tiers, and a badge claims only what was actually verified.</p>
+    <div class="scroll">
+    <table>
+      <tr><th>Tier</th><th>Proves</th></tr>
+      <tr><td><b>T0</b> schema</td><td>The manifest is complete and well-formed</td></tr>
+      <tr><td><b>T1</b> integrity</td><td>References resolve, assets decode, capabilities are supported</td></tr>
+      <tr><td><b>T2</b> graph</td><td><b>No dead ends exist</b>, computed from the world rather than asserted</td></tr>
+      <tr><td><b>T3</b> replay</td><td><b>One path completes</b>, from the beginning, with no state injection</td></tr>
+      <tr><td><b>T4</b> design</td><td>Chain depth, item economy, map shape and pacing</td></tr>
+    </table>
+    </div>
+    <p>
+      T2 and T3 check different things and neither implies the other. T3 starts every run
+      from the game's own opening state, because a test that can teleport the player or
+      hand them an item only shows that a scene works from a position nobody could reach.
+      Inform's <code>TEST ME</code> has allowed exactly those stipulations for twenty
+      years, and it is the reason a green run there proves less than it looks like.
+    </p>
+    <div class="scroll">
+    <table>
+      <tr><th>Badge</th><th>Means</th></tr>
+      <tr><td><b>invalid</b></td><td>At least one error. It will not be hosted</td></tr>
+      <tr><td><b>valid</b></td><td>T0 and T1 passed. Where every Path A game rests today</td></tr>
+      <tr><td><b>playable</b></td><td>T3 passed: a path to the ending exists</td></tr>
+      <tr><td><b>certified</b></td><td>T4 passed with no design warnings. Deliberately hard</td></tr>
+    </table>
+    </div>
+    <div class="note">
+      <span class="tag">Playable means a path exists</span>
+      <p>
+        It does not mean a human can find it. Those are separate claims and the badge keeps
+        them separate. The check that speaks to findability is a blind solver, which is
+        designed and not built.
+      </p>
+    </div>
+
+    <h2 id="dials">The dials</h2>
+    <p>
+      Difficulty is not one quantity. It is how deep puzzle chains run, how plainly clues
+      are stated, how far a key sits from its lock, and how long a game dares to go
+      without paying out. You state an intent and the brief resolves it into numbers.
+    </p>
+    <p>
+      The resolved brief is <strong>both the generation target and the validation
+      threshold</strong>. Ship it as <code>brief.json</code> and T4 grades your game
+      against your own intent rather than against generic defaults, which is what stops a
+      difficulty setting quietly becoming decorative.
+    </p>
+    <div class="scroll">
+    <table>
+      <tr><th>Dial</th><th>Values</th><th>Effect</th></tr>
+      <tr><td><code>length</code></td><td>short · <b>standard</b> · epic</td><td>12, 35 or 82 rooms. Or <code>{"rooms": n}</code>, or inferred from your source</td></tr>
+      <tr><td><code>difficulty</code></td><td>gentle · <b>standard</b> · cruel</td><td>Chain depth 3 / 5 / 9, gate distance 1 / 3 / 6, dry spell 20 / 45 / 69</td></tr>
+      <tr><td><code>deadliness</code></td><td>none · <b>fair</b> · classic</td><td>0, 3 or 8 deaths. Fair warns you first, classic does not</td></tr>
+      <tr><td><code>sprawl</code></td><td>linear · <b>balanced</b> · open</td><td>0.05, 0.35 or 0.67 map loops per room</td></tr>
+      <tr><td><code>density</code></td><td>sparse · <b>balanced</b> · packed</td><td>25%, 43% or 70% of objects are takeable</td></tr>
+    </table>
+    </div>
+<pre><b>folio brief</b> brief.json
+
+<span class="c">Resolved brief
+  A 12-room game with puzzle chains up to 3 steps deep.
+  forgiving — clues near their locks, frequent rewards.
+  nothing can kill you.
+  Map: some circling back.
+  World: mostly scenery, a few things that matter.</span></pre>
+    <p>
+      "Standard" is measured rather than guessed. It is Zork I, replayed and recorded: 82
+      rooms, 0.67 loops per room, a 43% take rate, a reward about every 11.5 moves, and one
+      stretch of 69 moves with no reward at all.
+    </p>
+    <p>
+      Two of those numbers changed how the checks work. Most of Zork's world is scenery by
+      design, so a world where everything is useful reads as a list of tasks rather than a
+      place. And one loop in a fifty-room map is still a corridor, so map shape is measured
+      per room rather than in total.
+    </p>
+    <p>
+      Chain depth is capped by what the map can carry. A twelve-room world cannot host a
+      nine-step chain without every room being a gate, so a small "cruel" game is honestly
+      reported as capped rather than silently graded against something impossible.
+    </p>
+
+    <h2 id="embed">Embedding a game</h2>
+    <p>The player is a single file with no dependencies. Host a <code>.folio</code> anywhere and point at it.</p>
+<pre>&lt;iframe src="https://folio.games/play/?game=<b>https://example.com/my-game.folio</b>"
+        width="720" height="680" style="border:0"&gt;&lt;/iframe&gt;</pre>
+    <p>
+      You can also download the player and serve both yourself. A game of Folio has no
+      server-side component and runs entirely in the browser, so it keeps working on a
+      static host, behind a firewall, and offline.
+    </p>
+    <p>
+      Games are small. The worked example in this repository is 2.4KB packed, and a full
+      Z-machine game with art runs to a couple of hundred kilobytes.
+    </p>
+
+    <div class="pager">
+      <a href="/docs/scenes/">← Scenes and verbs</a>
+      <a class="nx" href="/docs/errors/">Finding codes →</a>
+    </div>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script src="/assets/starfield.js"></script>
+</body>
+</html>

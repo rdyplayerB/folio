@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Scenes and verbs · Folio Game Engine</title>
+<meta name="description" content="The presentation API: drawing rooms, declaring hotspots, inventory sprites and the verb map.">
+<link rel="canonical" href="https://folio.games/docs/scenes/">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/docs.css">
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap doclayout">
+
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Your first game</a>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/">Writing a world</a>
+    <a href="/docs/porting/">Porting a game</a>
+    <a href="/docs/scenes/" aria-current="page">Scenes and verbs</a>
+    <div class="sub">
+      <a href="#free">What you get free</a>
+      <a href="#contract">The state object</a>
+      <a href="#draw">Drawing a room</a>
+      <a href="#hotspots">Hotspots</a>
+      <a href="#sprites">Inventory sprites</a>
+      <a href="#verbmap">The verb map</a>
+      <a href="#audio">Sound</a>
+      <a href="#style">Style rules</a>
+    </div>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/">Manifest, CLI, dials</a>
+    <a href="/docs/errors/">Finding codes</a>
+  </aside>
+
+  <article class="doc">
+    <p class="kicker">Making games</p>
+    <h1 class="display">Scenes and verbs</h1>
+    <p class="lede">
+      Everything in the two previous pages was logic. This is the layer that draws. It is
+      the one part of Folio that is real code rather than data, and it is the only part a
+      maker owns pixel by pixel.
+    </p>
+
+    <h2 id="free">What the engine draws without you</h2>
+    <p>
+      Almost all of it. The engine ships the board, and a game supplies the picture in one
+      pane. That division is deliberate: uniform furniture is what lets wildly different
+      games sit on one shelf without the shelf falling apart.
+    </p>
+    <div class="figs">
+      <figure>
+        <img src="/assets/img/cellar-door-start.png" width="1024" height="960"
+             alt="A Folio game with no artwork: every panel drawn, with a question mark placeholder in the scene pane.">
+        <figcaption>No presentation code at all. Everything but the picture.</figcaption>
+      </figure>
+      <figure>
+        <img src="/assets/img/zork-west-of-house.png" width="1024" height="960"
+             alt="The same board with a drawn scene: a white house, mailbox and forest in 8-bit pixel art.">
+        <figcaption>The same board with a <code>draw</code> function supplied.</figcaption>
+      </figure>
+    </div>
+    <p>
+      You do not lay out the compass, the verb grid, the text pane, the inventory strip,
+      the status bar, the save slots or the on-screen keyboard. You cannot move them
+      either. What you write is the contents of the scene pane, the sixteen-pixel icons in
+      the inventory strip, and the verb map that turns a click into a command.
+    </p>
+    <div class="gap">
+      <span class="tag">Nothing generates scene art</span>
+      <p>
+        There is no art pipeline. A Path B world with no presentation code renders every
+        room as the placeholder above, and it stays that way until somebody writes a
+        <code>draw</code> function for each room. That is the largest piece of manual work
+        in making a Folio game look finished, and automating it is open work.
+      </p>
+    </div>
+
+    <h2 id="contract">The state object</h2>
+    <p>
+      Everything the presentation layer reads arrives as one plain object, the World State
+      Contract. It is identical whether the game underneath is a 1988 binary or a world
+      you wrote last week, which is why the same drawing code works for both.
+    </p>
+<pre>{
+  <span class="k">roomId</span>:    <span class="s">"LIVING-ROOM"</span>,     <span class="c">// which scene to draw</span>
+  <span class="k">roomName</span>:  <span class="s">"The Living Room"</span>,
+  <span class="k">score</span>: 35, <span class="k">moves</span>: 13,
+  <span class="k">dark</span>:      false,               <span class="c">// engine draws the dark itself</span>
+  <span class="k">objects</span>:   [<span class="s">"LAMP"</span>,<span class="s">"SWORD"</span>,<span class="s">"RUG"</span>],  <span class="c">// visible here, incl. open containers</span>
+  <span class="k">inventory</span>: [<span class="s">"LAMP"</span>],
+  <span class="k">contents</span>:  { <span class="k">SACK</span>: [<span class="s">"GARLIC"</span>] }, <span class="c">// one level into open containers</span>
+  <span class="k">flags</span>:     { <span class="k">LAMP</span>: { <span class="k">ONBIT</span>: true } },
+  <span class="k">exits</span>:     { <span class="k">NORTH</span>: <span class="s">"KITCHEN"</span>, <span class="k">EAST</span>: false },
+  <span class="k">globals</span>:   { … },
+  <span class="k">fighting</span>:  false,               <span class="c">// a hostile actor is present</span>
+  <span class="k">lampTurns</span>: 27                   <span class="c">// or null when the game has no lamp</span>
+}</pre>
+    <p>
+      Read it, never write to it. On Path A it is a projection of live interpreter memory,
+      and writing would mean the picture and the game disagreed.
+    </p>
+
+    <h2 id="draw">Drawing a room</h2>
+    <p>
+      Scenes attach to <code>GUE.scenes</code>, keyed by the same room ids the logic uses.
+      A scene is an object with a <code>draw</code> function and usually a
+      <code>hotspots</code> function.
+    </p>
+<pre>GUE.scenes = GUE.scenes || {};
+
+GUE.scenes[<span class="s">'PORCH'</span>] = {
+  <span class="c">// ctx   a 2D canvas context, already translated and clipped to the pane</span>
+  <span class="c">// S     the state object above</span>
+  <span class="c">// t     a frame counter, for anything that moves</span>
+  draw: <span class="k">function</span> (ctx, S, t) {
+    ctx.fillStyle = <span class="s">'#5c94fc'</span>;  ctx.fillRect(0, 0, 144, 62);   <span class="c">// sky</span>
+    ctx.fillStyle = <span class="s">'#00a800'</span>;  ctx.fillRect(0, 62, 144, 42);  <span class="c">// grass</span>
+    ctx.fillStyle = <span class="s">'#d8d8d8'</span>;  ctx.fillRect(44, 30, 56, 44);  <span class="c">// house</span>
+    <span class="k">if</span> (S.flags.CELLAR_DOOR && S.flags.CELLAR_DOOR.OPENBIT) {
+      ctx.fillStyle = <span class="s">'#000000'</span>; ctx.fillRect(20, 80, 22, 14);
+    }
+  },
+  hotspots: <span class="k">function</span> (S) {
+    <span class="k">return</span> [
+      { x: 44, y: 30, w: 56, h: 44, obj: <span class="s">'HOUSE'</span> },
+      { x: 20, y: 80, w: 22, h: 14, obj: <span class="s">'CELLAR-DOOR'</span> },
+      { x:  0, y: 44, w: 20, h: 30, dir: <span class="s">'NORTH'</span> }
+    ];
+  }
+};</pre>
+    <dl class="fields">
+      <dt>the canvas</dt>
+      <dd>
+        <span class="t">144 × 104</span>
+        Always. Draw in those coordinates and never scale for the device. On a phone the
+        engine scales the whole pane by an integer factor so the picture doubles without
+        going soft, and your code never learns it happened.
+      </dd>
+      <dt>darkness</dt>
+      <dd>
+        When <code>S.dark</code> is true the engine draws the dark and never calls your
+        <code>draw</code>. You do not handle it.
+      </dd>
+      <dt>errors</dt>
+      <dd>
+        A <code>draw</code> that throws is caught, warned about once, and replaced with the
+        placeholder. One broken room will not take the game down.
+      </dd>
+      <dt>missing scenes</dt>
+      <dd>
+        A room with no entry in <code>GUE.scenes</code> gets the placeholder and a console
+        warning naming the room, which is the fastest way to find what you have not drawn.
+      </dd>
+    </dl>
+
+    <h2 id="hotspots">Hotspots</h2>
+    <p>
+      A picture full of things is only playable if the player can tell which things.
+      <code>hotspots</code> returns rectangles in the same 144 × 104 space, recomputed
+      every frame from state, so a hotspot can appear and disappear with the world.
+    </p>
+    <dl class="fields">
+      <dt>{x, y, w, h, obj}</dt>
+      <dd>A thing. <code>obj</code> is the id the logic knows it by.</dd>
+      <dt>{x, y, w, h, dir}</dt>
+      <dd>
+        A way out. <code>go</code> and <code>exit</code> work as aliases, and an
+        <code>obj</code> named like <code>_go_north</code> is also read as a direction.
+      </dd>
+    </dl>
+    <div class="note">
+      <span class="tag">Overlap is resolved by size, not by order</span>
+      <p>
+        Room-filling scenery is normally declared around the props sitting on it, so when
+        rectangles overlap the <strong>smallest wins</strong>. That is what makes clicking
+        a mailbox in front of a house select the mailbox. Later declaration breaks ties, so
+        a prop still beats same-sized scenery.
+      </p>
+      <p>
+        Objects and exits are ranked separately. While a verb other than <code>LOOK</code>
+        is armed, an object always beats an exit underneath it, because arming a verb is a
+        statement about a thing. With nothing armed, a bare click on a doorway walks it.
+      </p>
+    </div>
+    <p>
+      On a touch screen the engine widens every hit test and, if a tap still misses
+      everything, reaches for the nearest hotspot within a thumb's width rather than
+      swallowing the tap. You do not need to make targets finger-sized yourself.
+    </p>
+
+    <h2 id="sprites">Inventory sprites</h2>
+    <p>
+      The inventory strip draws each carried item as a 16 × 16 icon. Supply one function
+      that draws any of them.
+    </p>
+<pre>GUE.sprites = {
+  draw: <span class="k">function</span> (ctx, id, x, y, t) {
+    <span class="k">if</span> (id === <span class="s">'LANTERN'</span>) { <span class="c">/* …draw at x, y in a 16×16 box… */</span> <span class="k">return</span>; }
+    <span class="k">throw</span> <span class="k">new</span> Error(<span class="s">'no sprite'</span>);   <span class="c">// falls back to a lettered box</span>
+  }
+};</pre>
+    <p>
+      Throwing is a legitimate answer. The engine catches it and draws the item's first
+      letter in a box, so a game with no sprites is still playable and readable.
+    </p>
+
+    <h2 id="verbmap">The verb map</h2>
+    <p>
+      The verb map turns a click into a command string. Path B generates one
+      automatically, because verbs and nouns there are already the ids the rules match on.
+      Path A needs one written, because a Z-machine parser has idioms and its object ids
+      are not words a player would type.
+    </p>
+<pre>GUE.verbmap = {
+  <span class="c">// what to show the player when they point at something</span>
+  noun: <span class="k">function</span> (objId) { <span class="k">return</span> NAMES[objId] || objId.toLowerCase(); },
+
+  <span class="c">// the line actually submitted to the game</span>
+  command: <span class="k">function</span> (verb, objId, obj2Id, S) {
+    <span class="k">if</span> (verb === <span class="s">'USE'</span> && objId === <span class="s">'KEY'</span>) <span class="k">return</span> <span class="s">'unlock door with key'</span>;
+    <span class="k">return</span> verb.toLowerCase() + <span class="s">' '</span> + <span class="k">this</span>.noun(objId);
+  },
+
+  <span class="c">// does this verb need a second object before it can be sent?</span>
+  needsSecond: <span class="k">function</span> (verb) { <span class="k">return</span> /^(USE|HIT|GIVE)$/.test(verb); },
+
+  <span class="c">// words no player would guess, offered as buttons on the keyboard</span>
+  magicWords: [<span class="s">'xyzzy'</span>, <span class="s">'plugh'</span>]
+};</pre>
+    <p>
+      Returning <code>null</code> from <code>command</code> means the click is refused,
+      which is how you stop a verb being sent for something it cannot apply to.
+      <code>USE</code> and <code>HIT</code> are two-object verbs on the board, so the
+      engine will ask for a second target before calling you.
+    </p>
+
+    <h2 id="audio">Sound</h2>
+    <p>
+      Optional, and entirely yours. The engine calls it and survives its absence.
+    </p>
+    <dl class="fields">
+      <dt>init()</dt>
+      <dd>Called on the player's first gesture, which is when a browser will allow audio to start.</dd>
+      <dt>update(S)</dt>
+      <dd>Called as state changes, so music can follow the room or react to <code>S.fighting</code>.</dd>
+      <dt>sfx(name)</dt>
+      <dd>Called for one-off events.</dd>
+      <dt>muted</dt>
+      <dd>A boolean the engine's own menu toggles. Volume lives in the game's menu, not in browser chrome.</dd>
+    </dl>
+
+    <h2 id="style">Drawing in the house style</h2>
+    <p>
+      These rules were not chosen from taste. They came out of putting candidate art beside
+      real 1988 screenshots and asking fresh critics which was genuine, then reading back
+      the tells they named.
+    </p>
+    <ul>
+      <li>
+        <strong>Block colour with dark outline shading, not heavy dithering.</strong> This
+        one was wrong in three earlier drafts. Dense dithering is an EGA and Amiga
+        signature; console art of this era blocks colour in and shades with outline.
+      </li>
+      <li>
+        <strong>Neighbouring tiles should fight.</strong> Coherent, harmonious palettes
+        read as modern. The hardware forced clashes and the clashes are the look.
+      </li>
+      <li><strong>One pixel grid per scene.</strong> Mixing effective resolutions inside one picture is the fastest way to look fake.</li>
+      <li><strong>Every scene should be a moment of play</strong> rather than a landscape. Something in it should be worth clicking.</li>
+      <li><strong>No global filters.</strong> No scanline overlay, no bloom, no CRT curve on the art itself.</li>
+    </ul>
+    <p>
+      The engine's own furniture stays uniform on purpose while the games clash wildly.
+      That contrast is the point: coherence lives in the chrome so divergence can live in
+      the pictures.
+    </p>
+
+    <div class="pager">
+      <a href="/docs/porting/">← Porting a game</a>
+      <a class="nx" href="/docs/reference/">Reference →</a>
+    </div>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script src="/assets/starfield.js"></script>
+</body>
+</html>

@@ -185,6 +185,25 @@ checkout containing `data/story.js` and `data/roommap.js` to run them.
 
 ---
 
+## The manual
+
+This README is an introduction. The reference manual lives at
+[folio.games/docs](https://folio.games/docs/) and is the source of truth: where the
+two disagree, the manual is right.
+
+| Page | Covers |
+|---|---|
+| [Overview](https://folio.games/docs/) | How the pieces fit, and what is built versus designed |
+| [Your first game](https://folio.games/docs/quickstart/) | An empty directory to a validated `.folio`, in about ten minutes |
+| [Writing a world](https://folio.games/docs/world/) | Every field of `world.json`: rooms, items, rules, ten conditions, fourteen effects |
+| [Porting a game](https://folio.games/docs/porting/) | Path A, room maps, and `folio calibrate` |
+| [Scenes and verbs](https://folio.games/docs/scenes/) | Drawing rooms, hotspots, sprites, the verb map |
+| [Reference](https://folio.games/docs/reference/) | Manifest, folioscript, the CLI, certification tiers, the dials |
+| [Finding codes](https://folio.games/docs/errors/) | All 45 validator codes, what causes each and how to fix it |
+
+There is no visual editor. You write JSON and run `folio validate`, and the manual
+documents that workflow rather than a tool that does not exist yet.
+
 ## Contributing
 
 Folio uses a Developer Certificate of Origin rather than a copyright-assigning CLA,

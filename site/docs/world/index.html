@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Writing a world · Folio Game Engine</title>
+<meta name="description" content="The complete reference for world.json: rooms, items, actors, rules, conditions, effects and timers.">
+<link rel="canonical" href="https://folio.games/docs/world/">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/docs.css">
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap doclayout">
+
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Your first game</a>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/" aria-current="page">Writing a world</a>
+    <div class="sub">
+      <a href="#shape">Top level</a>
+      <a href="#meta">meta</a>
+      <a href="#rooms">rooms</a>
+      <a href="#exits">exits</a>
+      <a href="#items">items</a>
+      <a href="#attributes">attributes</a>
+      <a href="#actors">actors</a>
+      <a href="#rules">rules</a>
+      <a href="#conditions">conditions</a>
+      <a href="#effects">effects</a>
+      <a href="#timers">timers</a>
+      <a href="#builtins">built-in verbs</a>
+      <a href="#internal">internal flags</a>
+      <a href="#containers">containers</a>
+      <a href="#patterns">puzzle patterns</a>
+    </div>
+    <a href="/docs/porting/">Porting a game</a>
+    <a href="/docs/scenes/">Scenes and verbs</a>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/">Manifest, CLI, dials</a>
+    <a href="/docs/errors/">Finding codes</a>
+  </aside>
+
+  <article class="doc">
+    <p class="kicker">Making games</p>
+    <h1 class="display">Writing a world</h1>
+    <p class="lede">
+      The complete reference for <code>logic/world.json</code>, the declarative format
+      behind Path B. It is data, never code, which is why a <code>.folio</code> from a
+      stranger is safe to open and why the validator can see everything a game is able
+      to do before running it.
+    </p>
+    <div class="note">
+      <span class="tag">Deliberately less expressive than Inform</span>
+      <p>
+        The vocabulary below is closed. Ten conditions, fourteen effects, and no way to
+        add a fifteenth without a spec revision. That bound is the point: because every
+        effect comes from a fixed list, the dependency graph can be computed statically
+        rather than discovered by playing. You give up arbitrary logic and you get
+        provable completability.
+      </p>
+    </div>
+
+    <h2 id="shape">The top level</h2>
+<pre>{
+  <span class="k">"meta"</span>:   { … },   <span class="c">// required</span>
+  <span class="k">"flags"</span>:  { … },   <span class="c">// optional, initial world state</span>
+  <span class="k">"rooms"</span>:  [ … ],   <span class="c">// required</span>
+  <span class="k">"items"</span>:  [ … ],   <span class="c">// required, may be empty</span>
+  <span class="k">"actors"</span>: [ … ],   <span class="c">// optional</span>
+  <span class="k">"rules"</span>:  [ … ],   <span class="c">// optional, but a game with none is a museum</span>
+  <span class="k">"timers"</span>: [ … ]    <span class="c">// optional</span>
+}</pre>
+    <p>
+      <code>flags</code> is a plain object of your own named booleans, and it is the
+      memory of the world. Everything a puzzle needs to remember lives here.
+    </p>
+
+    <h2 id="meta">meta</h2>
+    <dl class="fields">
+      <dt>start</dt>
+      <dd>
+        <span class="t">string · required</span>
+        The room id the player begins in. If it does not name a real room the game will
+        not boot and validation stops at <span class="code e">E300</span>.
+      </dd>
+      <dt>title</dt>
+      <dd><span class="t">string</span> Shown above the opening room description.</dd>
+      <dt>seed</dt>
+      <dd>
+        <span class="t">number</span> Seeds the world's random number generator. Runs are
+        deterministic, which is what makes walkthrough replay and regression transcripts
+        possible. The CLI and validator override this with 1234 so a run is reproducible
+        across machines.
+      </dd>
+      <dt>defaults</dt>
+      <dd><span class="t">object</span> Overrides for the engine's built-in responses. See below.</dd>
+      <dt>magicWords</dt>
+      <dd>
+        <span class="t">string[]</span> Words a player would never guess to type, offered
+        as one-tap buttons on the on-screen keyboard. Read by the presentation layer
+        rather than by the logic.
+      </dd>
+    </dl>
+
+    <h3>meta.defaults</h3>
+    <p>
+      The engine answers commands you did not write rules for. These thirteen strings are
+      how you make those answers sound like your game rather than like a parser. Every
+      one is optional and falls back to the text on the right.
+    </p>
+    <div class="scroll">
+    <table>
+      <tr><th>Key</th><th>Spoken when</th><th>Default</th></tr>
+      <tr><td><code>blocked</code></td><td>Walking a direction with no exit</td><td>You cannot go that way.</td></tr>
+      <tr><td><code>dark</code></td><td>Looking in an unlit dark room</td><td>It is pitch black.</td></tr>
+      <tr><td><code>what</code></td><td><code>TAKE</code> with no noun</td><td>Take what?</td></tr>
+      <tr><td><code>already</code></td><td>Taking something already carried</td><td>You already have that.</td></tr>
+      <tr><td><code>absent</code></td><td>Acting on something not here</td><td>You do not see that here.</td></tr>
+      <tr><td><code>fixed</code></td><td>Taking something without <code>TAKEBIT</code></td><td>That is not something you can carry.</td></tr>
+      <tr><td><code>taken</code></td><td>A successful take</td><td>Taken.</td></tr>
+      <tr><td><code>nothave</code></td><td>Dropping something not carried</td><td>You are not carrying that.</td></tr>
+      <tr><td><code>dropped</code></td><td>A successful drop</td><td>Dropped.</td></tr>
+      <tr><td><code>alreadyOpen</code></td><td>Opening something already open</td><td>It is already open.</td></tr>
+      <tr><td><code>locked</code></td><td>Opening something that will not open</td><td>It will not open.</td></tr>
+      <tr><td><code>empty</code></td><td><code>INVENTORY</code> while empty-handed</td><td>You are empty-handed.</td></tr>
+      <tr><td><code>unknown</code></td><td>Any verb with no rule and no built-in</td><td>Nothing happens.</td></tr>
+    </table>
+    </div>
+    <p>
+      <code>unknown</code> earns the most attention. It is what a player hears every time
+      they try something you did not anticipate, so it is the single line that decides
+      whether your world feels responsive or dead.
+    </p>
+
+    <h2 id="rooms">rooms</h2>
+    <dl class="fields">
+      <dt>id</dt>
+      <dd><span class="t">string · required</span> Unique. Convention is upper-case with hyphens, matching what the Z-machine path produces.</dd>
+      <dt>name</dt>
+      <dd><span class="t">string</span> The heading the player sees. Falls back to the id, which looks like a bug, so write one.</dd>
+      <dt>prose</dt>
+      <dd><span class="t">string</span> The room description, printed on entry and on <code>LOOK</code>.</dd>
+      <dt>dark</dt>
+      <dd><span class="t">boolean</span> The room is unreadable unless a lit <code>LIGHTSOURCE</code> is carried or present.</dd>
+      <dt>exits</dt>
+      <dd><span class="t">object[]</span> Ways out. See below.</dd>
+    </dl>
+
+    <h2 id="exits">exits</h2>
+    <p>
+      Exits are declared per room and are <strong>one way</strong>. A return journey is a
+      second exit on the other room. The validator does not require symmetry, because
+      one-way drops are a real design tool, but it does check that both ends exist.
+    </p>
+    <dl class="fields">
+      <dt>dir</dt>
+      <dd>
+        <span class="t">string · required</span> One of
+        <code>NORTH SOUTH EAST WEST NE NW SE SW UP DOWN IN OUT</code>.
+        Anything else is silently ignored, so check your spelling.
+      </dd>
+      <dt>to</dt>
+      <dd><span class="t">string · required</span> Destination room id.</dd>
+      <dt>condition</dt>
+      <dd><span class="t">condition</span> The way is blocked until this passes.</dd>
+      <dt>door</dt>
+      <dd><span class="t">string</span> An item id. The way is blocked while that item is closed, which is the shorthand for a door you literally open.</dd>
+      <dt>hidden</dt>
+      <dd><span class="t">boolean</span> While blocked, the exit vanishes entirely rather than showing as blocked.</dd>
+    </dl>
+    <h4>Three states, not two</h4>
+    <p>This is the part worth reading twice, because it is what the compass draws.</p>
+    <div class="scroll">
+    <table>
+      <tr><th>Situation</th><th>Contract reports</th><th>Compass shows</th></tr>
+      <tr><td>Open way</td><td><code>NORTH: "KITCHEN"</code></td><td>Lit and clickable</td></tr>
+      <tr><td>Blocked, not hidden</td><td><code>DOWN: false</code></td><td>Greyed out, visible</td></tr>
+      <tr><td>Blocked and <code>hidden</code></td><td>absent</td><td>Nothing at all</td></tr>
+      <tr><td>No exit declared</td><td>absent</td><td>Nothing at all</td></tr>
+    </table>
+    </div>
+    <p>
+      The middle state carries real information: a door you can see and cannot yet open
+      tells the player there is something here to solve. Use <code>hidden</code> only
+      when the passage itself is the secret.
+    </p>
+
+    <h2 id="items">items</h2>
+    <dl class="fields">
+      <dt>id</dt>
+      <dd><span class="t">string · required</span> Unique across items and actors. This is what commands and rules refer to.</dd>
+      <dt>name</dt>
+      <dd><span class="t">string</span> What the player is shown, in the inventory and in hover labels.</dd>
+      <dt>location</dt>
+      <dd>
+        <span class="t">string · required</span> A room id, the literal
+        <code>"PLAYER"</code> to start it carried, another item's id to start it inside a
+        container, or <code>"NOWHERE"</code> to keep it out of play until a rule moves it in.
+      </dd>
+      <dt>roomProse</dt>
+      <dd>
+        <span class="t">string</span> A line appended to the room description while the
+        item is still lying in that room. It stops appearing the moment the item moves,
+        so a room reads as prose rather than as a list.
+      </dd>
+      <dt>attributes</dt>
+      <dd><span class="t">object</span> Booleans the engine understands. See below.</dd>
+      <dt>fuel</dt>
+      <dd>
+        <span class="t">number</span> Turns of light remaining, for a
+        <code>LIGHTSOURCE</code>. Drives the lamp gauge in the status bar. Burn it down
+        with a timer's <code>fuelFor</code>.
+      </dd>
+    </dl>
+
+    <h2 id="attributes">attributes</h2>
+    <p>Five booleans have meaning to the engine. Anything else you add is carried through to the presentation layer untouched and ignored by the logic.</p>
+    <div class="scroll">
+    <table>
+      <tr><th>Attribute</th><th>Effect</th></tr>
+      <tr><td><code>TAKEBIT</code></td><td>The item can be picked up. Without it, <code>TAKE</code> answers with <code>defaults.fixed</code>.</td></tr>
+      <tr><td><code>LIGHTSOURCE</code></td><td>The item counts as light when lit, defeating a <code>dark</code> room.</td></tr>
+      <tr><td><code>ONBIT</code></td><td>The item starts lit. Usually you leave this off and light it with a rule.</td></tr>
+      <tr><td><code>OPENBIT</code></td><td>The item starts open. Matters for containers and for exits with a <code>door</code>.</td></tr>
+      <tr><td><code>TRANSPARENT</code></td><td>You can see inside without opening it, so its contents are visible from the start.</td></tr>
+    </table>
+    </div>
+
+    <h2 id="actors">actors</h2>
+    <p>
+      Actors are things that are somebody rather than something. They are projected into
+      the scene the same way items are, but they cannot be carried and they are what the
+      <code>fighting</code> flag reads from.
+    </p>
+    <dl class="fields">
+      <dt>id</dt><dd><span class="t">string · required</span> Unique across items and actors.</dd>
+      <dt>name</dt><dd><span class="t">string</span> What the player is shown.</dd>
+      <dt>location</dt><dd><span class="t">string · required</span> A room id, or <code>"NOWHERE"</code> until they arrive.</dd>
+      <dt>hostile</dt>
+      <dd>
+        <span class="t">boolean</span> While a hostile actor shares your room, the contract
+        reports <code>fighting: true</code>, which the presentation layer can use to change
+        the music or the scene. It does not itself do any harm; the harm is a rule or a timer.
+      </dd>
+      <dt>attributes</dt><dd><span class="t">object</span> As for items.</dd>
+    </dl>
+    <p>Move them with the <code>move-actor</code> effect.</p>
+
+    <h2 id="rules">rules</h2>
+    <p>
+      A rule is a trigger, a guard and a consequence. It is the only place a world does
+      anything the engine did not already know how to do.
+    </p>
+<pre>{
+  <span class="k">"on"</span>: { <span class="k">"verb"</span>: <span class="s">"UNLOCK"</span>, <span class="k">"noun"</span>: <span class="s">"CELLAR-DOOR"</span>, <span class="k">"room"</span>: <span class="s">"PORCH"</span> },
+  <span class="k">"if"</span>: [ <span class="c">/* conditions, all must pass */</span> ],
+  <span class="k">"do"</span>: [ <span class="c">/* effects, applied in order */</span> ]
+}</pre>
+    <dl class="fields">
+      <dt>on.verb</dt><dd><span class="t">string</span> Matched case-insensitively. Omit to match any verb.</dd>
+      <dt>on.noun</dt><dd><span class="t">string</span> Matched case-insensitively against the object id. Omit to match any noun, including none.</dd>
+      <dt>on.room</dt><dd><span class="t">string</span> Only fires while the player is in this room.</dd>
+      <dt>if</dt><dd><span class="t">condition[]</span> Every one must pass. Omit for an unguarded rule.</dd>
+      <dt>do</dt><dd><span class="t">effect[]</span> Applied in order. All <code>print</code> text is joined with newlines and returned as the response.</dd>
+    </dl>
+    <div class="note">
+      <span class="tag">First match wins, and nothing else runs</span>
+      <p>
+        Rules are tested in array order. The first whose trigger matches and whose
+        conditions all pass is applied, and the scan stops there. Write the specific case
+        above the general one.
+      </p>
+      <p>
+        A rule that matches on trigger but fails its conditions does not block later
+        rules, so the usual shape is a guarded rule followed by an unguarded fallback for
+        the same trigger. That fallback is where the writing lives, and a world without
+        them answers <code>"Nothing happens."</code> to everything a player improvises.
+      </p>
+    </div>
+
+    <h2 id="conditions">conditions</h2>
+    <p>Ten types. Anything unrecognised evaluates to <code>false</code> rather than throwing, so a typo silently disables a rule. <span class="code w">W313</span> catches the common cases.</p>
+    <div class="scroll">
+    <table>
+      <tr><th>Type</th><th>Fields</th><th>True when</th></tr>
+      <tr><td><code>flag</code></td><td><code>flag</code>, <code>value</code></td><td>The named flag equals <code>value</code>, which defaults to <code>true</code></td></tr>
+      <tr><td><code>carrying</code></td><td><code>item</code></td><td>The player is holding it</td></tr>
+      <tr><td><code>in-room</code></td><td><code>item</code></td><td>It is lying in the current room, not carried</td></tr>
+      <tr><td><code>present</code></td><td><code>item</code></td><td>Carried or in the room, whichever</td></tr>
+      <tr><td><code>at</code></td><td><code>room</code></td><td>The player is in that room</td></tr>
+      <tr><td><code>visited</code></td><td><code>room</code></td><td>The player has been there at least once</td></tr>
+      <tr><td><code>open</code></td><td><code>item</code></td><td>It is open, by <code>OPENBIT</code>, <code>TRANSPARENT</code> or an <code>open</code> effect</td></tr>
+      <tr><td><code>lit</code></td><td><code>item</code></td><td>It is currently alight</td></tr>
+      <tr><td><code>score-at-least</code></td><td><code>value</code></td><td>Score is at or above the number</td></tr>
+      <tr><td><code>not</code></td><td><code>condition</code></td><td>The nested condition is false</td></tr>
+    </table>
+    </div>
+<pre><span class="c">// carrying the key, and the door is not already unlocked</span>
+<span class="k">"if"</span>: [
+  { <span class="k">"type"</span>: <span class="s">"carrying"</span>, <span class="k">"item"</span>: <span class="s">"KEY"</span> },
+  { <span class="k">"type"</span>: <span class="s">"not"</span>,
+    <span class="k">"condition"</span>: { <span class="k">"type"</span>: <span class="s">"flag"</span>, <span class="k">"flag"</span>: <span class="s">"doorUnlocked"</span> } }
+]</pre>
+
+    <h2 id="effects">effects</h2>
+    <p>Fourteen types. Unknown effects are inert at runtime and rejected by validation, so a typo fails loudly rather than quietly.</p>
+    <div class="scroll">
+    <table>
+      <tr><th>Type</th><th>Fields</th><th>Does</th></tr>
+      <tr><td><code>print</code></td><td><code>text</code></td><td>Adds a line to the response</td></tr>
+      <tr><td><code>set-flag</code></td><td><code>flag</code>, <code>value</code></td><td>Sets a flag, defaulting to <code>true</code></td></tr>
+      <tr><td><code>take</code></td><td><code>item</code></td><td>Moves it to the player, ignoring <code>TAKEBIT</code></td></tr>
+      <tr><td><code>move-item</code></td><td><code>item</code>, <code>to</code></td><td>Moves it to a room id, <code>"PLAYER"</code>, or a container id</td></tr>
+      <tr><td><code>destroy</code></td><td><code>item</code></td><td>Removes it from play, by moving it to <code>NOWHERE</code></td></tr>
+      <tr><td><code>open</code></td><td><code>item</code></td><td>Marks it open</td></tr>
+      <tr><td><code>close</code></td><td><code>item</code></td><td>Marks it closed</td></tr>
+      <tr><td><code>light</code></td><td><code>item</code></td><td>Lights it</td></tr>
+      <tr><td><code>extinguish</code></td><td><code>item</code></td><td>Puts it out</td></tr>
+      <tr><td><code>goto</code></td><td><code>room</code></td><td>Moves the player, marking the room visited</td></tr>
+      <tr><td><code>score</code></td><td><code>value</code></td><td>Adds to the score. Negative numbers work</td></tr>
+      <tr><td><code>move-actor</code></td><td><code>actor</code>, <code>to</code></td><td>Moves an actor to a room id or <code>NOWHERE</code></td></tr>
+      <tr><td><code>win</code></td><td><code>text</code></td><td>Ends the game as a win. At least one must be reachable or <span class="code e">E310</span></td></tr>
+      <tr><td><code>lose</code></td><td><code>text</code></td><td>Ends the game as a loss</td></tr>
+    </table>
+    </div>
+    <p>
+      Note that <code>take</code> ignores <code>TAKEBIT</code> on purpose. The attribute
+      governs what a player may pick up unaided; an effect is you deciding, so it always
+      works.
+    </p>
+
+    <h2 id="timers">timers</h2>
+    <p>
+      Timers tick once per move, after the command's rule has run. They are how anything
+      happens that the player did not directly cause.
+    </p>
+<pre>{
+  <span class="k">"startFlag"</span>: <span class="s">"_lit_LANTERN"</span>,   <span class="c">// waits until this flag is true</span>
+  <span class="k">"fuelFor"</span>:   <span class="s">"LANTERN"</span>,        <span class="c">// reports elapsed as this item's fuel used</span>
+  <span class="k">"turns"</span>:     40,               <span class="c">// fires after this many ticks</span>
+  <span class="k">"repeat"</span>:    <span class="k">false</span>,            <span class="c">// fire once, or every `turns` moves</span>
+  <span class="k">"do"</span>: [ <span class="c">/* effects */</span> ]
+}</pre>
+    <dl class="fields">
+      <dt>turns</dt><dd><span class="t">number · required</span> Ticks before firing.</dd>
+      <dt>startFlag</dt><dd><span class="t">string</span> The timer does not tick at all until this flag is true. Without it, it starts counting from move one.</dd>
+      <dt>repeat</dt><dd><span class="t">boolean</span> Fire every <code>turns</code> moves instead of once.</dd>
+      <dt>fuelFor</dt><dd><span class="t">string</span> An item id. Elapsed ticks are published as that item's fuel consumption, which is what moves the lamp gauge.</dd>
+      <dt>do</dt><dd><span class="t">effect[]</span> Applied when it fires. Printed text is appended to that move's response after a blank line.</dd>
+    </dl>
+
+    <h2 id="builtins">Built-in verbs, and the four that are not</h2>
+    <p>
+      The engine answers six things by itself. Everything else in the game is yours.
+    </p>
+    <div class="scroll">
+    <table>
+      <tr><th>Verb</th><th>Built-in behaviour</th></tr>
+      <tr><td>The twelve directions</td><td>Move if the exit is open, otherwise <code>defaults.blocked</code></td></tr>
+      <tr><td><code>LOOK</code></td><td>Re-describe the room, or <code>defaults.dark</code></td></tr>
+      <tr><td><code>TAKE</code></td><td>Pick it up if it is here and has <code>TAKEBIT</code></td></tr>
+      <tr><td><code>DROP</code></td><td>Put down something carried</td></tr>
+      <tr><td><code>OPEN</code></td><td>Reports open or refuses. It cannot actually open anything on its own</td></tr>
+      <tr><td><code>INVENTORY</code></td><td>List what is carried</td></tr>
+    </table>
+    </div>
+    <div class="gap">
+      <span class="tag">Half the verb grid does nothing by default</span>
+      <p>
+        The player is shown eight verbs:
+        <code>LOOK TAKE DROP OPEN CLOSE USE HIT SPEAK</code>. Four of them,
+        <strong>CLOSE, USE, HIT and SPEAK</strong>, have no built-in behaviour at all in a
+        Path B world. Without rules they answer <code>defaults.unknown</code>, which reads
+        to a player as a broken button.
+      </p>
+      <p>
+        <code>OPEN</code> is a near miss in the same way. It will tell you something is
+        already open, and otherwise refuse, but only a rule with an <code>open</code>
+        effect can make it succeed. Assume every verb needs writing.
+      </p>
+    </div>
+
+    <h2 id="internal">Internal flags</h2>
+    <p>
+      The engine keeps some state in the same flag namespace you write to, using an
+      underscore prefix. You can read these in conditions, which is frequently the
+      clearest way to express something. Do not write to them directly; use the effect.
+    </p>
+    <dl class="fields">
+      <dt>_open_&lt;ITEM&gt;</dt><dd>Set by <code>open</code> and <code>close</code>. Overrides <code>OPENBIT</code>.</dd>
+      <dt>_lit_&lt;ITEM&gt;</dt><dd>Set by <code>light</code> and <code>extinguish</code>. Overrides <code>ONBIT</code>.</dd>
+      <dt>_fuelUsed_&lt;ITEM&gt;</dt><dd>Maintained by a timer's <code>fuelFor</code>. Subtracted from <code>fuel</code> to give the gauge.</dd>
+    </dl>
+<pre><span class="c">// "you grope in the dark" — the branch that runs when the lamp is not lit</span>
+<span class="k">"if"</span>: [
+  { <span class="k">"type"</span>: <span class="s">"in-room"</span>, <span class="k">"item"</span>: <span class="s">"LOCKET"</span> },
+  { <span class="k">"type"</span>: <span class="s">"not"</span>, <span class="k">"condition"</span>: {
+      <span class="k">"type"</span>: <span class="s">"flag"</span>, <span class="k">"flag"</span>: <span class="s">"_lit_LANTERN"</span>, <span class="k">"value"</span>: <span class="k">true</span> } }
+]</pre>
+
+    <h2 id="containers">Containers</h2>
+    <p>
+      Put an item's <code>location</code> to another item's id and it is inside it. The
+      contract projects container contents <strong>one level deep</strong>, and only when
+      the container is open or <code>TRANSPARENT</code>. A box inside a box is legal data
+      but the inner contents will not be listed.
+    </p>
+<pre>{ <span class="k">"id"</span>: <span class="s">"CHEST"</span>, <span class="k">"location"</span>: <span class="s">"ATTIC"</span>,
+  <span class="k">"attributes"</span>: { <span class="k">"OPENBIT"</span>: <span class="k">false</span> } },
+{ <span class="k">"id"</span>: <span class="s">"COIN"</span>,  <span class="k">"location"</span>: <span class="s">"CHEST"</span>,
+  <span class="k">"attributes"</span>: { <span class="k">"TAKEBIT"</span>: <span class="k">true</span> } }</pre>
+    <p>
+      The coin is invisible until a rule opens the chest. This is the cheapest way to
+      hide something in plain sight, and it costs you no flags.
+    </p>
+
+    <h2 id="patterns">The patterns worth stealing</h2>
+
+    <h3>A gate</h3>
+    <p>
+      A flag, an exit condition, and a rule that sets it. Every locked door, raised
+      drawbridge and placated guardian is this shape.
+    </p>
+
+    <h3>A guarded action with a failure branch</h3>
+    <p>
+      Two rules on the same trigger, the guarded one first. The second is not optional
+      polish. It is the difference between a world that answers and one that shrugs.
+    </p>
+
+    <h3>A hazard that is fair</h3>
+    <p>
+      A repeating timer that prints a warning, and a second timer or a rule that applies
+      <code>lose</code>. Foreshadowing a death is what separates a hazard from an ambush,
+      and T4 measures whether you did it.
+    </p>
+
+    <h3>A consumable</h3>
+    <p>
+      <code>destroy</code> the item as part of the effect that spends it. The dependency
+      graph understands that the item is gone, so a puzzle needing it later will be
+      reported as unreachable rather than discovered by a player at move 200.
+    </p>
+
+    <div class="note">
+      <span class="tag">Check your work continuously</span>
+      <p>
+        <code>folio validate</code> is fast enough to run on every save. T2 computes the
+        dependency graph from the world rather than trusting your walkthrough, so it
+        finds the dead end you created three rules ago, not the one you happened to
+        walk into.
+      </p>
+    </div>
+
+    <div class="pager">
+      <a href="/docs/quickstart/">← Your first game</a>
+      <a class="nx" href="/docs/porting/">Porting a game →</a>
+    </div>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script src="/assets/starfield.js"></script>
+</body>
+</html>

@@ -3,45 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Docs — Folio Game Engine</title>
-<meta name="description" content="How the .folio format, the World State Contract, and certification work.">
+<title>Docs · Folio Game Engine</title>
+<meta name="description" content="How the Folio engine, the .folio format and the validator fit together, and what exists today.">
 <link rel="canonical" href="https://folio.games/docs/">
 <meta name="theme-color" content="#050409">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/site.css">
-<style>
-  .layout{display:grid;grid-template-columns:200px 1fr;gap:48px;padding:52px 0 0;align-items:start}
-  @media (max-width:940px){.layout{grid-template-columns:1fr;gap:22px;padding-top:40px}}
-  .toc{position:sticky;top:78px}
-  .toc p{font:600 10.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;
-    color:var(--gold);margin:0 0 14px}
-  .toc a{display:block;padding:7px 0 7px 14px;color:var(--gray);text-decoration:none;
-    border-left:1px solid rgba(155,155,164,.3);font-size:14px}
-  .toc a:hover{color:var(--paper);border-color:var(--gold)}
-  @media (max-width:940px){
-    .toc{position:static}
-    .toc a{display:inline-block;border-left:0;padding:6px 16px 6px 0}
-  }
-  /* Documentation is the one page here that gets read line by line rather than
-     scanned, so the prose sits on a solid panel instead of directly on the sky.
-     Stars behind running text are atmosphere on a poster and grit in a manual. */
-  article{
-    max-width:calc(72ch + 76px);min-width:0;
-    background:var(--panel);border:1px solid rgba(232,228,218,.16);
-    padding:34px 38px 40px;
-    box-shadow:0 3px 0 rgba(0,0,0,.55), 0 10px 24px rgba(0,0,0,.45);
-  }
-  @media (max-width:620px){article{padding:26px 20px 30px}}
-  article h2{font:italic 700 24px/1.3 var(--slab);color:var(--palegold);
-    margin:48px 0 14px;padding-top:18px;border-top:1px solid rgba(155,155,164,.28)}
-  article p,article li{font-size:15.5px}
-  article ul{padding-left:20px}
-  article li{margin:7px 0}
-  article strong{color:var(--paper)}
-  .callout{border-left:3px solid var(--gold);background:rgba(242,167,27,.07);
-    padding:16px 20px;margin:20px 0}
-  .callout p{margin:0;font-size:15px}
-</style>
+<link rel="stylesheet" href="/assets/docs.css">
 </head>
 <body>
 
@@ -58,133 +26,212 @@
 </header>
 
 <main>
-<div class="wrap layout">
+<div class="wrap doclayout">
 
-  <aside class="toc">
-    <p>On this page</p>
-    <a href="#start">Getting started</a>
-    <a href="#format">The .folio format</a>
-    <a href="#contract">The contract</a>
-    <a href="#cert">Certification</a>
-    <a href="#dials">The dials</a>
-    <a href="#embed">Embedding</a>
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/" aria-current="page">Overview</a>
+    <div class="sub">
+      <a href="#pieces">The pieces</a>
+      <a href="#paths">Two logic paths</a>
+      <a href="#loop">The authoring loop</a>
+      <a href="#today">What exists today</a>
+    </div>
+    <a href="/docs/quickstart/">Your first game</a>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/">Writing a world</a>
+    <a href="/docs/porting/">Porting a game</a>
+    <a href="/docs/scenes/">Scenes and verbs</a>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/">Manifest, CLI, dials</a>
+    <a href="/docs/errors/">Finding codes</a>
   </aside>
 
-  <article>
+  <article class="doc">
     <p class="kicker">Documentation</p>
     <h1 class="display">How Folio works</h1>
     <p class="lede">
-      An engine, a file format, and a way of proving a game can be finished. The full
-      reference lives with the source; this is the shape of it.
+      An engine, a file format, and a way of proving a game can be finished. This is
+      the reference manual. It is more detailed than the README on GitHub, and where
+      the two disagree, this is the one that is right.
     </p>
 
-    <h2 id="start">Getting started</h2>
-    <pre><b>npm i -g folio-engine</b>
+    <h2 id="pieces">The pieces</h2>
+    <p>
+      Folio is four things that fit together, and it is worth knowing which one you are
+      working with at any moment.
+    </p>
+    <dl class="fields">
+      <dt>the engine</dt>
+      <dd>
+        Reads a game and draws it. It runs in a browser with no build step and no
+        server. The interface it draws is fixed: a scene, a verb grid, a compass, a
+        text pane, an inventory strip, a status bar. You do not lay that out.
+      </dd>
+      <dt>the .folio</dt>
+      <dd>
+        One zip file holding a whole game, with nothing pointing outside it. This is the
+        unit of creation, sharing, validation and play. See
+        <a href="/docs/reference/#layout">the layout reference</a>.
+      </dd>
+      <dt>the validator</dt>
+      <dd>
+        Five tiers of checks that decide what a game may claim. The interesting one
+        replays the game's own walkthrough from a cold start and requires it to reach
+        the ending. See <a href="/docs/reference/#tiers">certification</a>.
+      </dd>
+      <dt>the CLI</dt>
+      <dd>
+        <code>folio pack</code>, <code>validate</code>, <code>play</code>,
+        <code>info</code>, <code>profile</code>, <code>brief</code> and
+        <code>calibrate</code>. Everything the site does, the command line does too.
+      </dd>
+    </dl>
 
-<b>folio pack</b> my-game/ my-game.folio    <span style="opacity:.55"># assemble</span>
-<b>folio validate</b> my-game.folio         <span style="opacity:.55"># check it</span>
-<b>folio play</b> my-game.folio             <span style="opacity:.55"># play in the terminal</span>
-<b>folio profile</b> my-game.folio          <span style="opacity:.55"># measure its design shape</span></pre>
+    <h2 id="paths">Two logic paths</h2>
     <p>
-      A game directory needs a <code>manifest.json</code>, a
-      <code>walkthrough.folioscript</code>, and either a Z-machine story file or a
-      <code>world.json</code>. Everything else is presentation.
+      A game's logic comes from one of two places, and which one you have determines
+      most of what you will do. The manifest declares it as <code>logicType</code>.
     </p>
-
-    <h2 id="format">The .folio format</h2>
-    <p>
-      A <code>.folio</code> is a zip with a fixed layout, and it carries everything the
-      game needs. Archives of community work tend to lose their contents the same way,
-      by depending on something stored elsewhere, so nothing here points outward.
-    </p>
-    <pre>my-game.folio
-├── manifest.json            <span style="opacity:.55">id, title, author, licence, rating</span>
-├── walkthrough.folioscript  <span style="opacity:.55">required: the proof it can be finished</span>
-├── logic/
-│   ├── game.z3              <span style="opacity:.55">a Z-machine story, or</span>
-│   └── world.json           <span style="opacity:.55">a declarative world</span>
-├── presentation/            <span style="opacity:.55">scenes, sprites, verb map, bindings</span>
-└── checksums.json           <span style="opacity:.55">written on pack, verified on load</span></pre>
-    <p>
-      Three manifest fields are mandatory: <strong>licence</strong>, where unknown
-      means playable but not hostable, <strong>content rating</strong>, and a
-      structured <strong>AI disclosure</strong>.
-    </p>
-
-    <h2 id="contract">The World State Contract</h2>
-    <p>
-      The renderer reads one thing, a plain object describing the world right now. It
-      never learns which kind of game produced it, which is how the same code draws a
-      1988 binary and a world compiled from a novel last week.
-    </p>
-    <pre>{
-  roomId:    "LIVING-ROOM",
-  score: 35, moves: 13, dark: false,
-  objects:   ["LAMP","SWORD","RUG"],
-  inventory: ["LAMP"],
-  exits:     { NORTH:"KITCHEN", EAST:false },
-  flags:     { LAMP:{ ONBIT:true } }
-}</pre>
-    <p>
-      <code>exits</code> has three states rather than two. A room id means you can go,
-      <code>false</code> means the way exists but is blocked, and absent means there is
-      no way at all. The middle state is what lets the compass grey out a door you can
-      see and cannot yet open.
-    </p>
-
-    <h2 id="cert">Certification</h2>
-    <p>Games are checked in tiers, and a badge claims only what was verified.</p>
+    <div class="scroll">
     <table>
-      <tr><th>Tier</th><th>Proves</th></tr>
-      <tr><td><b>T0</b> schema</td><td>The manifest is complete and well-formed</td></tr>
-      <tr><td><b>T1</b> integrity</td><td>References resolve, assets decode, capabilities are supported</td></tr>
-      <tr><td><b>T2</b> graph</td><td><b>No dead ends exist</b>, computed from the world rather than asserted</td></tr>
-      <tr><td><b>T3</b> replay</td><td><b>One path completes</b>, from the beginning, with no state injection</td></tr>
-      <tr><td><b>T4</b> design</td><td>Chain depth, item economy, map shape and pacing</td></tr>
+      <tr><th></th><th>Path A · <code>zmachine</code></th><th>Path B · <code>world</code></th></tr>
+      <tr>
+        <td>You start with</td>
+        <td>An existing Z-machine story file, v3, v5 or v8</td>
+        <td>Nothing. A story, an idea, a novel</td>
+      </tr>
+      <tr>
+        <td>Logic lives in</td>
+        <td>The original binary, run unmodified</td>
+        <td><code>logic/world.json</code>, plain data</td>
+      </tr>
+      <tr>
+        <td>You supply</td>
+        <td>A room map, mostly derived by <code>folio calibrate</code></td>
+        <td>The whole world: rooms, items, rules</td>
+      </tr>
+      <tr>
+        <td>Can contain code</td>
+        <td>Yes, it is a compiled program</td>
+        <td>No, and it never can</td>
+      </tr>
+      <tr>
+        <td>Validator reaches</td>
+        <td>T0 and T1 only</td>
+        <td>T0 through T4</td>
+      </tr>
+      <tr>
+        <td>Guide</td>
+        <td><a href="/docs/porting/">Porting a game</a></td>
+        <td><a href="/docs/world/">Writing a world</a></td>
+      </tr>
     </table>
+    </div>
     <p>
-      T2 and T3 check different things and neither implies the other. T3 starts every
-      run from the game's own opening state, because a test that can teleport the
-      player or hand them an item shows that a scene works from a position nobody could
-      reach.
+      Both paths hand the engine the same object, the World State Contract, and the
+      engine never learns which one it got. That is what lets one renderer draw a 1988
+      binary and a world compiled from a novel last week. The contract is specified in
+      <code>packages/format/world-state-contract.md</code> and summarised in
+      <a href="/docs/scenes/#contract">Scenes and verbs</a>, because it is the object
+      your scene code reads.
     </p>
-    <div class="callout">
+
+    <h2 id="loop">The authoring loop</h2>
+    <p>
+      Whichever path you are on, the working loop is the same four commands. There is no
+      project file and no scaffolding step. A game is a directory.
+    </p>
+<pre><span class="c"># 1. assemble the directory into one file</span>
+<b>folio pack</b> my-game/ my-game.folio
+
+<span class="c"># 2. find out whether it holds together, and what it may claim</span>
+<b>folio validate</b> my-game.folio
+
+<span class="c"># 3. play it in the terminal, which is the fastest way to feel a problem</span>
+<b>folio play</b> my-game.folio
+
+<span class="c"># 4. measure its design shape against the corpus</span>
+<b>folio profile</b> my-game.folio</pre>
+    <p>
+      Most of your time goes into step two. The validator is deliberately talkative and
+      its warnings are the closest thing Folio has to a design review. Every code it
+      can emit is documented in <a href="/docs/errors/">the finding codes reference</a>,
+      with what causes it and what to do about it.
+    </p>
+
+    <h2 id="today">What exists today</h2>
+    <p>
+      Folio is an early project and some of what has been designed is not built. Reading
+      this manual should not leave you guessing which is which, so here is the line.
+    </p>
+
+    <h3>Built and working</h3>
+    <ul>
+      <li>The engine, both logic backends, and the browser player</li>
+      <li>The <code>.folio</code> container, with checksums verified on load</li>
+      <li>The validator, tiers T0 through T4, and the corpus profiler</li>
+      <li>The <code>folio</code> command line, all seven commands</li>
+      <li>
+        Room-map calibration, which derives a Path A binding from a story file and
+        reports the parts it could not finish rather than guessing them
+      </li>
+      <li>The authoring dials, which resolve intent into targets and thresholds</li>
+    </ul>
+
+    <h3>Designed, not built</h3>
+    <div class="gap">
+      <span class="tag">There is no editor</span>
       <p>
-        <strong>Playable means a path exists. It does not mean a human can find it.</strong>
-        Those are separate claims and the badge keeps them separate.
+        You author a Folio game by writing JSON in your own text editor and running
+        <code>folio validate</code>. There is no visual editor, no dependency-chart view,
+        and no web studio. Those are designed and intended, and the dependency chart is
+        meant to become the primary editing surface, but none of it is written yet.
+      </p>
+      <p>
+        This manual documents the workflow that exists. Where a section would otherwise
+        describe an unbuilt tool, it says so in a box like this one instead.
       </p>
     </div>
+    <ul>
+      <li>
+        <strong>The Story Compiler.</strong> Turning a novel or screenplay into a world
+        automatically. The pieces it needs exist around it, the compiler itself does not.
+      </li>
+      <li>
+        <strong>The art pipeline.</strong> Nothing generates scene art. A Path B game
+        currently renders every room as a placeholder unless you write the drawing code
+        yourself. See <a href="/docs/scenes/">Scenes and verbs</a>.
+      </li>
+      <li>
+        <strong>The blind solver.</strong> T4 measures design shape but cannot yet tell
+        you whether a human could find the solution.
+      </li>
+      <li>
+        <strong>The gallery backend.</strong> Uploads, accounts and moderation.
+      </li>
+    </ul>
 
-    <h2 id="dials">The dials</h2>
+    <h2 id="next">Where to go next</h2>
     <p>
-      Thresholds come from replaying Zork I and measuring what it does: 82 rooms, 0.67
-      loops per room, a 43% take rate, a reward about every 11.5 moves, and one stretch
-      of 69 moves with no reward at all.
+      If you have never built one, start with
+      <a href="/docs/quickstart/">Your first game</a>. It builds a small complete game
+      from an empty directory and takes about ten minutes.
     </p>
     <p>
-      Two of those numbers changed how the checks work. Most of Zork's world is scenery
-      by design, so a world where everything is useful reads as a list of tasks rather
-      than a place. And one loop in a fifty-room map is still a corridor, so map shape
-      is measured per room.
+      If you have a story and want to build a game out of it,
+      <a href="/docs/world/">Writing a world</a> is the full reference for the format you
+      will be writing.
     </p>
     <p>
-      Scale is the one thing that does not come from the corpus. Zork has 82 rooms
-      because Zork is Zork, so a game adapted from a short story is measured against
-      its own source or the brief you set.
+      If you have a Z-machine game you want to give pictures to, read
+      <a href="/docs/porting/">Porting a game</a> first. It is honest about a missing
+      piece in that workflow, and you should know about it before you start.
     </p>
 
-    <h2 id="embed">Embedding a game</h2>
-    <p>
-      The player is a single file with no dependencies. Host a <code>.folio</code>
-      anywhere and point at it:
-    </p>
-    <pre>&lt;iframe src="https://folio.games/play/?game=<b>https://example.com/my-game.folio</b>"
-        width="720" height="680" style="border:0"&gt;&lt;/iframe&gt;</pre>
-    <p>
-      You can also download the player and serve both yourself. A game of Folio has no
-      server-side component and runs entirely in the browser, so it keeps working on a
-      static host and offline.
-    </p>
+    <div class="pager">
+      <a class="nx" href="/docs/quickstart/">Your first game →</a>
+    </div>
   </article>
 
 </div>

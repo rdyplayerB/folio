@@ -125,6 +125,77 @@ try {
       console.log('  ' + k.padEnd(22) + C.dim + (Array.isArray(v) ? JSON.stringify(v) : v) + C.off);
     }
 
+  } else if (cmd === 'calibrate') {
+    // The first half of porting a Z-machine game: work out which numbered object
+    // is which room. Everything structural is derived; the attribute table is
+    // partly inference, and the parts that are not confident are handed back as
+    // evidence rather than written out as fact.
+    const [file] = args;
+    if (!file) throw new Error('usage: folio calibrate <story.z3> [-o roommap.json]');
+    const oi = args.indexOf('-o');
+    const out = oi > 0 ? args[oi + 1] : null;
+
+    const { calibrate, NEEDED_FLAGS } = require('../zmachine/calibrate.js');
+    const r = calibrate(fs.readFileSync(file));
+    const rep = r.report;
+
+    console.log(C.bold + path.basename(file) + C.off + C.dim +
+      '  v' + rep.story.version + ' release ' + rep.story.release +
+      ' serial ' + rep.story.serial + ', ' + rep.story.objects + ' objects' + C.off + '\n');
+
+    const row = (k, v, note) =>
+      console.log('  ' + k.padEnd(14) + String(v).padStart(5) + '   ' + C.dim + (note || '') + C.off);
+    row('rooms', rep.rooms, 'from the ' + rep.roomsFoundBy);
+    row('objects', rep.objects, rep.unnamed ? rep.unnamed + ' unnamed internals skipped' : '');
+    row('directions', rep.directions.considered.length,
+      Math.round(rep.directions.reciprocity * 100) + '% of exits lead back, which is what named them');
+    row('player', r.roommap.ADVENTURER === null ? '—' : r.roommap.ADVENTURER,
+      rep.player.how);
+
+    console.log('\n  ' + C.bold + 'attribute bits' + C.off);
+    for (const a of rep.attributes) {
+      const known = a.bit !== null;
+      console.log('    ' + (known ? C.green + '✓' + C.off : C.yellow + '?' + C.off) + ' ' +
+        a.flag.padEnd(11) + String(known ? a.bit : '—').padStart(3) + '   ' +
+        C.dim + a.why + C.off);
+    }
+
+    const missing = rep.missingFlags;
+    if (missing.length) {
+      // This is the part a person finishes. Reading eight rows of object names is
+      // a couple of minutes of work and it is never wrong, which beats a solver
+      // that is right most of the time and silently wrong the rest.
+      console.log('\n  ' + C.yellow + 'Confirm ' + missing.length + ' flags by hand' + C.off +
+        C.dim + ' — find the bit whose objects match the meaning' + C.off);
+      console.log('  ' + C.dim + missing.join(', ') + C.off + '\n');
+      const cens = rep.census
+        .filter(c => !c.claimed && c.count > 2 && c.count < rep.story.objects * 0.5)
+        .sort((a, b) => b.count - a.count);
+      for (const c of cens) {
+        console.log('    bit ' + String(c.bit).padStart(2) + C.dim + '  n=' +
+          String(c.count).padEnd(4) + (c.rooms ? 'rooms=' + String(c.rooms).padEnd(4) : '        ') +
+          C.off + c.sample.slice(0, 5).join(', ').slice(0, 62));
+      }
+    }
+
+    if (out) {
+      const doc = Object.assign({}, r.roommap);
+      if (missing.length) {
+        doc._confirm = {
+          note: 'Fill each of these into ATTR as a bit number, then delete this block. ' +
+                'Run folio calibrate again to see the object names behind each bit.',
+          flags: missing
+        };
+      }
+      fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+      fs.writeFileSync(out, JSON.stringify(doc, null, 2));
+      console.log('\n  wrote ' + out + '  ' + C.dim +
+        (missing.length ? missing.length + ' flags left for you' : 'complete') + C.off);
+    } else {
+      console.log('\n  ' + C.dim + 'pass -o presentation/roommap.json to write it' + C.off);
+    }
+    process.exit(rep.rooms > 0 ? 0 : 1);
+
   } else if (cmd === 'info') {
     const [file] = args;
     if (!file) throw new Error('usage: folio info <file.folio>');
@@ -165,6 +236,7 @@ try {
     console.log('  folio play <file.folio>        play it in the terminal');
     console.log('  folio profile <file.folio>     measure its design shape');
     console.log('  folio brief [brief.json]       resolve authoring dials into targets');
+    console.log('  folio calibrate <story.z3>     derive a room map from a Z-machine story');
     process.exit(cmd ? 1 : 0);
   }
 } catch (e) {

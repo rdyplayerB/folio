@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Finding codes · Folio Game Engine</title>
+<meta name="description" content="Every error and warning the Folio validator can emit, what causes it, and what to do about it.">
+<link rel="canonical" href="https://folio.games/docs/errors/">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/docs.css">
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap doclayout">
+
+  <aside class="docnav">
+    <p class="grp">Getting started</p>
+    <a href="/docs/">Overview</a>
+    <a href="/docs/quickstart/">Your first game</a>
+    <p class="grp">Making games</p>
+    <a href="/docs/world/">Writing a world</a>
+    <a href="/docs/porting/">Porting a game</a>
+    <a href="/docs/scenes/">Scenes and verbs</a>
+    <p class="grp">Reference</p>
+    <a href="/docs/reference/">Manifest, CLI, dials</a>
+    <a href="/docs/errors/" aria-current="page">Finding codes</a>
+    <div class="sub">
+      <a href="#t0">T0 · schema</a>
+      <a href="#t1">T1 · integrity</a>
+      <a href="#t2">T2 · graph</a>
+      <a href="#t3">T3 · replay</a>
+      <a href="#t4">T4 · design</a>
+    </div>
+  </aside>
+
+  <article class="doc">
+    <p class="kicker">Reference</p>
+    <h1 class="display">Finding codes</h1>
+    <p class="lede">
+      Every code <code>folio validate</code> can emit, what causes it, and what to do.
+      Errors block certification. Warnings do not, and the T4 warnings in particular are
+      opinions rather than faults.
+    </p>
+    <div class="note">
+      <span class="tag">Why this page exists</span>
+      <p>
+        A validator that refuses your game without saying why is worse than no validator.
+        Every code the engine can produce has an entry here, and the intent is that adding
+        one without documenting it should be impossible.
+      </p>
+    </div>
+
+    <h2 id="t0">T0 · schema</h2>
+    <p>The manifest and the container. Nothing else runs until these pass.</p>
+    <dl class="fields">
+      <dt><span class="code e">E100</span></dt>
+      <dd>
+        <b>manifest is missing a mandatory field.</b> All seven of <code>id</code>,
+        <code>title</code>, <code>author</code>, <code>folioVersion</code>,
+        <code>logicType</code>, <code>license</code> and <code>contentRating</code> are
+        required. See <a href="/docs/reference/#manifest">the manifest reference</a>.
+      </dd>
+      <dt><span class="code e">E101</span></dt>
+      <dd><b>A manifest field is the wrong type.</b> All seven are strings, including <code>folioVersion</code>.</dd>
+      <dt><span class="code e">E102</span></dt>
+      <dd><b><code>folioVersion</code> is not semver.</b> Three dot-separated numbers, so <code>"0.1.0"</code> rather than <code>"0.1"</code>.</dd>
+      <dt><span class="code e">E103</span></dt>
+      <dd><b>Unknown <code>logicType</code>.</b> Only <code>world</code> and <code>zmachine</code> exist.</dd>
+      <dt><span class="code e">E104</span></dt>
+      <dd><b>Unknown <code>contentRating</code>.</b> One of <code>all-ages</code>, <code>teen</code>, <code>mature</code>.</dd>
+      <dt><span class="code e">E107</span></dt>
+      <dd>
+        <b>The walkthrough is empty.</b> It is the proof of completability, so a game
+        without one cannot certify. Even a one-line walkthrough is better than none.
+      </dd>
+      <dt><span class="code w">W105</span></dt>
+      <dd>
+        <b>Licence is "unknown".</b> Playable, but the gallery cannot serve a game whose
+        rights are undeclared. Set an SPDX identifier once you know.
+      </dd>
+      <dt><span class="code w">W106</span></dt>
+      <dd>
+        <b>No <code>aiDisclosure</code> block.</b> State precisely what was generated and
+        what a human reviewed. A claim that outruns the pipeline is the failure mode that
+        costs trust.
+      </dd>
+      <dt><span class="code w">W108</span></dt>
+      <dd>
+        <b><code>brief.json</code> could not be read.</b> The game is judged against
+        generic defaults instead of your stated intent, which usually means harsher T4
+        warnings than you deserve.
+      </dd>
+    </dl>
+
+    <h2 id="t1">T1 · integrity</h2>
+    <p>Every reference resolves and every asset decodes.</p>
+    <dl class="fields">
+      <dt><span class="code e">E200</span></dt>
+      <dd><b>Declared <code>zmachine</code> but no story file.</b> Needs a <code>logic/*.z3</code>, <code>.z5</code> or <code>.z8</code>.</dd>
+      <dt><span class="code e">E201</span></dt>
+      <dd><b>That is not a Z-machine story.</b> Its first byte is not 3, 5 or 8. Usually a wrapped or base64 file rather than the raw binary.</dd>
+      <dt><span class="code e">E202</span></dt>
+      <dd>
+        <b>Extension and header disagree.</b> A file named <code>.z3</code> whose header
+        says v5. Rename it, or ship the story you meant to ship. This is checked because
+        the mistake otherwise surfaces in front of a player.
+      </dd>
+      <dt><span class="code e">E203</span></dt>
+      <dd>
+        <b>No <code>presentation/roommap.json</code>.</b> Path A needs one to bind object
+        numbers to stable ids. Generate it with
+        <code>folio calibrate</code>, see <a href="/docs/porting/#hard">Porting a game</a>.
+      </dd>
+      <dt><span class="code e">E204</span></dt>
+      <dd><b><code>roommap.json</code> is not valid JSON.</b></dd>
+      <dt><span class="code e">E205</span></dt>
+      <dd>
+        <b><code>roommap.json</code> is missing a key.</b> <code>ROOMMAP</code>,
+        <code>OBJMAP</code> and <code>ATTR</code> are all required. If you generated it,
+        you probably still have flags left in the <code>_confirm</code> block.
+      </dd>
+      <dt><span class="code e">E210</span></dt>
+      <dd><b>Declared <code>world</code> but no <code>logic/world.json</code>.</b></dd>
+      <dt><span class="code e">E211</span></dt>
+      <dd><b><code>world.json</code> is not valid JSON.</b> The message carries the parser's position.</dd>
+      <dt><span class="code e">E220</span></dt>
+      <dd>
+        <b>Unknown capability.</b> The game is asking for an engine feature this format
+        version does not define. Known values are listed in
+        <a href="/docs/reference/#manifest">the manifest reference</a>.
+      </dd>
+      <dt><span class="code e">E230</span></dt>
+      <dd><b>A <code>.png</code> is not a PNG.</b> Its magic bytes are wrong. Assets are checked here because a bad one otherwise fails at play time.</dd>
+    </dl>
+
+    <h2 id="t2">T2 · graph</h2>
+    <p>
+      The dependency graph, computed from the world rather than taken on trust. This is
+      where dead ends are caught, and it runs on Path B only, because a compiled binary's
+      graph cannot be read.
+    </p>
+    <dl class="fields">
+      <dt><span class="code e">E300</span></dt>
+      <dd><b><code>meta.start</code> is not a real room.</b> Nothing can boot. Check spelling and case.</dd>
+      <dt><span class="code e">E301</span></dt>
+      <dd><b>An exit leads to a room that does not exist.</b> The message names both ends.</dd>
+      <dt><span class="code e">E302</span></dt>
+      <dd><b>An exit's <code>door</code> is not an item.</b> A door has to be a real item id, and it needs to exist even if the player never picks it up.</dd>
+      <dt><span class="code e">E303</span></dt>
+      <dd>
+        <b>An item starts nowhere real.</b> <code>location</code> must be a room id,
+        another item's id, <code>"PLAYER"</code> or <code>"NOWHERE"</code>.
+      </dd>
+      <dt><span class="code e">E304</span></dt>
+      <dd><b>A rule sends the player to a room that does not exist.</b> A <code>goto</code> with a bad target.</dd>
+      <dt><span class="code e">E305</span></dt>
+      <dd><b>A rule acts on an item that does not exist.</b> Usually a typo in an effect's <code>item</code>.</dd>
+      <dt><span class="code e">E310</span></dt>
+      <dd>
+        <b>The win state is not reachable.</b> The one every first draft hits. Either
+        nothing declares a <code>win</code> effect at all, or a puzzle in the chain has no
+        solution from the start state. Work backwards from the win: what condition guards
+        it, what sets that, and is that reachable in turn?
+      </dd>
+      <dt><span class="code e">E311</span></dt>
+      <dd>
+        <b>A room is unreachable.</b> Nothing the player can do leads there. Usually a
+        missing return exit or a condition nothing satisfies.
+      </dd>
+      <dt><span class="code w">W312</span></dt>
+      <dd><b>An item can never be reached.</b> It exists but no player will ever see it. Often left in a room you later made unreachable.</dd>
+      <dt><span class="code w">W313</span></dt>
+      <dd>
+        <b>A rule can never fire.</b> Its room is unreachable, or its noun can never be
+        present. Reported from the <em>trigger</em> and never from the conditions, because
+        a rule with conditions that fail is a deliberate failure branch and not dead code.
+      </dd>
+      <dt><span class="code w">W314</span></dt>
+      <dd>
+        <b>An item can be destroyed but is also required.</b> A player who destroys it
+        first may be unable to finish. Make it unbreakable, replaceable, or make the
+        destruction itself a win or lose branch.
+      </dd>
+    </dl>
+
+    <h2 id="t3">T3 · replay</h2>
+    <p>
+      Your walkthrough is run from a cold start, with no state injected and no privileged
+      verbs, and it has to reach the ending.
+    </p>
+    <dl class="fields">
+      <dt><span class="code e">E400</span></dt>
+      <dd><b>The walkthrough contains no commands.</b> Every line was a comment or blank.</dd>
+      <dt><span class="code e">E401</span></dt>
+      <dd><b>The game would not start.</b> Usually a malformed <code>meta</code> block.</dd>
+      <dt><span class="code e">E402</span></dt>
+      <dd>
+        <b>Unknown assertion.</b> Only <code>expect: score N</code>,
+        <code>expect: room ID</code> and <code>expect: moves N</code> exist.
+      </dd>
+      <dt><span class="code e">E403</span></dt>
+      <dd>
+        <b>An assertion failed.</b> The line number counts <em>commands</em>, not file
+        lines, so comments and blanks are not included in the count.
+      </dd>
+      <dt><span class="code e">E404</span></dt>
+      <dd><b>A command threw.</b> A genuine engine-level fault. Worth reporting as a bug alongside the world that triggered it.</dd>
+      <dt><span class="code e">E410</span></dt>
+      <dd>
+        <b>The walkthrough ended without winning.</b> The hint reports where it stopped,
+        the score, the move count and the last command, which is normally enough to see
+        which step stopped working.
+      </dd>
+      <dt><span class="code e">E411</span></dt>
+      <dd><b>The walkthrough ends in a loss.</b> It reached a <code>lose</code> effect. The hint carries the death text.</dd>
+    </dl>
+
+    <h2 id="t4">T4 · design</h2>
+    <p>
+      Advisory, always. A shallow game is still a game; it simply cannot claim to be a
+      finished one. Thresholds come from replaying Zork I and measuring what it does, and
+      shipping a <code>brief.json</code> re-grades all of these against your own stated
+      intent instead.
+    </p>
+    <dl class="fields">
+      <dt><span class="code w">W500</span></dt>
+      <dd>
+        <b>Too few rooms.</b> Short enough to read as a demo. If your source carries more
+        named places than the adaptation used, the message says so, because that gap is the
+        characteristic failure of compiling a long book into six rooms and a walk.
+      </dd>
+      <dt><span class="code w">W501</span></dt>
+      <dd>
+        <b>The longest puzzle chain is shallow.</b> Nothing requires several steps of
+        planning. Depth is what makes a solution feel earned; a chain of one is an errand.
+      </dd>
+      <dt><span class="code w">W502</span></dt>
+      <dd>
+        <b>Too few items do anything.</b> Almost nothing is load-bearing. Zork carries a
+        lot of scenery too, only 43% of what a player sees is ever picked up, but below
+        about a quarter the world stops rewarding attention.
+      </dd>
+      <dt><span class="code w">W503</span></dt>
+      <dd>
+        <b>Too few rooms contain anything.</b> The rest are corridors, and empty rooms are
+        the most common way a generated map inflates its size without adding a game.
+      </dd>
+      <dt><span class="code w">W504</span></dt>
+      <dd>
+        <b>The map is a tree.</b> Corridor maps are the signature of generated geography.
+        Zork runs 0.67 loops per room, so nearly every room sits on a circuit, which is
+        what lets a player take a shortcut and feel the map as a place rather than a menu.
+        Measured per room, because one loop in a fifty-room map is still a corridor.
+      </dd>
+      <dt><span class="code w">W505</span></dt>
+      <dd>
+        <b>Nothing can kill or defeat the player.</b> Without stakes, exploration carries
+        no tension. Not mandatory, and some fine games have no death, but worth having
+        decided rather than defaulted. Setting <code>deadliness: "none"</code> in your
+        brief silences it, because a dial must silence the warning it authorises.
+      </dd>
+      <dt><span class="code w">W506</span></dt>
+      <dd>
+        <b>Keys sit in the same room as their locks.</b> A key beside its door is a
+        formality rather than a puzzle. Distance is what makes a player carry something in
+        the hope that it matters.
+      </dd>
+      <dt><span class="code w">W507</span></dt>
+      <dd>
+        <b>Almost everything is load-bearing.</b> The opposite of W502. A world where
+        everything matters reads as a shopping list, and Zork keeps roughly half its
+        objects as pure scenery precisely so the useful ones feel chosen.
+      </dd>
+    </dl>
+
+    <div class="pager">
+      <a href="/docs/reference/">← Reference</a>
+      <a class="nx" href="/docs/">Overview →</a>
+    </div>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script src="/assets/starfield.js"></script>
+</body>
+</html>
