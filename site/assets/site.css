@@ -99,6 +99,10 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .display{
   font:italic 700 clamp(34px,4.4vw,56px)/1.08 var(--slab);
   color:var(--palegold);letter-spacing:.005em;
+  /* Proportional, because the line height is tight enough at 1.08 that a fixed
+     gap that works at 56px closes up at 34px. Nothing was setting this, so the
+     lede sat flush against the descenders. */
+  margin:0 0 .34em;
   /* Hard, stepped print shadow. A soft glow is the tell that gives away a
      modern imitation: phototypesetting could not render one. */
   text-shadow:2px 2px 0 #7a1b16, 4px 4px 0 rgba(0,0,0,.85);

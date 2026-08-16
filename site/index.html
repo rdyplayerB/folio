@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Folio Game Engine — play and make 8-bit adventures</title>
-<meta name="description" content="Text adventures rendered as point-and-click graphic adventures you play in a browser. Play what the community has made, or turn your own story into one.">
+<title>Folio Game Engine · play and make 8-bit adventures</title>
+<meta name="description" content="Old and new adventures, rebuilt as point-and-click games you play in a browser. Play what the community has made, or turn a story of your own into one.">
 <link rel="canonical" href="https://folio.games/">
-<meta property="og:title" content="Folio Game Engine — play and make 8-bit adventures">
-<meta property="og:description" content="Text adventures rendered as point-and-click graphic adventures you play in a browser. Every game is one portable file.">
+<meta property="og:title" content="Folio Game Engine · play and make 8-bit adventures">
+<meta property="og:description" content="Old and new adventures, rebuilt as point-and-click games you play in a browser. Every game is one portable file.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://folio.games/">
 <meta name="twitter:card" content="summary_large_image">
@@ -15,9 +15,18 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/site.css">
 <style>
-  .hero{padding:64px 0 8px;display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center}
+  /* The left column is wide enough for the headline to break at its comma. At
+     the old ratio the second clause could not fit on one line at display size,
+     so the wrap fell mid-clause and left a line ending on "as". */
+  .hero{padding:64px 0 8px;display:grid;grid-template-columns:1.24fr .76fr;gap:52px;align-items:center}
   @media (max-width:960px){.hero{grid-template-columns:1fr;gap:32px;padding-top:44px}}
-  .hero p{font-size:17.5px;margin:0 0 15px;max-width:56ch}
+  /* On a phone neither clause fits a line, so the hard break buys nothing and
+     costs a whole line of display type. Let it wrap on its own down there. */
+  @media (max-width:700px){.hero h1.display br{display:none}}
+  /* :not(.kicker) because a bare `.hero p` outranks `.kicker` on specificity and
+     was silently resizing the kicker from 11px to 17.5px, which is what pushed
+     it onto two lines on a phone. Narrow the rule rather than out-specify it. */
+  .hero p:not(.kicker){font-size:17.5px;margin:0 0 15px;max-width:56ch}
   .cta{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
   .facts{display:flex;gap:30px;margin-top:32px;flex-wrap:wrap;
     font:11px/1.5 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dimgray)}
@@ -59,10 +68,18 @@
   <section class="hero">
     <div>
       <p class="kicker">Open source · Free to play</p>
-      <h1 class="display">Every text adventure deserves the <span class="nb">8-bit</span> port it never got.</h1>
+      <!-- The break is hard rather than left to text-wrap:balance. Balance
+           equalises line lengths, which put the turn after "rebuilt" and left
+           the second line opening on "as". The clause is the right place to
+           break at every width, so it is stated rather than hoped for. -->
+      <!-- The space before the break is load-bearing. On phones the break is
+           switched off, and without it the two text nodes close up into
+           "adventures,rebuilt". A trailing space at a line end is trimmed, so
+           it costs nothing when the break is showing. -->
+      <h1 class="display">Old and new adventures, <br>rebuilt as <span class="nb">point-and-click</span> games.</h1>
       <p>
-        Folio turns text adventures into point-and-click graphic adventures you play
-        in a browser. A picture of the room, a grid of verbs, a compass. Nobody types.
+        A picture of the room, a grid of verbs, a compass, an inventory. You click
+        the thing you want and the game answers. Nobody types at a prompt.
       </p>
       <p>
         Play what the community has made, or bring a story of your own and turn it

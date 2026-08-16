@@ -1,8 +1,8 @@
 # Folio Game Engine
 
-Text adventures, rendered as point-and-click graphic adventures you play in a
-browser. A picture of the room, a grid of verbs, a compass, an inventory. Nobody
-types.
+Old and new adventures, rebuilt as point-and-click games you play in a browser.
+A picture of the room, a grid of verbs, a compass, an inventory. Nobody types at
+a prompt.
 
 ![Zork I running in Folio: the living room, with the trophy case, sword, lamp and rug](docs/images/zork-living-room.png)
 
