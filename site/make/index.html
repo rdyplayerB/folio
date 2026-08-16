@@ -3,40 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Make a game — Folio</title>
+<title>Make a game — Folio Game Engine</title>
 <meta name="description" content="Turn a story into a playable 8-bit adventure, or give a Z-machine game the pictures it never had.">
 <link rel="canonical" href="https://folio.games/make/">
 <meta name="theme-color" content="#050409">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/site.css">
 <style>
-  .intro{padding:58px 0 8px;max-width:70ch}
-  
-  .steps{counter-reset:s;display:grid;gap:16px;margin-top:8px}
-  .step{border:1px solid var(--line);border-radius:14px;padding:22px 24px;background:var(--card);
-    position:relative;padding-left:70px}
-  .step::before{counter-increment:s;content:counter(s);position:absolute;left:24px;top:22px;
-    width:30px;height:30px;border-radius:8px;background:var(--ink);color:var(--paper);
+  .intro{padding:58px 0 10px;max-width:66ch}
+  .steps{counter-reset:s;display:grid;gap:18px;margin-top:6px}
+  .step{border:1px solid rgba(232,228,218,.22);background:rgba(232,228,218,.04);
+    padding:24px 26px 24px 74px;position:relative}
+  .step::before{counter-increment:s;content:counter(s);position:absolute;left:26px;top:25px;
+    width:30px;height:30px;background:var(--gold);color:#20140a;
     display:grid;place-items:center;font:700 14px/1 var(--mono)}
-  .step h3{margin:4px 0 8px;font:700 18px/1.3 var(--sans)}
-  .step p{margin:0 0 12px;color:var(--body);font-size:15px;max-width:64ch}
-  .dial{display:grid;grid-template-columns:130px 1fr;gap:6px 18px;font-size:14.5px;
-    border-top:1px solid var(--line);padding-top:14px;margin-top:4px}
-  .dial dt{font:600 12px/1.7 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-  .dial dd{margin:0;color:var(--body)}
-  .dial dd b{color:var(--ink)}
-  @media (max-width:620px){.dial{grid-template-columns:1fr;gap:2px}
-    .dial dd{margin-bottom:10px}}
+  .step h3{margin:2px 0 10px;font:italic 700 20px/1.25 var(--slab);color:var(--palegold)}
+  .step p{margin:0 0 14px;font-size:15px;max-width:62ch}
+  .step p:last-child{margin-bottom:0}
+  .dial{display:grid;grid-template-columns:120px 1fr;gap:9px 20px;font-size:14.5px;
+    border-top:1px solid rgba(155,155,164,.25);padding-top:16px;margin:16px 0 0}
+  .dial dt{font:600 11px/1.5 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--gold)}
+  .dial dd{margin:0;color:rgba(232,228,218,.72)}
+  .dial dd b{color:var(--paper);font-weight:600}
+  @media (max-width:620px){
+    .dial{grid-template-columns:1fr;gap:2px}
+    .dial dd{margin-bottom:12px}
+    .step{padding:22px 20px 22px 20px}
+    .step::before{position:static;margin-bottom:12px}
+  }
 </style>
 </head>
 <body>
 
 <header class="banner">
   <div class="wrap">
-    <a class="mark" href="/">Folio Entertainment Engine</a>
+    <a class="mark" href="/">Folio Game Engine</a>
     <nav>
       <a href="/#library">Library</a>
-      <a href="/make/ aria-current="page">Make one</a>
+      <a href="/make/" aria-current="page">Make one</a>
       <a href="/docs/" class="hide-sm">Docs</a>
       <a href="https://github.com/rdyplayerB/folio">GitHub</a>
     </nav>
@@ -50,26 +55,26 @@
     <p class="kicker">Make one</p>
     <h1 class="display">Two ways in. Both end in a single file.</h1>
     <p class="lede">
-      Whether you start with a story nobody has ever played or a game from 1984,
-      you finish with a <code>.folio</code> — one file that anyone can open in a
-      browser and that you can keep forever.
+      Whether you start with a story nobody has ever played or a game from 1984, you
+      finish with a <code>.folio</code>. One file that anyone can open in a browser,
+      and that you can keep.
     </p>
   </section>
 
   <section class="section">
-    <h2 class="rule">Bring a story</h2><p class="subhead">A novel, a screenplay, something you wrote.</p></div>
+    <h2 class="rule">Bring a story</h2>
     <div class="steps">
 
       <div class="step">
         <h3>Say what kind of game you want</h3>
         <p>
-          Difficulty is not one quantity — it is how deep the puzzle chains run, how
+          Difficulty is not one quantity. It is how deep the puzzle chains run, how
           plainly clues are stated, how far a key sits from its lock, and how long the
-          game dares to go without rewarding you. You set the intent; the compiler
-          works out the numbers.
+          game goes without rewarding you. You set the intent and the compiler works
+          out the numbers.
         </p>
         <dl class="dial">
-          <dt>Length</dt><dd><b>short</b> · standard · epic — or let it follow the source</dd>
+          <dt>Length</dt><dd><b>short</b> · standard · epic, or let it follow the source</dd>
           <dt>Difficulty</dt><dd>gentle · <b>standard</b> · cruel</dd>
           <dt>Deadliness</dt><dd>none · <b>fair</b> · classic</dd>
           <dt>Sprawl</dt><dd>linear · <b>balanced</b> · open</dd>
@@ -81,9 +86,9 @@
         <h3>The compiler reads your source</h3>
         <p>
           It pulls out the places, the people, the objects that matter and the moments
-          the story turns on — citing the passage each one came from, so you can check
-          its work. If your source is a poor fit for an adventure, it says so up front
-          rather than handing you a hollow game.
+          the story turns on, citing the passage each one came from so you can check
+          its work. If your source is a poor fit for an adventure, it says so before
+          you spend anything on it.
         </p>
       </div>
 
@@ -92,17 +97,18 @@
         <p>
           The puzzles are built and checked as an abstract shape before a single
           sentence is written. That ordering is what stops a long book compiling into
-          six rooms and a walk: bad structure is thrown away while it is still cheap.
+          six rooms and a walk, because bad structure gets thrown away while it is
+          still cheap to replace.
         </p>
       </div>
 
       <div class="step">
         <h3>It has to prove itself</h3>
         <p>
-          The engine replays your walkthrough from a cold start — no teleporting, no
-          conjured items — and has to reach the ending. It also checks that no dead
-          ends exist, that your world is not mostly empty rooms, and that the shape
-          resembles a game people actually finish.
+          The engine replays your walkthrough from the beginning, with no teleporting
+          and no conjured items, and has to reach the ending. It also checks that no
+          dead ends exist, that your world is not mostly empty rooms, and that the
+          shape resembles a game people finish.
         </p>
         <pre><b>$ folio validate my-game.folio</b>
 PLAYABLE  my-game.folio  T0+T1+T2+T3+T4 passed
@@ -114,20 +120,20 @@ PLAYABLE  my-game.folio  T0+T1+T2+T3+T4 passed
   </section>
 
   <section class="section">
-    <h2 class="rule">Bring a game</h2><p class="subhead">Zork, an Inform project, anything from the IF Archive.</p></div>
+    <h2 class="rule">Bring a game</h2>
     <div class="cols-2">
       <div class="card">
         <h3>The original binary runs unmodified</h3>
         <p>
           Folio does not reimplement your game or paraphrase it. It runs the actual
           story file and reads the machine's live memory to work out what to draw. The
-          game underneath is exactly the one people played; the pictures are a layer
-          on top.
+          game underneath is the one people played, and the pictures are a layer on
+          top of it.
         </p>
         <p>
-          What you supply is the presentation: which room maps to which scene, and what
-          the verb buttons send. That travels inside the <code>.folio</code>, so the
-          engine stays generic and your game stays yours.
+          What you supply is the presentation: which room maps to which scene, and
+          what the verb buttons send. That travels inside the <code>.folio</code>, so
+          the engine stays generic and your game stays yours.
         </p>
       </div>
       <div class="card">
@@ -138,8 +144,8 @@ PLAYABLE  my-game.folio  T0+T1+T2+T3+T4 passed
 <b>folio validate</b> my-game.folio
 <b>folio play</b> my-game.folio</pre>
         <p>
-          The command line does everything the site does. Documentation, the format
-          specification, and the engine source all live on GitHub.
+          The command line does everything the site does. The documentation, the format
+          specification and the engine source are all on GitHub.
         </p>
         <a class="btn" href="https://github.com/rdyplayerB/folio">Get started on GitHub</a>
       </div>
@@ -147,24 +153,24 @@ PLAYABLE  my-game.folio  T0+T1+T2+T3+T4 passed
   </section>
 
   <section class="section">
-    <h2 class="rule">What you keep</h2></div>
+    <h2 class="rule">What you keep</h2>
     <div class="cols-3">
       <div class="card">
         <h3>Your copyright</h3>
-        <p>Your game is yours. Publishing here is not a transfer of anything.</p>
+        <p>Your game is yours. Publishing it here transfers nothing to us.</p>
       </div>
       <div class="card">
         <h3>Your file</h3>
         <p>
           Download it any time. It runs without us, on any static host, offline. If
-          this site vanished tomorrow your game would still work.
+          this site went away tomorrow, your game would still work.
         </p>
       </div>
       <div class="card">
         <h3>The tools</h3>
         <p>
-          The engine, format and validator are MIT licensed. The ability to make,
-          export and play a <code>.folio</code> is never behind a paywall.
+          The engine, format and validator are MIT licensed. Making, exporting and
+          playing a <code>.folio</code> stays free.
         </p>
       </div>
     </div>

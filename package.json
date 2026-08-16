@@ -1,7 +1,7 @@
 {
   "name": "folio",
   "private": true,
-  "description": "Folio \u2014 an open engine and portable .folio format for NES-era graphic adventures.",
+  "description": "Folio Game Engine \u2014 text adventures rendered as point-and-click graphic adventures you play in a browser.",
   "license": "MIT",
   "workspaces": [
     "packages/*"
