@@ -98,6 +98,20 @@ try {
     }
     process.exit(r.ok ? 0 : 1);
 
+  } else if (cmd === 'brief') {
+    // Turn a creator's intent into concrete targets. The same resolved object is
+    // what the compiler builds toward and what T4 grades against.
+    const [file] = args;
+    const input = file ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+    const r = require('../format/brief.js').resolve(input);
+    console.log(C.bold + 'Resolved brief' + C.off);
+    console.log(r.describe().split('\n').map(l => '  ' + l).join('\n'));
+    console.log('');
+    for (const n of r.notes) console.log(C.dim + '  · ' + n + C.off);
+    console.log('');
+    console.log(C.dim + '  targets    ' + JSON.stringify(r.targets) + C.off);
+    console.log(C.dim + '  thresholds ' + JSON.stringify(r.thresholds) + C.off);
+
   } else if (cmd === 'profile') {
     // Reverse-engineer the recipe: replay a game's own walkthrough and measure
     // what a design that worked actually looks like. This is where T4's thresholds
@@ -150,6 +164,7 @@ try {
     console.log('  folio info <file.folio>        what is inside');
     console.log('  folio play <file.folio>        play it in the terminal');
     console.log('  folio profile <file.folio>     measure its design shape');
+    console.log('  folio brief [brief.json]       resolve authoring dials into targets');
     process.exit(cmd ? 1 : 0);
   }
 } catch (e) {

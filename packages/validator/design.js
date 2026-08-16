@@ -146,7 +146,8 @@ function audit(world, opts) {
     minParticipation: 25,
     maxParticipation: 90,
     minRoomUtility: 60,
-    minLoopsPerRoom: 0.15
+    minLoopsPerRoom: 0.15,
+    expectDeaths: true
   }, opts.thresholds);
 
   if (metrics.rooms < T.minRooms) {
@@ -188,7 +189,7 @@ function audit(world, opts) {
       'loops per room — nearly every room sits on a circuit — which is what lets ' +
       'a player take a shortcut and feel the map as a place rather than a menu.');
   }
-  if (!metrics.hasDeathState) {
+  if (!metrics.hasDeathState && T.expectDeaths) {
     warn('W505', 'nothing in this world can kill or defeat the player',
       'Without stakes, exploration carries no tension. Not mandatory — some fine ' +
       'games have no death — but worth having decided rather than defaulted.');

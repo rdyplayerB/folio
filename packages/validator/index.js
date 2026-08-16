@@ -167,7 +167,23 @@ function validate(game, opts) {
         // T4 reports a profile rather than a verdict, so its findings are always
         // advisory. A shallow game is still a game; it simply cannot claim to be
         // a finished one.
-        const d = require('./design.js').audit(def, opts && opts.thresholds ? opts : {});
+        // If the game shipped the brief it was built to, judge it against that
+        // brief rather than against generic defaults. Generation target and
+        // validation threshold must be the same object or a difficulty setting
+        // quietly becomes decorative.
+        let auditOpts = opts.thresholds ? { thresholds: opts.thresholds } : {};
+        if (game.files['brief.json']) {
+          try {
+            const brief = require('../format/brief.js')
+              .resolve(JSON.parse(game.files['brief.json'].toString('utf8')));
+            auditOpts = { thresholds: brief.thresholds };
+            stats = Object.assign(stats, { briefTargets: brief.targets });
+          } catch (e) {
+            warn('W108', 'brief.json could not be read: ' + e.message,
+              'The game will be judged against generic defaults instead.');
+          }
+        }
+        const d = require('./design.js').audit(def, auditOpts);
         f.push(...d.findings);
         ran.push('T4');
         stats = Object.assign(stats, d.metrics);
