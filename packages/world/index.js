@@ -340,8 +340,15 @@ function mulberry32(a) {
 
 /** Create a Path B backend. Mirrors @folio/zmachine's createBackend shape. */
 function createBackend(worldJson, opts) {
-  const def = typeof worldJson === 'string' ? JSON.parse(worldJson) :
-    Buffer.isBuffer(worldJson) ? JSON.parse(worldJson.toString('utf8')) : worldJson;
+  // Accept a string, raw bytes (Buffer in node, Uint8Array in a browser), or an
+  // already-parsed object. The engine has to run in a page with no build step, so
+  // it cannot assume Buffer exists.
+  let def = worldJson;
+  if (typeof worldJson === 'string') {
+    def = JSON.parse(worldJson);
+  } else if (worldJson && typeof worldJson.byteLength === 'number') {
+    def = JSON.parse(new TextDecoder().decode(worldJson));
+  }
   if (!def || !def.meta || !def.meta.start) {
     throw new Error('@folio/world: world.json needs meta.start');
   }
@@ -354,4 +361,5 @@ function createBackend(worldJson, opts) {
   };
 }
 
-module.exports = { createBackend, World };
+if (typeof module !== 'undefined' && module.exports) module.exports = { createBackend, World };
+if (typeof window !== 'undefined') { window.FolioWorld = { createBackend, World }; }

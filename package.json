@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/format/test/brief.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node packages/validator/test/design.js && node conformance/parity.js"
+    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/format/test/brief.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node packages/validator/test/design.js && node conformance/parity.js",
+    "build": "node tools/build-player.js",
+    "test:browser": "node tools/build-player.js && node tools/test-player.js"
   },
   "bin": {
     "folio": "packages/cli/folio.js"
