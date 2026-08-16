@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 //
-//  Builds the standalone player: one HTML file, everything inlined.
+//  Builds the LITE player: the fallback shell, for Path B world games that the
+//  full shell does not render yet. One HTML file, everything inlined.
 //
 //  Self-contained is the requirement, not the convenience. A .folio and a player
 //  should both survive being emailed, dropped on a USB stick, or hosted on a dead
@@ -15,14 +16,12 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const ORIGIN = process.env.FOLIO_ORIGIN ||
-  path.join(process.env.HOME, 'projects-games', 'zork1');
-
 const read = (p) => fs.readFileSync(p, 'utf8');
 
-// The engine's own 8x8 bitmap font. The brand's letterforms ARE the games'
-// letterforms, by construction rather than by resemblance.
-const font = read(path.join(ORIGIN, 'ui', 'font.js'));
+// The engine's own 8x8 bitmap font, from the vendored copy that ships with this
+// repository. Reading it from a sibling checkout worked on one machine and broke
+// the moment CI ran, which is the whole argument for vendoring it.
+const font = read(path.join(ROOT, 'packages/engine/vendor/font.js'));
 
 const parts = [
   '// --- engine font (8x8 bitmap, from the origin engine) ---',
@@ -33,7 +32,7 @@ const parts = [
   '// --- Path B: declarative world interpreter ---',
   read(path.join(ROOT, 'packages/world/index.js')),
   '// --- shell: renders the World State Contract ---',
-  read(path.join(ROOT, 'packages/engine/shell.js')),
+  read(path.join(ROOT, 'packages/engine/shell-lite.js')),
   '// --- player ---',
   read(path.join(ROOT, 'packages/engine/player.js'))
 ].join('\n\n');

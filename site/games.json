@@ -8,7 +8,8 @@
     "tier": "certified",
     "featured": true,
     "file": "/games/zork-1.folio",
-    "shot": "/shots/zork-1.png"
+    "shot": "/shots/zork-1.png",
+    "pick": true
   },
   {
     "id": "cellar-door",

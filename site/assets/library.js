@@ -130,16 +130,25 @@
     name.textContent = g.title;
     var sub = document.createElement('div');
     sub.className = 'sub';
-    sub.appendChild(document.createTextNode(g.genre || 'Adventure'));
-    if (g.tier === 'certified' || g.tier === 'playable') {
-      sub.appendChild(document.createTextNode(' · '));
-      var t = document.createElement('span');
-      if (g.tier === 'certified') t.className = 'cert';
-      t.textContent = g.tier === 'certified' ? 'Certified' : 'Playable';
-      sub.appendChild(t);
-    }
+    sub.appendChild(document.createTextNode((g.genre || 'Adventure') + ' Series'));
     sub.appendChild(document.createElement('br'));
-    sub.appendChild(document.createTextNode('by ' + g.author));
+    sub.appendChild(document.createTextNode('made by ' + g.author));
+    if (g.tier === 'certified' || g.tier === 'playable' || g.pick) {
+      sub.appendChild(document.createElement('br'));
+      if (g.tier === 'certified' || g.tier === 'playable') {
+        var t = document.createElement('span');
+        if (g.tier === 'certified') t.className = 'cert';
+        t.textContent = g.tier === 'certified' ? '\u2713 Certified' : 'Playable';
+        sub.appendChild(t);
+      }
+      if (g.pick) {
+        sub.appendChild(document.createTextNode(' · '));
+        var w = document.createElement('span');
+        w.className = 'pick';
+        w.textContent = '\u2605 Wall pick';
+        sub.appendChild(w);
+      }
+    }
     txt.appendChild(name);
     txt.appendChild(sub);
 

@@ -4,46 +4,51 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Folio — play and make 8-bit adventures</title>
-<meta name="description" content="Every text adventure deserves the 8-bit port it never got. Play community-made graphic adventures in your browser, or turn your own story into one.">
+<meta name="description" content="Text adventures rendered as point-and-click graphic adventures you play in a browser. Play what the community has made, or turn your own story into one.">
 <link rel="canonical" href="https://folio.games/">
 <meta property="og:title" content="Folio — play and make 8-bit adventures">
-<meta property="og:description" content="Text adventures, rendered as point-and-click graphic adventures you play in a browser. Every game is one portable file.">
+<meta property="og:description" content="Text adventures rendered as point-and-click graphic adventures you play in a browser. Every game is one portable file.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://folio.games/">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#050409">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/site.css">
 <style>
-  .hero{padding:64px 0 12px;display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
-  @media (max-width:900px){.hero{grid-template-columns:1fr;gap:28px;padding-top:40px}}
-  .hero h1{font:700 clamp(34px,4.6vw,54px)/1.06 var(--sans);margin:0 0 18px}
-  .hero p{font-size:18px;color:var(--body);margin:0 0 14px;max-width:56ch}
-  .cta{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
-  .facts{display:flex;gap:26px;margin-top:30px;flex-wrap:wrap;
-    font:12px/1.4 var(--mono);letter-spacing:.04em;color:var(--muted)}
-  .facts b{display:block;font:700 21px/1.1 var(--sans);color:var(--ink)}
-  .feature{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
-  .feature .cap{display:flex;justify-content:space-between;gap:12px;align-items:center;
-    padding:11px 15px;border-bottom:1px solid var(--line);
-    font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-  .feature .cap .cert{color:var(--green)}
-  .feature .shot{display:block;background:#000}
-  .feature .shot img{width:100%;display:block;image-rendering:pixelated}
-  .feature .meta2{padding:17px;display:flex;flex-direction:column;align-items:flex-start}
-  .feature h3{margin:0 0 4px;font:italic 700 21px/1.25 var(--slab)}
-  .feature .by{font-size:13.5px;color:var(--muted);margin:0 0 13px}
+  .hero{padding:64px 0 8px;display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center}
+  @media (max-width:960px){.hero{grid-template-columns:1fr;gap:32px;padding-top:44px}}
+  .hero p{font-size:17.5px;margin:0 0 15px;max-width:56ch}
+  .cta{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+  .facts{display:flex;gap:30px;margin-top:32px;flex-wrap:wrap;
+    font:11px/1.5 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dimgray)}
+  .facts b{display:block;font:italic 700 24px/1.1 var(--slab);color:var(--palegold);
+    letter-spacing:0;text-transform:none}
+
+  /* Featured: the same bezel as the wall, given room to be the example. */
+  .feat{display:block}
+  .feat .cap{display:flex;justify-content:space-between;gap:14px;align-items:baseline;
+    margin:0 0 11px;font:600 10.5px/1 var(--mono);letter-spacing:.2em;
+    text-transform:uppercase;color:var(--gold)}
+  .feat .cap .cert{color:var(--green)}
+  .feat .screen{aspect-ratio:auto}
+  .feat .screen img{width:100%;height:auto}
+  .feat .line{display:flex;gap:16px;align-items:flex-end;justify-content:space-between;
+    flex-wrap:wrap;margin-top:14px}
+  .feat h2{font:italic 700 26px/1.2 var(--slab);color:var(--gold);margin:0 0 5px}
+  .feat .by{font:11px/1.6 var(--mono);letter-spacing:.07em;text-transform:uppercase;
+    color:var(--dimgray);margin:0}
 </style>
 </head>
 <body>
 
-<header class="top">
+<header class="banner">
   <div class="wrap">
-    <a class="brand" href="/">FOLIO<i>▾</i></a>
+    <a class="mark" href="/">Folio Entertainment Engine</a>
     <nav>
       <a href="#library" aria-current="page">Library</a>
       <a href="/make/">Make one</a>
-      <a href="/docs/">Docs</a>
-      <a class="btn ghost hide-sm" href="https://github.com/rdyplayerB/folio">GitHub</a>
+      <a href="/docs/" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
     </nav>
   </div>
 </header>
@@ -53,15 +58,15 @@
 
   <section class="hero">
     <div>
-      <p class="kicker">Open source · MIT</p>
-      <h1>Every text adventure deserves the <span class="nb">8-bit</span> port it never got.</h1>
+      <p class="kicker">Open source · Free to play</p>
+      <h1 class="display">Every text adventure deserves the <span class="nb">8-bit</span> port it never got.</h1>
       <p>
         Folio turns text adventures into point-and-click graphic adventures you play
-        in a browser — a picture of the room, a grid of verbs, a compass. Nobody types.
+        in a browser. A picture of the room, a grid of verbs, a compass. Nobody types.
       </p>
       <p>
-        Play what the community has made, or bring your own story and turn it into a
-        game. Every game is one portable file you can download and keep.
+        Play what the community has made, or bring a story of your own and turn it
+        into a game. Every game is one file you can download and keep.
       </p>
       <div class="cta">
         <a class="btn" href="#library">Play a game</a>
@@ -70,61 +75,82 @@
       <div class="facts">
         <div><b id="fGames">—</b> games</div>
         <div><b id="fMakers">—</b> makers</div>
-        <div><b>Free</b> to play, forever</div>
+        <div><b>Free</b> forever</div>
       </div>
     </div>
 
-    <div class="feature">
+    <div class="feat">
       <div class="cap"><span>Featured</span><span class="cert">✓ Certified</span></div>
-      <a class="shot" id="featShot" href="#"><img id="featImg" alt=""></a>
-      <div class="meta2">
-        <h3 id="featName">—</h3>
-        <p class="by" id="featBy">—</p>
-        <a class="btn" id="featPlay" href="#">Play in your browser</a>
+      <a class="screen" id="featShot" href="#"><img id="featImg" alt=""></a>
+      <div class="line">
+        <div>
+          <h2 id="featName">—</h2>
+          <p class="by" id="featBy">—</p>
+        </div>
+        <a class="btn" id="featPlay" href="#">Play it</a>
       </div>
     </div>
   </section>
 
   <section class="section" id="library">
-    <div class="head">
-      <h2>The library</h2>
-      <p>Click any screen to play instantly. No account, no install.</p>
-    </div>
+    <h2 class="rule">The Library</h2>
     <div class="filters" id="filters"></div>
-    <div class="wall">
-      <div class="grid" id="grid"></div>
-      <div class="wallfoot">
-        <span id="prog">You have finished 0</span>
-        <span>☑ = you finished it · every game downloadable</span>
-      </div>
+    <div class="grid" id="grid"></div>
+    <div class="wallfoot">
+      <span id="prog">You have finished 0</span>
+      <span>☑ = you finished it · every game downloadable</span>
     </div>
   </section>
 
   <section class="section">
-    <div class="head"><h2>How it works</h2></div>
+    <h2 class="rule">How it works</h2>
     <div class="cols-3">
       <div class="card">
         <h3>One file per game</h3>
         <p>
-          A <code>.folio</code> carries everything: the logic, the pictures, the sound,
-          and its own walkthrough. Download it and you have the game permanently,
-          whatever happens to this site.
+          A <code>.folio</code> carries the logic, the pictures, the sound and its own
+          walkthrough. Download it and you have the game permanently, whatever happens
+          to this site.
         </p>
       </div>
       <div class="card">
         <h3>Proven finishable</h3>
         <p>
-          Before a game can call itself certified, the engine replays its walkthrough
-          from a cold start and has to reach the ending. No teleporting, no shortcuts —
-          if it does not finish, it does not ship.
+          Before a game is certified, the engine replays its walkthrough from the
+          beginning and has to reach the ending. No teleporting and no shortcuts. If it
+          does not finish, it does not ship.
         </p>
       </div>
       <div class="card">
-        <h3>Runs the real thing</h3>
+        <h3>The real thing underneath</h3>
         <p>
-          Classic games run their original 1980s binary, unmodified. The pictures are
-          a layer on top; the game underneath is exactly the one people played.
+          Classic games run their original 1980s binary, unmodified. The pictures are a
+          layer on top, so the game you play is the one people played then.
         </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="rule">Your game goes here</h2>
+    <div class="cols-2">
+      <div class="card">
+        <h3>Bring a story</h3>
+        <p>
+          A novel, a screenplay, something you wrote. The compiler builds the map, the
+          puzzles and the prose, then proves the result is finishable before it ships.
+          You set how long it runs and how cruel it gets.
+        </p>
+        <a class="btn ghost" href="/make/">See how it works</a>
+      </div>
+      <div class="card">
+        <h3>Bring a game</h3>
+        <p>
+          Already have a Z-machine game? Folio runs the original binary and gives it
+          the pictures it never had. The tools, the format and the engine are all on
+          GitHub, and they are yours to use.
+        </p>
+        <a class="btn ghost" href="https://github.com/rdyplayerB/folio">Get the tools</a>
       </div>
     </div>
   </section>

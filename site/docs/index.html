@@ -6,6 +6,7 @@
 <title>Docs — Folio</title>
 <meta name="description" content="How the .folio format, the World State Contract, and certification work.">
 <link rel="canonical" href="https://folio.games/docs/">
+<meta name="theme-color" content="#050409">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/site.css">
 <style>
@@ -19,7 +20,7 @@
   .toc a:hover{color:var(--ink);border-color:var(--muted)}
   @media (max-width:900px){.toc{position:static}.toc a{display:inline-block;border:0;padding:6px 12px 6px 0}}
   article{max-width:74ch}
-  article h1{font:700 clamp(28px,3.6vw,40px)/1.12 var(--sans);margin:0 0 14px}
+  
   article h2{font:700 22px/1.3 var(--sans);margin:46px 0 12px;padding-top:14px;border-top:1px solid var(--line)}
   article h3{font:700 16px/1.4 var(--sans);margin:26px 0 8px}
   article p,article li{color:var(--body);font-size:15.5px}
@@ -33,14 +34,14 @@
 </head>
 <body>
 
-<header class="top">
+<header class="banner">
   <div class="wrap">
-    <a class="brand" href="/">FOLIO<i>▾</i></a>
+    <a class="mark" href="/">Folio Entertainment Engine</a>
     <nav>
       <a href="/#library">Library</a>
       <a href="/make/">Make one</a>
-      <a href="/docs/" aria-current="page">Docs</a>
-      <a class="btn ghost hide-sm" href="https://github.com/rdyplayerB/folio">GitHub</a>
+      <a href="/docs/" aria-current="page" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
     </nav>
   </div>
 </header>
@@ -60,7 +61,7 @@
 
   <article>
     <p class="kicker">Documentation</p>
-    <h1>How Folio works</h1>
+    <h1 class="display">How Folio works</h1>
     <p class="lede">
       An engine, a file format, and a way of proving a game is finishable. The full
       reference lives with the source; this is the shape of it.

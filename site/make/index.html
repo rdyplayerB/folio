@@ -6,11 +6,12 @@
 <title>Make a game — Folio</title>
 <meta name="description" content="Turn a story into a playable 8-bit adventure, or give a Z-machine game the pictures it never had.">
 <link rel="canonical" href="https://folio.games/make/">
+<meta name="theme-color" content="#050409">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/site.css">
 <style>
   .intro{padding:58px 0 8px;max-width:70ch}
-  .intro h1{font:700 clamp(30px,4vw,44px)/1.1 var(--sans);margin:0 0 18px}
+  
   .steps{counter-reset:s;display:grid;gap:16px;margin-top:8px}
   .step{border:1px solid var(--line);border-radius:14px;padding:22px 24px;background:var(--card);
     position:relative;padding-left:70px}
@@ -30,14 +31,14 @@
 </head>
 <body>
 
-<header class="top">
+<header class="banner">
   <div class="wrap">
-    <a class="brand" href="/">FOLIO<i>▾</i></a>
+    <a class="mark" href="/">Folio Entertainment Engine</a>
     <nav>
       <a href="/#library">Library</a>
-      <a href="/make/" aria-current="page">Make one</a>
-      <a href="/docs/">Docs</a>
-      <a class="btn ghost hide-sm" href="https://github.com/rdyplayerB/folio">GitHub</a>
+      <a href="/make/ aria-current="page">Make one</a>
+      <a href="/docs/" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
     </nav>
   </div>
 </header>
@@ -47,7 +48,7 @@
 
   <section class="intro">
     <p class="kicker">Make one</p>
-    <h1>Two ways in. Both end in a single file.</h1>
+    <h1 class="display">Two ways in. Both end in a single file.</h1>
     <p class="lede">
       Whether you start with a story nobody has ever played or a game from 1984,
       you finish with a <code>.folio</code> — one file that anyone can open in a
@@ -56,7 +57,7 @@
   </section>
 
   <section class="section">
-    <div class="head"><h2>Bring a story</h2><p>A novel, a screenplay, something you wrote.</p></div>
+    <h2 class="rule">Bring a story</h2><p class="subhead">A novel, a screenplay, something you wrote.</p></div>
     <div class="steps">
 
       <div class="step">
@@ -113,7 +114,7 @@ PLAYABLE  my-game.folio  T0+T1+T2+T3+T4 passed
   </section>
 
   <section class="section">
-    <div class="head"><h2>Bring a game</h2><p>Zork, an Inform project, anything from the IF Archive.</p></div>
+    <h2 class="rule">Bring a game</h2><p class="subhead">Zork, an Inform project, anything from the IF Archive.</p></div>
     <div class="cols-2">
       <div class="card">
         <h3>The original binary runs unmodified</h3>
@@ -146,7 +147,7 @@ PLAYABLE  my-game.folio  T0+T1+T2+T3+T4 passed
   </section>
 
   <section class="section">
-    <div class="head"><h2>What you keep</h2></div>
+    <h2 class="rule">What you keep</h2></div>
     <div class="cols-3">
       <div class="card">
         <h3>Your copyright</h3>
