@@ -1,10 +1,12 @@
 {
   "name": "folio",
   "private": true,
-  "description": "Folio — an open engine and portable .folio format for NES-era graphic adventures.",
+  "description": "Folio \u2014 an open engine and portable .folio format for NES-era graphic adventures.",
   "license": "MIT",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "test": "node packages/zmachine/test/smoke.js"
+    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js"
   }
 }
