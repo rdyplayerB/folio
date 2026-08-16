@@ -1,0 +1,1011 @@
+<title>Folio Design Review</title>
+<style>
+:root{
+  --paper:#f6f4ec; --ink:#0f0f14; --line:#d8d5c8; --body:#3a3a44; --muted:#6a6a76;
+  --wall:#0a0a12; --wall2:#141428; --gold:#f8d878; --red:#e76e55; --green:#92cc41;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --slab:"Iowan Old Style",Palatino,Georgia,serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#14141a; --ink:#ece9e0; --line:#2c2c36; --body:#b8b5ad; --muted:#8a8794;
+}}
+:root[data-theme="dark"]{
+  --paper:#14141a; --ink:#ece9e0; --line:#2c2c36; --body:#b8b5ad; --muted:#8a8794;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 var(--mono)}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--red);margin:0 0 10px}
+h1{font:700 34px/1.1 var(--mono);letter-spacing:.06em;margin:0 0 8px}
+h2{font:700 13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:52px 0 0;
+   display:flex;align-items:center;gap:12px}
+h2::after{content:"";flex:1;height:3px;background:var(--ink)}
+p{color:var(--body);max-width:66ch}
+.lede{font-size:17px;color:var(--body)}
+.note{font-size:13.5px;color:var(--muted);max-width:66ch;margin-top:10px}
+.box{border:4px solid var(--ink);background:var(--paper);padding:20px 22px;margin-top:14px}
+.mark{font:700 30px/1 var(--mono);letter-spacing:.14em;margin:0 0 6px}
+.mark span{color:var(--red)}
+nav{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}
+nav a{font:700 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);
+  text-decoration:none;padding:9px 13px;border:3px solid var(--ink);background:var(--paper)}
+nav a[aria-current]{background:var(--ink);color:var(--paper)}
+.wall{border:4px solid var(--ink);margin-top:14px;
+  background:radial-gradient(120% 90% at 50% 0%,var(--wall2),var(--wall));padding:22px;overflow:hidden}
+.banner{background:var(--red);color:#fff;margin:-22px -22px 20px;padding:9px 16px;display:flex;
+  justify-content:space-between;gap:12px;font:700 12px/1 var(--mono);letter-spacing:.12em;
+  text-transform:uppercase;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:22px 18px}
+.cart{display:flex;flex-direction:column;gap:8px}
+.screen{border:3px solid #e8e6dc;border-radius:16px;overflow:hidden;background:#000;
+  aspect-ratio:4/3;display:block;width:100%;box-shadow:inset 0 0 0 2px rgba(0,0,0,.6);cursor:pointer}
+.screen img{width:100%;height:100%;display:block;image-rendering:pixelated}
+.meta{display:flex;gap:8px;align-items:flex-start}
+.tick{width:17px;height:17px;flex:none;margin-top:3px;border:3px solid #fff;background:transparent;cursor:pointer;padding:0}
+.tick[aria-pressed="true"]{background:var(--gold);border-color:var(--gold)}
+.tick:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.name{font:italic 700 16px/1.15 var(--slab);color:var(--gold);text-decoration:none}
+.sub{font:11px/1.5 var(--mono);color:#8d8da0;letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.sub .cert{color:var(--green)}
+.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:20px;
+  padding-top:14px;border-top:1px solid #2a2a3c;font:11px/1 var(--mono);letter-spacing:.1em;
+  text-transform:uppercase;color:#8d8da0}
+.play{margin-top:14px;border:4px solid var(--ink);background:#0a0a12;padding:20px;
+  display:grid;place-items:center}
+canvas{image-rendering:pixelated;display:block;max-width:100%}
+.hint{font-size:12.5px;color:var(--muted);margin-top:10px;text-align:center}
+.cta{display:inline-block;font:700 13px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  background:var(--red);color:#fff;text-decoration:none;padding:13px 18px;border:3px solid var(--ink);margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:14px}
+th{text-align:left;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+  border-bottom:2px solid var(--ink);padding:6px 10px 6px 0}
+td{border-bottom:1px solid var(--line);padding:8px 10px 8px 0;vertical-align:top;color:var(--body)}
+td b{color:var(--ink)}
+footer{border-top:3px solid var(--ink);margin-top:56px;padding:18px 0 50px;font-size:12px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <div style="padding:40px 0 0">
+    <p class="eyebrow">Design review · 2026-08-16</p>
+    <h1>Folio</h1>
+    <p class="lede">The gallery, the player, and the running engine. Everything below is live code, not a mockup — the game plays.</p>
+  </div>
+
+  <h2>The masthead</h2>
+  <p class="note">The Text Box system: an ink-bordered window, the engine's own pixel letterforms, and a continue-triangle that says there is more story.</p>
+  <div class="box">
+    <h3 class="mark">FOLIO<span>▾</span></h3>
+    <p style="margin:0;color:var(--muted)">Every text adventure deserves the 8-bit port it never got.</p>
+    <nav>
+      <a href="#" aria-current="page">The Wall</a><a href="#">Make One</a><a href="#">Docs</a><a href="#">Source</a>
+    </nav>
+  </div>
+
+  <h2>The wall</h2>
+  <p class="note">Paper is the site; phosphor is the library. The thumbnail is generated from the game itself — a maker supplies no artwork, because the engine already renders every room. Click the screen to play it.</p>
+  <div class="wall">
+    <div class="banner"><span id="count">1 playable folio · 1 maker</span><span>New every Thursday</span></div>
+    <div class="grid">
+      <article class="cart">
+        <button class="screen" id="tile" aria-label="Play Cellar Door">
+          <img id="shot" alt="">
+        </button>
+        <div class="meta">
+          <button class="tick" id="tick" aria-pressed="false" aria-label="Mark Cellar Door finished"></button>
+          <div>
+            <a class="name" href="#play">Cellar Door</a>
+            <div class="sub">Mystery Series · <span class="cert">Playable</span><br>by Folio conformance suite</div>
+          </div>
+        </div>
+      </article>
+    </div>
+    <div class="foot"><span id="prog">You have finished 0 of 1</span><span>☑ = you finished it</span></div>
+  </div>
+
+  <h2 id="play">The player — this is real</h2>
+  <p class="note">A .folio opens here with no install and no build step. Click a verb, then an object; click the compass to move. The cellar is locked until you find the key in the hall, and dark until you light the lantern.</p>
+  <div class="play"><canvas id="screen" width="256" height="240"></canvas></div>
+  <p class="hint" id="hint">Loading the game…</p>
+
+  <h2>What certification means</h2>
+  <table>
+    <tr><th>Tier</th><th>Proves</th></tr>
+    <tr><td><b>T0</b> schema</td><td>The manifest is complete and well-formed</td></tr>
+    <tr><td><b>T1</b> integrity</td><td>Every reference resolves; assets decode; capabilities are supported</td></tr>
+    <tr><td><b>T2</b> graph</td><td><b>No dead ends exist</b> — computed from the world, not asserted</td></tr>
+    <tr><td><b>T3</b> replay</td><td><b>One path completes</b> — cold start, no state injection, no privileged verbs</td></tr>
+    <tr><td><b>T4</b> design</td><td>It is a <i>game</i>: chain depth, item economy, map shape, pacing</td></tr>
+  </table>
+  <p class="note">Calibrated against Zork I, measured rather than estimated: 82 rooms, 0.67 loops per room, a 43% take rate, a reward every 11.5 moves, and one 69-move stretch with no reward at all. “Playable” means a path exists — not that a human can find it.</p>
+
+  <h2>Your game goes here</h2>
+  <p>Bring a story and the Studio turns it into a playable <code>.folio</code>. You steer, the compiler builds, and the validator proves it is finishable before it ships.</p>
+  <a class="cta" href="https://github.com/rdyplayerB/folio">Read the source</a>
+</div>
+
+<footer><div class="wrap">Open source · MIT · A Mochi Labs project</div></footer>
+
+<script>
+window.GUE=window.GUE||{};
+window.GUE = window.GUE || {};
+/* ui/font.js — 8x8 chunky bitmap font (NES feel), full printable ASCII + UI glyphs.
+   Glyph cell is 6px of ink in an 8px advance; row byte, leftmost column = bit 7.
+   Generated from ASCII-art grids; data is 8 bytes per glyph, codes 0x20..0x7E
+   followed by the extras listed in GUE.font.EXTRA. */
+(function () {
+  var W = 8, H = 8, FIRST = 32, LAST = 126;
+  var EXTRA = "▼►◄▲•"; // \u25BC \u25BA \u25C4 \u25B2 \u2022
+  var DATA = [
+    '000000000000000030303030003000006c6c0000000000002828fc28fc2828002078a07028f02000c4c810204c8c00006090a040a89068003030000000000000',
+    '183020202030180060301010103060000020a870a8200000002020f8202000000000000000302040000000f80000000000000000003030000808102040808000',
+    '708898a8c88870002060202020207000708808102040f800f81030080888700010305090f8101000f880f00808887000304080f088887000f808102040404000',
+    '708888708888700070888878081060000030300030300000003030003020400010204080402010000000f800f800000040201008102040007088081020002000',
+    '7088b8a8b880700020508888f8888800f08888f08888f0007088808080887000e09088888890e000f88080f08080f800f88080f080808000708880b888887000',
+    '888888f888888800702020202020700038101010109060008890a0c0a0908800808080808080f80088d8a8a88888880088c8c8a8989888007088888888887000',
+    'f08888f08080800070888888a8906800f08888f0a0908800788080700808f000f82020202020200088888888888870008888888888502000888888a8a8d88800',
+    '88885020508888008888502020202000f80810204080f80038202020202038008080402010080800e02020202020e000205088000000000000000000000000f8',
+    '402000000000000000007008788878008080f0888888f0000000708880887000080878888888780000007088f8807000304840f0404040000000788888780870',
+    '8080f0888888880020006020202070001000301010109060808090a0c0a0900060202020202070000000d0a8a88888000000f088888888000000708888887000',
+    '0000f08888f0808000007888887808080000b0c880808000000078807008f0004040f040404830000000888888887800000088888850200000008888a8a85000',
+    '000088502050880000008888887808700000f8102040f800182020602020180020202020202020006010101810106000000064980000000000fc787830300000',
+    'c0e0f0f8f0e0c0000c1c3c7c3c1c0c000030307878fc00000000307878300000'
+  ].join('');
+
+  var N = (LAST - FIRST + 1) + EXTRA.length;
+  // glyph index -> Uint8Array(8) of row bitmaps
+  var GLYPHS = new Array(N);
+  for (var g = 0; g < N; g++) {
+    var rows = new Uint8Array(8);
+    for (var r = 0; r < 8; r++) rows[r] = parseInt(DATA.substr(g * 16 + r * 2, 2), 16);
+    GLYPHS[g] = rows;
+  }
+
+  function index(ch) {
+    var c = ch.charCodeAt(0);
+    if (c >= FIRST && c <= LAST) return c - FIRST;
+    var e = EXTRA.indexOf(ch);
+    if (e >= 0) return (LAST - FIRST + 1) + e;
+    return -1; // unmapped: rendered as blank (never as garbage)
+  }
+
+  // Per-color glyph atlas: one offscreen strip built lazily, then blitted.
+  // Keeps a full 240x72 text page at ~250 drawImage calls instead of ~4000 fillRects.
+  var atlases = {};
+  function atlas(color) {
+    var a = atlases[color];
+    if (a) return a;
+    if (typeof document === 'undefined') return null;
+    var cv = document.createElement('canvas');
+    cv.width = N * W; cv.height = H;
+    var c = cv.getContext('2d');
+    c.fillStyle = color;
+    for (var g = 0; g < N; g++) {
+      var rows = GLYPHS[g];
+      for (var y = 0; y < 8; y++) {
+        var b = rows[y];
+        if (!b) continue;
+        var run = -1;
+        for (var x = 0; x <= 8; x++) {
+          var on = x < 8 && (b & (0x80 >> x));
+          if (on && run < 0) run = x;
+          else if (!on && run >= 0) { c.fillRect(g * W + run, y, x - run, 1); run = -1; }
+        }
+      }
+    }
+    atlases[color] = cv;
+    return cv;
+  }
+
+  function draw(ctx, str, x, y, color) {
+    if (!ctx || str == null) return x;
+    str = String(str);
+    var a = atlas(color || '#ffffff');
+    if (!a) return x + str.length * W;
+    for (var i = 0; i < str.length; i++) {
+      var gi = index(str[i]);
+      if (gi >= 0 && str[i] !== ' ') ctx.drawImage(a, gi * W, 0, W, H, x + i * W, y, W, H);
+    }
+    return x + str.length * W;
+  }
+
+  // Centered helper — used constantly by the shell's button labels.
+  function drawCentered(ctx, str, cx, y, color) {
+    return draw(ctx, str, Math.round(cx - measure(str) / 2), y, color);
+  }
+
+  function measure(str) { return String(str == null ? '' : str).length * W; }
+
+  GUE.font = {
+    W: W, H: H, EXTRA: EXTRA,
+    DOWN: EXTRA[0], RIGHT: EXTRA[1], LEFT: EXTRA[2], UP: EXTRA[3], DOT: EXTRA[4],
+    draw: draw, drawCentered: drawCentered, measure: measure,
+    glyph: function (ch) { var i = index(ch); return i < 0 ? null : GLYPHS[i]; }
+  };
+})();
+
+//  Browser-side .folio reader.
+//
+//  A .folio must open in a page with no build step and no library download — the
+//  portability promise collapses the moment playing a game requires npm. So this
+//  reads the container using only what a browser already has: DataView for the
+//  headers and DecompressionStream for the payloads.
+//
+//  Deliberately read-only. Packing is an authoring operation and belongs in the
+//  CLI; a player that could also write archives is a larger attack surface for no
+//  benefit to the person playing.
+
+(function (root) {
+  'use strict';
+
+  const CDIR_SIG = 0x02014b50;
+  const EOCD_SIG = 0x06054b50;
+
+  /**
+   * @param {ArrayBuffer|Uint8Array} input
+   * @returns {Promise<Object<string, Uint8Array>>}
+   */
+  async function readFolio(input) {
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    // Scan back for the end-of-central-directory record. The comment field can be
+    // up to 64KB, so the scan is bounded rather than unbounded.
+    let eocd = -1;
+    const floor = Math.max(0, bytes.length - 65558);
+    for (let i = bytes.length - 22; i >= floor; i--) {
+      if (view.getUint32(i, true) === EOCD_SIG) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('not a .folio: no end-of-central-directory record');
+
+    const count = view.getUint16(eocd + 10, true);
+    let p = view.getUint32(eocd + 16, true);
+    const out = {};
+
+    for (let i = 0; i < count; i++) {
+      if (view.getUint32(p, true) !== CDIR_SIG) throw new Error('corrupt central directory');
+      const method = view.getUint16(p + 10, true);
+      const compSize = view.getUint32(p + 20, true);
+      const nameLen = view.getUint16(p + 28, true);
+      const extraLen = view.getUint16(p + 30, true);
+      const commentLen = view.getUint16(p + 32, true);
+      const localOff = view.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
+
+      // The local header repeats the name and extra lengths, and they may differ
+      // from the central directory's, so the data offset must come from the local
+      // header or entries silently decode as garbage.
+      const lNameLen = view.getUint16(localOff + 26, true);
+      const lExtraLen = view.getUint16(localOff + 28, true);
+      const start = localOff + 30 + lNameLen + lExtraLen;
+      const body = bytes.subarray(start, start + compSize);
+
+      out[name] = method === 0 ? body : await inflateRaw(body);
+      p += 46 + nameLen + extraLen + commentLen;
+    }
+    return out;
+  }
+
+  async function inflateRaw(bytes) {
+    if (typeof DecompressionStream !== 'function') {
+      throw new Error('this browser cannot decompress .folio entries (no DecompressionStream)');
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  const text = (u8) => new TextDecoder().decode(u8);
+  const json = (u8) => JSON.parse(text(u8));
+
+  root.FolioZip = { readFolio, text, json };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+//  @folio/world — Path B logic backend: a declarative world interpreter.
+//
+//  Runs a world.json directly. This is how a story that was never a game becomes
+//  one: there is no compiler and no scripting language, only data. A .folio can
+//  therefore never contain executable code, which is a security property worth
+//  advertising and the reason a game is safe to open from a stranger.
+//
+//  Deliberately less expressive than ZIL or Inform. A bounded model is what makes
+//  generation reliable and validation tractable: because every effect comes from a
+//  closed vocabulary, the validator can see statically everything a game can ever
+//  do. When the vocabulary genuinely cannot express something the community needs,
+//  it grows in a spec revision — with conformance fixtures keeping old games alive.
+//
+//  It emits the same World State Contract as @folio/zmachine. That is the whole
+//  point: one shell, two backends, and a cross-path parity suite to keep them
+//  honest as both evolve.
+
+'use strict';
+
+const DIRS = ['NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW', 'UP', 'DOWN', 'IN', 'OUT'];
+
+class World {
+  constructor(world, opts) {
+    opts = opts || {};
+    this.def = world;
+    this.rng = mulberry32(opts.seed !== undefined ? opts.seed : (world.meta && world.meta.seed) || 1);
+
+    this.rooms = index(world.rooms);
+    this.items = index(world.items);
+    this.actors = index(world.actors || []);
+    this.rules = world.rules || [];
+    this.timers = (world.timers || []).map(t => Object.assign({ elapsed: 0 }, t));
+
+    this.flags = Object.assign({}, world.flags);
+    this.here = world.meta.start;
+    this.moves = 0;
+    this.score = 0;
+    this.ended = null;             // null | {win:boolean, reason:string}
+    this.visited = new Set([this.here]);
+
+    // Live location per item: room id, 'PLAYER', or a container's id.
+    this.loc = {};
+    for (const it of world.items) this.loc[it.id] = it.location;
+    this.actorLoc = {};
+    for (const a of (world.actors || [])) this.actorLoc[a.id] = a.location;
+
+    this.log = [];
+  }
+
+  // -------------------------------------------------------------- contract
+  /** Project into the World State Contract — identical shape to @folio/zmachine. */
+  state() {
+    const room = this.rooms[this.here] || {};
+    const objects = [];
+    const contents = {};
+    const flags = {};
+
+    for (const id of Object.keys(this.loc)) {
+      const where = this.loc[id];
+      const item = this.items[id];
+      if (!item) continue;
+      if (where === this.here) {
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+      } else if (this.items[where] && this.loc[where] === this.here && this.isOpen(where)) {
+        // One level into open containers, matching the Z-machine projection.
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+        (contents[where] = contents[where] || []).push(id);
+      }
+    }
+    for (const id of Object.keys(this.actorLoc)) {
+      if (this.actorLoc[id] === this.here) { objects.push(id); flags[id] = this.flagsOf(id); }
+    }
+
+    const inventory = Object.keys(this.loc).filter(id => this.loc[id] === 'PLAYER');
+    for (const id of inventory) flags[id] = this.flagsOf(id);
+
+    return {
+      roomId: this.here,
+      roomName: room.name || this.here,
+      score: this.score,
+      moves: this.moves,
+      dark: this.isDark(),
+      objects,
+      inventory,
+      contents,
+      flags,
+      exits: this.exits(),
+      globals: Object.assign({}, this.flags),
+      fighting: objects.some(id => this.actors[id] && this.actors[id].hostile),
+      lampTurns: this.lampTurns()
+    };
+  }
+
+  /**
+   * Live exits, keyed by direction. Three states, not two:
+   *   "ROOM-ID"  passable now
+   *   false      the passage exists but is blocked (locked door, boarded window)
+   *   absent     no passage in that direction at all
+   *
+   * The middle state is the one worth having: it lets the compass grey out a door
+   * the player can see but cannot yet use, which is information the player needs.
+   * Path A emits it natively (Zork's boarded front door reports EAST: false), and
+   * cross-path parity is what surfaced that Path B was collapsing it. An author who
+   * genuinely wants a passage concealed marks the exit `hidden` and it disappears
+   * entirely until its condition is met.
+   */
+  exits() {
+    const room = this.rooms[this.here];
+    const out = {};
+    if (!room) return out;
+    for (const ex of (room.exits || [])) {
+      if (!DIRS.includes(ex.dir)) continue;
+      const blocked = (ex.condition && !this.test(ex.condition)) ||
+                      (ex.door && !this.isOpen(ex.door));
+      if (blocked) {
+        if (!ex.hidden) out[ex.dir] = false;
+      } else {
+        out[ex.dir] = ex.to;
+      }
+    }
+    return out;
+  }
+
+  flagsOf(id) {
+    const thing = this.items[id] || this.actors[id] || {};
+    const a = Object.assign({}, thing.attributes);
+    if (this.flags['_open_' + id] !== undefined) a.OPENBIT = !!this.flags['_open_' + id];
+    if (this.flags['_lit_' + id] !== undefined) a.ONBIT = !!this.flags['_lit_' + id];
+    return a;
+  }
+
+  isOpen(id) {
+    if (this.flags['_open_' + id] !== undefined) return !!this.flags['_open_' + id];
+    const it = this.items[id] || {};
+    return !!(it.attributes && (it.attributes.OPENBIT || it.attributes.TRANSPARENT));
+  }
+
+  isLit(id) {
+    if (this.flags['_lit_' + id] !== undefined) return !!this.flags['_lit_' + id];
+    const it = this.items[id] || {};
+    return !!(it.attributes && it.attributes.ONBIT);
+  }
+
+  isDark() {
+    const room = this.rooms[this.here] || {};
+    if (!room.dark) return false;
+    // A lit light source in the room or carried defeats the dark.
+    for (const id of Object.keys(this.loc)) {
+      const it = this.items[id];
+      if (!it || !it.attributes || !it.attributes.LIGHTSOURCE) continue;
+      if (!this.isLit(id)) continue;
+      if (this.loc[id] === 'PLAYER' || this.loc[id] === this.here) return false;
+    }
+    return true;
+  }
+
+  lampTurns() {
+    const lamp = Object.keys(this.items).find(id =>
+      this.items[id].attributes && this.items[id].attributes.LIGHTSOURCE &&
+      this.items[id].fuel !== undefined);
+    if (!lamp) return null;
+    const used = this.flags['_fuelUsed_' + lamp] || 0;
+    return Math.max(0, this.items[lamp].fuel - used);
+  }
+
+  // ---------------------------------------------------------------- command
+  /**
+   * Submit a command. Returns verbatim authored prose plus the new state.
+   * Rules are consulted first; the engine's default responses only speak when no
+   * rule matched, so authors write the interesting cases and nothing else.
+   */
+  submit(verb, noun, indirect) {
+    if (this.ended) return { prose: this.endText(), state: this.state() };
+    verb = String(verb || '').toUpperCase();
+    noun = noun ? String(noun).toUpperCase() : null;
+
+    let prose = null;
+    for (const rule of this.rules) {
+      if (!this.matches(rule, verb, noun, indirect)) continue;
+      if (rule.if && !rule.if.every(c => this.test(c))) continue;
+      prose = this.apply(rule.do || []);
+      break;
+    }
+    if (prose === null) prose = this.builtin(verb, noun);
+
+    this.moves++;
+    const timed = this.tickTimers();
+    if (timed) prose += '\n\n' + timed;
+    if (this.ended) prose += '\n\n' + this.endText();
+
+    this.log.push({ verb, noun, prose });
+    return { prose, state: this.state() };
+  }
+
+  matches(rule, verb, noun) {
+    const on = rule.on || {};
+    if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
+    if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
+    if (on.room && on.room !== this.here) return false;
+    return true;
+  }
+
+  /** Closed condition vocabulary — everything the validator must reason about. */
+  test(c) {
+    switch (c.type) {
+      case 'flag': return !!this.flags[c.flag] === (c.value === undefined ? true : !!c.value);
+      case 'carrying': return this.loc[c.item] === 'PLAYER';
+      case 'in-room': return this.loc[c.item] === this.here;
+      case 'present': return this.loc[c.item] === 'PLAYER' || this.loc[c.item] === this.here;
+      case 'at': return this.here === c.room;
+      case 'visited': return this.visited.has(c.room);
+      case 'open': return this.isOpen(c.item);
+      case 'lit': return this.isLit(c.item);
+      case 'score-at-least': return this.score >= c.value;
+      case 'not': return !this.test(c.condition);
+      default: return false;
+    }
+  }
+
+  /** Closed effect vocabulary. No scripting; a .folio can contain no code. */
+  apply(effects) {
+    const said = [];
+    for (const e of effects) {
+      switch (e.type) {
+        case 'print': said.push(e.text); break;
+        case 'set-flag': this.flags[e.flag] = e.value === undefined ? true : e.value; break;
+        case 'move-item': this.loc[e.item] = e.to; break;
+        case 'take': this.loc[e.item] = 'PLAYER'; break;
+        case 'destroy': this.loc[e.item] = 'NOWHERE'; break;
+        case 'open': this.flags['_open_' + e.item] = true; break;
+        case 'close': this.flags['_open_' + e.item] = false; break;
+        case 'light': this.flags['_lit_' + e.item] = true; break;
+        case 'extinguish': this.flags['_lit_' + e.item] = false; break;
+        case 'goto': this.here = e.room; this.visited.add(e.room); break;
+        case 'score': this.score += e.value; break;
+        case 'move-actor': this.actorLoc[e.actor] = e.to; break;
+        case 'win': this.ended = { win: true, reason: e.text || 'You have won.' }; break;
+        case 'lose': this.ended = { win: false, reason: e.text || 'You have died.' }; break;
+        default: break;   // unknown effects are inert; T1 rejects them at validation
+      }
+    }
+    return said.join('\n');
+  }
+
+  tickTimers() {
+    const fired = [];
+    for (const t of this.timers) {
+      if (t.done) continue;
+      if (t.startFlag && !this.flags[t.startFlag]) continue;
+      t.elapsed++;
+      if (t.fuelFor) this.flags['_fuelUsed_' + t.fuelFor] = t.elapsed;
+      if (t.elapsed >= t.turns) {
+        t.done = !t.repeat;
+        if (!t.repeat) t.elapsed = 0;
+        const text = this.apply(t.do || []);
+        if (text) fired.push(text);
+      }
+    }
+    return fired.join('\n');
+  }
+
+  endText() {
+    return this.ended ? this.ended.reason : '';
+  }
+
+  /** Default responses. Tone is configurable so authors only write what matters. */
+  builtin(verb, noun) {
+    const room = this.rooms[this.here] || {};
+    const tone = (this.def.meta && this.def.meta.defaults) || {};
+    if (DIRS.includes(verb)) {
+      const dest = this.exits()[verb];
+      if (!dest) return tone.blocked || 'You cannot go that way.';
+      this.here = dest;
+      this.visited.add(dest);
+      return this.describe();
+    }
+    switch (verb) {
+      case 'LOOK': return this.describe();
+      case 'TAKE': {
+        if (!noun) return tone.what || 'Take what?';
+        if (this.loc[noun] === 'PLAYER') return tone.already || 'You already have that.';
+        if (this.loc[noun] !== this.here) return tone.absent || 'You do not see that here.';
+        const it = this.items[noun] || {};
+        if (!(it.attributes && it.attributes.TAKEBIT)) return tone.fixed || 'That is not something you can carry.';
+        this.loc[noun] = 'PLAYER';
+        return tone.taken || 'Taken.';
+      }
+      case 'DROP':
+        if (this.loc[noun] !== 'PLAYER') return tone.nothave || 'You are not carrying that.';
+        this.loc[noun] = this.here;
+        return tone.dropped || 'Dropped.';
+      case 'OPEN':
+        if (!this.items[noun]) return tone.absent || 'You do not see that here.';
+        if (this.isOpen(noun)) return tone.alreadyOpen || 'It is already open.';
+        return tone.locked || 'It will not open.';
+      case 'INVENTORY': {
+        const inv = Object.keys(this.loc).filter(i => this.loc[i] === 'PLAYER');
+        if (!inv.length) return tone.empty || 'You are empty-handed.';
+        return 'You are carrying:\n' + inv.map(i => '  ' + ((this.items[i] || {}).name || i)).join('\n');
+      }
+      default:
+        return tone.unknown || 'Nothing happens.';
+    }
+  }
+
+  describe() {
+    if (this.isDark()) {
+      return (this.def.meta && this.def.meta.defaults && this.def.meta.defaults.dark) ||
+        'It is pitch black.';
+    }
+    const room = this.rooms[this.here] || {};
+    const here = Object.keys(this.loc).filter(i => this.loc[i] === this.here);
+    let out = (room.name || this.here) + '\n' + (room.prose || '');
+    for (const id of here) {
+      const it = this.items[id];
+      if (it && it.roomProse) out += '\n' + it.roomProse;
+    }
+    return out;
+  }
+}
+
+function index(list) {
+  const out = {};
+  for (const x of (list || [])) out[x.id] = x;
+  return out;
+}
+
+// Small deterministic PRNG. Determinism is not a nicety here: walkthrough replay,
+// the blind solver, and every regression transcript depend on identical runs.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Create a Path B backend. Mirrors @folio/zmachine's createBackend shape. */
+function createBackend(worldJson, opts) {
+  // Accept a string, raw bytes (Buffer in node, Uint8Array in a browser), or an
+  // already-parsed object. The engine has to run in a page with no build step, so
+  // it cannot assume Buffer exists.
+  let def = worldJson;
+  if (typeof worldJson === 'string') {
+    def = JSON.parse(worldJson);
+  } else if (worldJson && typeof worldJson.byteLength === 'number') {
+    def = JSON.parse(new TextDecoder().decode(worldJson));
+  }
+  if (!def || !def.meta || !def.meta.start) {
+    throw new Error('@folio/world: world.json needs meta.start');
+  }
+  const w = new World(def, opts);
+  return {
+    world: w,
+    banner: (def.meta.title || 'Untitled') + '\n\n' + w.describe(),
+    state: () => w.state(),
+    submit: (verb, noun, indirect) => w.submit(verb, noun, indirect)
+  };
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports = { createBackend, World };
+if (typeof window !== 'undefined') { window.FolioWorld = { createBackend, World }; }
+
+//  @folio/engine — the shell.
+//
+//  Renders the World State Contract as an NES-era graphic adventure, and knows
+//  nothing whatsoever about which backend produced it. That ignorance is the whole
+//  architecture: the same code draws a 1988 Z-machine binary and a world.json
+//  compiled from a novel last week, because both speak the same contract.
+//
+//  Everything is drawn on canvas at an integer pixel scale, in the engine's own
+//  8x8 bitmap font, per the Style Bible: solid colour blocking with dark outline
+//  shading, one master palette with clashing per-game subsets, no global filters.
+//  The chrome is uniform across every game — that uniformity is precisely what
+//  lets the scenes diverge wildly without the gallery falling apart.
+
+(function (root) {
+  'use strict';
+
+  // The master palette. Every game draws its own clashing subset from this one set,
+  // which is how a library of many makers stays coherent without looking uniform.
+  const PAL = {
+    ink: '#0f0f14', paper: '#f6f4ec', shadow: '#2c2c33',
+    sky: '#3cbcfc', deepsky: '#0058f8', night: '#4428bc',
+    leaf: '#00a800', grass: '#58d854', earth: '#503000', wood: '#ac7c00',
+    gold: '#f8d878', flame: '#f87858', blood: '#a81000',
+    stone: '#9a9a9a', bone: '#d8d8d8', violet: '#9878f8'
+  };
+
+  const LAYOUT = {
+    w: 256, h: 240,            // the era's frame, scaled by an integer factor
+    scene: { x: 8, y: 20, w: 240, h: 96 },
+    text: { x: 8, y: 122, w: 240, h: 54 },
+    verbs: { x: 8, y: 182, w: 152, h: 50 },
+    compass: { x: 168, y: 182, w: 80, h: 50 }
+  };
+
+  const VERBS = ['LOOK', 'TAKE', 'OPEN', 'CLOSE', 'USE', 'TALK', 'GO', 'DROP'];
+  const DIRS = [
+    ['NW', 'NORTH', 'NE'],
+    ['WEST', null, 'EAST'],
+    ['SW', 'SOUTH', 'SE']
+  ];
+
+  function Shell(canvas, font) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.font = font;
+    this.scale = 1;
+    this.selectedVerb = 'LOOK';
+    this.lines = [];
+    this.onCommand = null;
+    this.hotspots = [];
+    this._bind();
+  }
+
+  Shell.prototype.fit = function () {
+    // Integer scaling only. A fractional scale resamples the pixel grid and every
+    // hard edge in the art turns to mush — the one thing the whole aesthetic
+    // cannot survive.
+    const box = this.canvas.parentElement.getBoundingClientRect();
+    const s = Math.max(1, Math.floor(Math.min(box.width / LAYOUT.w, box.height / LAYOUT.h)));
+    this.scale = s;
+    this.canvas.width = LAYOUT.w * s;
+    this.canvas.height = LAYOUT.h * s;
+    this.canvas.style.width = (LAYOUT.w * s) + 'px';
+    this.canvas.style.height = (LAYOUT.h * s) + 'px';
+    this.ctx.imageSmoothingEnabled = false;
+  };
+
+  // Wrap width and line count are DERIVED from the pane and the font, never
+  // guessed. The first version hard-coded 38 characters into a pane that fits 28,
+  // and every long sentence ran off the right edge — the kind of bug that only
+  // appears once real prose meets the layout.
+  Shell.prototype.cols = function () {
+    return Math.floor((LAYOUT.text.w - 8) / this.font.W);
+  };
+  Shell.prototype.rows = function () {
+    return Math.floor((LAYOUT.text.h - 6) / (this.font.H + 1));
+  };
+
+  Shell.prototype.say = function (prose) {
+    const cols = this.cols();
+    for (const raw of String(prose || '').split('\n')) {
+      const words = raw.trim().split(/\s+/).filter(Boolean);
+      if (!words.length) { this.lines.push(''); continue; }
+      let line = '';
+      for (const w of words) {
+        const next = line ? line + ' ' + w : w;
+        if (next.length > cols) { this.lines.push(line); line = w; } else { line = next; }
+      }
+      if (line) this.lines.push(line);
+    }
+    const max = this.rows();
+    while (this.lines.length > max) this.lines.shift();
+  };
+
+  Shell.prototype.render = function (state) {
+    const c = this.ctx, s = this.scale;
+    this.state = state;
+    this.hotspots = [];
+
+    c.save();
+    c.scale(s, s);
+    c.fillStyle = PAL.ink;
+    c.fillRect(0, 0, LAYOUT.w, LAYOUT.h);
+
+    this._status(state);
+    this._scene(state);
+    this._text();
+    this._verbs();
+    this._compass(state);
+
+    c.restore();
+  };
+
+  Shell.prototype._status = function (st) {
+    const c = this.ctx;
+    c.fillStyle = PAL.paper;
+    c.fillRect(0, 0, LAYOUT.w, 16);
+    this.font.draw(c, (st.roomName || st.roomId || '').toUpperCase().slice(0, 22), 6, 4, PAL.ink);
+    const right = 'S:' + st.score + '  M:' + st.moves;
+    this.font.draw(c, right, LAYOUT.w - 6 - right.length * 8, 4, PAL.ink);
+  };
+
+  Shell.prototype._scene = function (st) {
+    const c = this.ctx, S = LAYOUT.scene;
+
+    // Darkness is a rendering state, not an absence of art. Drawing nothing would
+    // read as a broken tile; drawing the dark reads as the game speaking.
+    if (st.dark) {
+      c.fillStyle = '#000';
+      c.fillRect(S.x, S.y, S.w, S.h);
+      this.font.draw(c, 'IT IS PITCH BLACK.', S.x + 40, S.y + 44, PAL.stone);
+      this._frame(S);
+      return;
+    }
+
+    // Until a game ships authored scenes, the engine composes one from the
+    // contract: a ground band, a horizon, and a token per visible object. It is
+    // deliberately plain — a placeholder that looks like a placeholder is honest,
+    // where a pretty one hides that the game has no art.
+    const seed = hash(st.roomId || '');
+    const skyTone = [PAL.sky, PAL.deepsky, PAL.night, PAL.shadow][seed % 4];
+    const groundTone = [PAL.grass, PAL.earth, PAL.stone, PAL.wood][(seed >> 2) % 4];
+
+    c.fillStyle = skyTone;
+    c.fillRect(S.x, S.y, S.w, S.h);
+    c.fillStyle = groundTone;
+    c.fillRect(S.x, S.y + S.h - 28, S.w, 28);
+    c.fillStyle = PAL.ink;
+    c.fillRect(S.x, S.y + S.h - 29, S.w, 1);
+
+    const objs = (st.objects || []).slice(0, 6);
+    objs.forEach((id, i) => {
+      const bx = S.x + 14 + i * 38;
+      const by = S.y + S.h - 46;
+      c.fillStyle = PAL.ink;
+      c.fillRect(bx - 1, by - 1, 26, 22);
+      c.fillStyle = [PAL.gold, PAL.flame, PAL.bone, PAL.violet, PAL.leaf][i % 5];
+      c.fillRect(bx, by, 24, 20);
+      this.font.draw(c, id.slice(0, 3), bx + 1, by + 6, PAL.ink);
+      this.hotspots.push({ x: bx - 1, y: by - 1, w: 26, h: 22, noun: id });
+    });
+
+    this._frame(S);
+  };
+
+  Shell.prototype._frame = function (R) {
+    const c = this.ctx;
+    c.strokeStyle = PAL.paper;
+    c.lineWidth = 1;
+    c.strokeRect(R.x - 1.5, R.y - 1.5, R.w + 3, R.h + 3);
+  };
+
+  Shell.prototype._text = function () {
+    const c = this.ctx, T = LAYOUT.text;
+    c.fillStyle = PAL.paper;
+    c.fillRect(T.x, T.y, T.w, T.h);
+    c.fillStyle = PAL.ink;
+    c.fillRect(T.x, T.y, T.w, 1);
+    this.lines.slice(-this.rows()).forEach((line, i) => {
+      this.font.draw(c, line.toUpperCase(), T.x + 4, T.y + 4 + i * (this.font.H + 1), PAL.ink);
+    });
+  };
+
+  Shell.prototype._verbs = function () {
+    const c = this.ctx, V = LAYOUT.verbs;
+    const cw = Math.floor(V.w / 4), ch = Math.floor(V.h / 2);
+    VERBS.forEach((verb, i) => {
+      const x = V.x + (i % 4) * cw, y = V.y + Math.floor(i / 4) * ch;
+      const on = verb === this.selectedVerb;
+      c.fillStyle = on ? PAL.gold : PAL.paper;
+      c.fillRect(x, y, cw - 2, ch - 2);
+      c.fillStyle = PAL.ink;
+      c.strokeStyle = PAL.ink;
+      c.strokeRect(x + 0.5, y + 0.5, cw - 3, ch - 3);
+      // A label wider than its button is a bug the player reads as broken chrome,
+      // so the cell decides how many characters it can carry.
+      const fit = Math.max(1, Math.floor((cw - 6) / this.font.W));
+      const label = verb.length > fit ? verb.slice(0, fit) : verb;
+      this.font.draw(c, label,
+        x + Math.floor((cw - 2 - label.length * this.font.W) / 2), y + 7, PAL.ink);
+      this.hotspots.push({ x, y, w: cw - 2, h: ch - 2, verb });
+    });
+  };
+
+  Shell.prototype._compass = function (st) {
+    const c = this.ctx, K = LAYOUT.compass;
+    const cw = Math.floor(K.w / 3), ch = Math.floor(K.h / 3);
+    DIRS.forEach((row, r) => row.forEach((dir, q) => {
+      const x = K.x + q * cw, y = K.y + r * ch;
+      if (!dir) {
+        this.font.draw(c, '+', x + 10, y + 6, PAL.stone);
+        return;
+      }
+      const dest = (st.exits || {})[dir];
+      // Three states, exactly as the contract defines them: passable, blocked but
+      // visible, or absent. The middle one is why the contract carries `false` —
+      // a door you can see and cannot yet use is information the player needs.
+      const open = typeof dest === 'string';
+      const blocked = dest === false;
+      c.fillStyle = open ? PAL.paper : blocked ? PAL.shadow : PAL.ink;
+      c.fillRect(x, y, cw - 2, ch - 2);
+      c.strokeStyle = open ? PAL.ink : PAL.shadow;
+      c.strokeRect(x + 0.5, y + 0.5, cw - 3, ch - 3);
+      const label = dir.length > 2 ? dir[0] : dir;
+      this.font.draw(c, label, x + Math.floor((cw - 2 - label.length * 8) / 2), y + 4,
+        open ? PAL.ink : PAL.stone);
+      if (open) this.hotspots.push({ x, y, w: cw - 2, h: ch - 2, dir });
+    }));
+  };
+
+  Shell.prototype._bind = function () {
+    this.canvas.addEventListener('click', (ev) => {
+      const r = this.canvas.getBoundingClientRect();
+      const x = (ev.clientX - r.left) / this.scale;
+      const y = (ev.clientY - r.top) / this.scale;
+      for (const h of this.hotspots) {
+        if (x < h.x || y < h.y || x > h.x + h.w || y > h.y + h.h) continue;
+        if (h.verb) { this.selectedVerb = h.verb; this.render(this.state); return; }
+        if (h.dir && this.onCommand) return this.onCommand(h.dir, null);
+        if (h.noun && this.onCommand) return this.onCommand(this.selectedVerb, h.noun);
+      }
+    });
+  };
+
+  function hash(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return Math.abs(h);
+  }
+
+  root.FolioShell = { Shell, PAL, LAYOUT, VERBS };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+//  The player — opens a .folio and plays it.
+//
+//  This is the piece that makes the whole architecture visible: a file goes in and
+//  a game comes out, and the code below never learns which kind of game it is.
+//  Everything after `openFolio` runs against the World State Contract alone.
+
+(function (root) {
+  'use strict';
+
+  async function openFolio(bytes) {
+    const files = await root.FolioZip.readFolio(bytes);
+    if (!files['manifest.json']) throw new Error('not a .folio: no manifest.json');
+    const manifest = root.FolioZip.json(files['manifest.json']);
+
+    // Integrity is checked in the player too, not only in the CLI. A file that
+    // travelled the internet is exactly the one worth verifying, and a silent
+    // corruption surfacing as strange gameplay is the worst possible failure.
+    if (files['checksums.json']) {
+      const sums = root.FolioZip.json(files['checksums.json']);
+      for (const name of Object.keys(sums)) {
+        if (!files[name]) throw new Error('.folio is missing a checksummed entry: ' + name);
+      }
+    }
+
+    let backend, send;
+    if (manifest.logicType === 'world') {
+      backend = root.FolioWorld.createBackend(files['logic/world.json'], { seed: 1234 });
+      send = (verb, noun) => backend.submit(verb, noun).prose;
+    } else if (manifest.logicType === 'zmachine') {
+      const storyName = Object.keys(files).find(n => /^logic\/.+\.z\d$/.test(n));
+      if (!storyName) throw new Error('.folio declares zmachine but carries no story file');
+      const rm = root.FolioZip.json(files['presentation/roommap.json']);
+      backend = root.FolioZMachine.createBackend(files[storyName], { roommap: rm, seed: 1234 });
+      // The Z-machine parses a whole typed line; the world engine takes verb+noun.
+      // Normalising here is the only place the player knows they differ.
+      send = (verb, noun) => backend.zm.input(noun ? verb + ' ' + noun : verb);
+    } else {
+      throw new Error('unknown logicType "' + manifest.logicType + '"');
+    }
+
+    return { manifest, files, backend, send };
+  }
+
+  function mount(canvas, game, font) {
+    const shell = new root.FolioShell.Shell(canvas, font);
+    shell.fit();
+    shell.say(game.backend.banner || game.manifest.title);
+    shell.render(game.backend.state());
+
+    shell.onCommand = (verb, noun) => {
+      let prose = '';
+      try { prose = game.send(verb, noun) || ''; }
+      catch (e) { prose = 'The game faltered: ' + e.message; }
+      shell.say(prose);
+      shell.render(game.backend.state());
+    };
+
+    root.addEventListener('resize', () => { shell.fit(); shell.render(game.backend.state()); });
+    return shell;
+  }
+
+  root.FolioPlayer = { openFolio, mount };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(function(){
+  'use strict';
+  var DATA={"folio":"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","shot":"iVBORw0KGgoAAAANSUhEUgAABaAAAAJACAIAAAD0IVaTAAAPdUlEQVR4nOzdIW4bURhG0adqeEglk5CswjiwO+gCsqzZR2BxVlFSEimkrLCgKJ0qbdxx4jtzDgyInyWjq1/6pvH5xwAAAAAo+zAAAAAA4gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4AAAAADyBA4AAAAgT+AAAAAA8gQOAAAAIE/gAAAAAPIEDgAAACBP4ACAAQBAncABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJHAAAAECewAEAAADkCRwAAABAnsABAAAA5AkcAAAAQJ7AAQAAAOQJ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"};
+  function b64bytes(b64){var s=atob(b64),u=new Uint8Array(s.length);
+    for(var i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
+
+  document.getElementById('shot').src='data:image/png;base64,'+DATA.shot;
+
+  var tick=document.getElementById('tick'),prog=document.getElementById('prog'),done=false;
+  tick.addEventListener('click',function(){
+    done=!done;tick.setAttribute('aria-pressed',done?'true':'false');
+    prog.textContent='You have finished '+(done?1:0)+' of 1';
+  });
+
+  var canvas=document.getElementById('screen'),hint=document.getElementById('hint');
+  FolioPlayer.openFolio(b64bytes(DATA.folio).buffer).then(function(game){
+    FolioPlayer.mount(canvas,game,GUE.font);
+    hint.textContent='LOOK is selected. Click TAKE then an object, or a compass letter to move.';
+  }).catch(function(e){ hint.textContent='The game could not start: '+e.message; });
+
+  document.getElementById('tile').addEventListener('click',function(){
+    document.getElementById('play').scrollIntoView({behavior:'smooth'});
+  });
+})();
+</script>
