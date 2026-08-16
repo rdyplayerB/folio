@@ -1,9 +1,20 @@
 [
   {
+    "id": "zork-1",
+    "title": "ZORK I: The Great Underground Empire",
+    "author": "Infocom",
+    "genre": "Fantasy",
+    "series": "The Great Underground Empire",
+    "tier": "certified",
+    "featured": true,
+    "file": "../site/games/zork-1.folio",
+    "shot": "./shots/zork-1.png"
+  },
+  {
     "id": "cellar-door",
     "title": "Cellar Door",
     "author": "Folio conformance suite",
-    "series": "Mystery Series",
+    "genre": "Mystery",
     "tier": "playable",
     "file": "../site/games/cellar-door.folio",
     "shot": "./shots/cellar-door.png"
