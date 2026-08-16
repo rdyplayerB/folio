@@ -24,21 +24,25 @@
     const files = await root.FolioZip.readFolio(bytes);
     if (!files['manifest.json']) throw new Error('not a .folio: no manifest.json');
     const manifest = root.FolioZip.json(files['manifest.json']);
-    if (manifest.logicType !== 'zmachine') {
-      throw new Error('the full shell currently boots zmachine games; this is "' +
-        manifest.logicType + '"');
-    }
-
     const GUE = root.GUE = root.GUE || {};
 
-    // --- logic: the story file, handed over as the base64 the shell expects ---
-    const storyName = Object.keys(files).find(n => /^logic\/.+\.z\d$/.test(n));
-    if (!storyName) throw new Error('.folio declares zmachine but carries no story file');
-    GUE.STORY_BASE64 = bytesToB64(files[storyName]);
-
-    // --- presentation: the binding from story object numbers to stable ids ---
-    const rm = root.FolioZip.json(files['presentation/roommap.json']);
-    Object.assign(GUE, rm);
+    if (manifest.logicType === 'world') {
+      // Path B renders in the same shell, through the adapter. Both kinds of game
+      // therefore get the portrait board, the inventory strip, the save slots and
+      // every other thing the interface learned by being played.
+      if (!files['logic/world.json']) {
+        throw new Error('.folio declares a world but carries no logic/world.json');
+      }
+      root.FolioWorldAdapter.install(root.FolioZip.json(files['logic/world.json']));
+    } else if (manifest.logicType === 'zmachine') {
+      const storyName = Object.keys(files).find(n => /^logic\/.+\.z\d$/.test(n));
+      if (!storyName) throw new Error('.folio declares zmachine but carries no story file');
+      GUE.STORY_BASE64 = bytesToB64(files[storyName]);
+      const rm = root.FolioZip.json(files['presentation/roommap.json']);
+      Object.assign(GUE, rm);
+    } else {
+      throw new Error('unknown logicType "' + manifest.logicType + '"');
+    }
 
     // --- presentation: verb map and scene art are code that draws, and they
     //     belong to THIS GAME, so they travel inside its container ---

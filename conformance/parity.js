@@ -118,5 +118,21 @@ check('a locked passage shows as blocked, then becomes passable',
   before === false && after === 'CELLAR',
   'before=' + before + ' after=' + after);
 
+// ---------------------------------------------------- adapter surface parity
+// The real shell reaches for a small set of methods on the interpreter and the
+// bridge. Path B renders through an adapter that supplies them, so the adapter
+// has to keep matching the Z-machine's shape or the shell breaks for one kind of
+// game only, which is the failure this file exists to catch.
+const ADAPTER_SURFACE = {
+  machine: ['start', 'input', 'snapshot', 'restore', 'getGlobal'],
+  bridge: ['init', 'state', 'lampFraction']
+};
+for (const m of ADAPTER_SURFACE.machine) {
+  check('the Z-machine exposes ' + m + '() for the shell', typeof A.zm[m] === 'function');
+}
+for (const m of ADAPTER_SURFACE.bridge) {
+  check('the bridge exposes ' + m + '() for the shell', typeof A.bridge[m] === 'function');
+}
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mboth paths speak the same contract\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

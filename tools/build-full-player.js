@@ -17,6 +17,8 @@ const engine=[
   read('packages/engine/browser-zip.js'),
   read('packages/zmachine/src/zmachine.js'),
   read('packages/zmachine/src/bridge.js'),
+  read('packages/world/index.js'),
+  read('packages/engine/world-adapter.js'),
   read('packages/engine/player-full.js')
 ].join('\n');
 
@@ -31,7 +33,7 @@ const html=`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Folio Player</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj4KICA8IS0tIFRoZSBtZXNzYWdlIHdpbmRvdzogYW4gaW5rLWJvcmRlcmVkIGJveCB3aXRoIHRoZSBjb250aW51ZSB0cmlhbmdsZSB0aGF0IHNheXMKICAgICAgIHRoZXJlIGlzIG1vcmUgc3RvcnkuIERyYXduIG9uIGEgMTZweCBncmlkIHNvIGl0IHN0YXlzIHNoYXJwIGF0IHRhYiBzaXplLiAtLT4KICA8cmVjdCB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIGZpbGw9IiNmN2Y1ZWYiLz4KICA8cmVjdCB4PSIxIiB5PSIzIiB3aWR0aD0iMTQiIGhlaWdodD0iMTAiIGZpbGw9IiMxMjEyMWEiLz4KICA8cmVjdCB4PSIyIiB5PSI0IiB3aWR0aD0iMTIiIGhlaWdodD0iOCIgZmlsbD0iI2Y3ZjVlZiIvPgogIDxyZWN0IHg9IjMiIHk9IjYiIHdpZHRoPSI4IiBoZWlnaHQ9IjEiIGZpbGw9IiMxMjEyMWEiLz4KICA8cmVjdCB4PSIzIiB5PSI4IiB3aWR0aD0iNiIgaGVpZ2h0PSIxIiBmaWxsPSIjMTIxMjFhIi8+CiAgPHBhdGggZD0iTTExIDloM3YxaC0ydjFoLTF6IiBmaWxsPSIjZTA1YTQ0Ii8+Cjwvc3ZnPgo=" type="image/svg+xml">
 <style>
   :root{color-scheme:dark}
   *{box-sizing:border-box}
