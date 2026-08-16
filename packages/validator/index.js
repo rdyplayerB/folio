@@ -3,14 +3,14 @@
 //    T0 SCHEMA       manifest fields, types, zip layout, checksums
 //    T1 INTEGRITY    every reference resolves; assets decode; capabilities are
 //                    supported by the declared format version
-//    T2 GRAPH        (later) puzzle-dependency analysis — no dead ends exist
-//    T3 COMPLETABLE  (later) headless cold-start walkthrough replay
-//    T4 DESIGN       (later) corpus-calibrated design audit + blind solver
+//    T2 GRAPH        puzzle-dependency analysis — no dead ends exist
+//    T3 COMPLETABLE  headless cold-start walkthrough replay
+//    T4 DESIGN       design-shape audit (blind solver still to come)
 //
-//  T0/T1 ship here. The tiers above need the world interpreter and corpus profiler,
-//  and are staged in the roadmap rather than stubbed, because a validator that
-//  silently passes checks it cannot actually perform is worse than one that says
-//  plainly what it has and has not verified.
+//  T2-T4 run for Path B worlds, which are readable. A Z-machine binary is opaque,
+//  so its graph must be recovered by exploration rather than read, and those tiers
+//  are honestly reported as not-run rather than faked — a validator that silently
+//  passes checks it cannot perform is worse than one that states its own limits.
 //
 //  Findings carry a code, and every code must have a matching docs anchor — the
 //  cheapest way to keep "why won't my game certify" answerable is to make it
@@ -34,7 +34,8 @@ const KNOWN_CAPABILITIES = [
  * @param {{manifest:object, walkthrough:string, files:object}} game
  * @returns {{ok:boolean, tier:string, findings:Array, summary:string}}
  */
-function validate(game) {
+function validate(game, opts) {
+  opts = opts || {};
   const f = [];
   const err = (code, msg, hint) => f.push({ level: 'error', code, msg, hint });
   const warn = (code, msg, hint) => f.push({ level: 'warning', code, msg, hint });
@@ -162,6 +163,14 @@ function validate(game) {
         f.push(...r.findings);
         ran.push('T3');
         stats = Object.assign(stats, r.stats);
+
+        // T4 reports a profile rather than a verdict, so its findings are always
+        // advisory. A shallow game is still a game; it simply cannot claim to be
+        // a finished one.
+        const d = require('./design.js').audit(def, opts && opts.thresholds ? opts : {});
+        f.push(...d.findings);
+        ran.push('T4');
+        stats = Object.assign(stats, d.metrics);
       }
     }
   }
@@ -170,7 +179,12 @@ function validate(game) {
   const ok = errors.length === 0;
   // Badge language is deliberately conservative. T3 proves a path exists; it does
   // not prove a human could find it, and only T4's blind solver speaks to that.
+  // Certification is the top tier and is deliberately hard to reach: a game must
+  // pass every check AND clear the design thresholds. "Playable" is the honest
+  // resting place for a game that works but is thin, which most first drafts are.
+  const designWarnings = f.filter(x => x.level === 'warning' && /^W5/.test(x.code)).length;
   const tier = !ok ? 'invalid'
+    : ran.includes('T4') && designWarnings === 0 ? 'certified'
     : ran.includes('T3') ? 'playable'
     : 'valid';
 
