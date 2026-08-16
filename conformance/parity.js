@@ -20,8 +20,8 @@ const path = require('path');
 const zmachine = require('../packages/zmachine/index.js');
 const world = require('../packages/world/index.js');
 
-const ORIGIN = process.env.FOLIO_ORIGIN ||
-  path.join(process.env.HOME, 'projects-games', 'zork1');
+const origin = require('./origin.js');
+if (!origin.available()) origin.skip('cross-path parity (needs a Path A story file)');
 
 let failed = 0;
 function check(label, cond, detail) {
@@ -31,16 +31,8 @@ function check(label, cond, detail) {
 }
 
 // ------------------------------------------------------------------ Path A
-const storySrc = fs.readFileSync(path.join(ORIGIN, 'data', 'story.js'), 'utf8');
-const b64 = storySrc.match(/["']([A-Za-z0-9+/=]{2000,})["']/);
-const ns = {}; const sb = { GUE: ns }; sb.window = sb;
-new Function('window', 'globalThis', 'global', 'GUE', 'module',
-  fs.readFileSync(path.join(ORIGIN, 'data', 'roommap.js'), 'utf8'))(sb, sb, sb, ns, undefined);
-
-const A = zmachine.createBackend(Buffer.from(b64[1], 'base64'), {
-  roommap: { ROOMMAP: ns.ROOMMAP, OBJMAP: ns.OBJMAP, ADVENTURER: ns.ADVENTURER,
-    ATTR: ns.ATTR, DIRPROP: ns.DIRPROP, EXIT_HAS_ROOM: ns.EXIT_HAS_ROOM },
-  seed: 1234
+const A = zmachine.createBackend(origin.storyBytes(), {
+  roommap: origin.roommap(), seed: 1234
 });
 
 // ------------------------------------------------------------------ Path B

@@ -15,6 +15,9 @@ const os = require('os');
 const path = require('path');
 const { pack, load } = require('../pack.js');
 const { createBackend } = require('../../zmachine/index.js');
+const origin = require('../../../conformance/origin.js');
+
+if (!origin.available()) origin.skip('.folio round-trip test (needs a story file)');
 
 const ORIGIN = process.env.FOLIO_ORIGIN ||
   path.join(process.env.HOME, 'projects-games', 'zork1');

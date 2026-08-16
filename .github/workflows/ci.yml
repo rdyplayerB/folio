@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # This repository ships NO GAME DATA — the posture ScummVM has held for
+      # twenty years. Path A suites therefore skip here and say so loudly; every
+      # Path B suite, the container, the validator and the dials run in full.
+      # To exercise Path A locally, point FOLIO_ORIGIN at a checkout holding
+      # data/story.js and data/roommap.js.
+      - run: npm test
+
+      - run: npm run build

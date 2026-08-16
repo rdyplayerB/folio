@@ -11,6 +11,9 @@
 const fs = require('fs');
 const path = require('path');
 const { createBackend } = require('../index.js');
+const origin = require('../../../conformance/origin.js');
+
+if (!origin.available()) origin.skip('@folio/zmachine smoke test');
 
 const ORIGIN = process.env.FOLIO_ORIGIN ||
   path.join(process.env.HOME, 'projects-games', 'zork1');
