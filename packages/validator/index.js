@@ -138,16 +138,55 @@ function validate(game) {
     }
   }
 
-  const errors = f.filter(x => x.level === 'error');
-  const tier = errors.length ? 'invalid' : 'valid';
+  // ------------------------------------------------------------- T2 and T3
+  // Only Path B worlds can be analysed statically today: a Z-machine binary is
+  // opaque, so its graph must be recovered by exploration rather than read. That
+  // is real work, not a shortcut, and it is staged rather than faked — the tiers
+  // report honestly which checks actually ran.
+  const ran = ['T0', 'T1'];
+  let stats = null;
+
+  if (errorsIn(f).length === 0 && m.logicType === 'world' && game.files['logic/world.json']) {
+    let def = null;
+    try { def = JSON.parse(game.files['logic/world.json'].toString('utf8')); }
+    catch (e) { err('E211', 'logic/world.json is not valid JSON: ' + e.message); }
+
+    if (def) {
+      const g = require('./graph.js').analyse(def);
+      f.push(...g.findings);
+      ran.push('T2');
+      stats = Object.assign({}, g.stats);
+
+      if (g.ok) {
+        const r = require('./replay.js').replay(def, game.walkthrough);
+        f.push(...r.findings);
+        ran.push('T3');
+        stats = Object.assign(stats, r.stats);
+      }
+    }
+  }
+
+  const errors = errorsIn(f);
+  const ok = errors.length === 0;
+  // Badge language is deliberately conservative. T3 proves a path exists; it does
+  // not prove a human could find it, and only T4's blind solver speaks to that.
+  const tier = !ok ? 'invalid'
+    : ran.includes('T3') ? 'playable'
+    : 'valid';
+
   return {
-    ok: errors.length === 0,
+    ok,
     tier,
+    ran,
+    stats,
     findings: f,
     summary: errors.length
       ? errors.length + ' error' + (errors.length > 1 ? 's' : '')
-      : 'T0+T1 passed' + (f.length ? ' with ' + f.length + ' warning' + (f.length > 1 ? 's' : '') : '')
+      : ran.join('+') + ' passed' +
+        (f.length ? ' with ' + f.length + ' warning' + (f.length > 1 ? 's' : '') : '')
   };
 }
+
+function errorsIn(f) { return f.filter(x => x.level === 'error'); }
 
 module.exports = { validate, KNOWN_CAPABILITIES };

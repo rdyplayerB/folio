@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/validator/test/catches.js && node conformance/parity.js"
+    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node conformance/parity.js"
   },
   "bin": {
     "folio": "packages/cli/folio.js"

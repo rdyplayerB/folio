@@ -20,22 +20,42 @@ const path = require('path');
 const { pack, load } = require('../format/pack.js');
 const { validate } = require('../validator/index.js');
 const { createBackend } = require('../zmachine/index.js');
+const world = require('../world/index.js');
 
 const C = { dim: '\x1b[2m', red: '\x1b[31m', yellow: '\x1b[33m', green: '\x1b[32m', bold: '\x1b[1m', off: '\x1b[0m' };
 
+// Both logic paths open the same way from the caller's side. That symmetry is not
+// cosmetic — it is the World State Contract doing its job, and if this function
+// ever needs to know which backend it has beyond construction, the contract has
+// sprung a leak.
 function openGame(file) {
   const game = load(fs.readFileSync(file));
-  if (game.manifest.logicType !== 'zmachine') {
-    throw new Error('only zmachine games are playable so far (this is "' + game.manifest.logicType + '")');
+
+  if (game.manifest.logicType === 'zmachine') {
+    const rmFile = game.files['presentation/roommap.json'];
+    if (!rmFile) throw new Error('game is missing presentation/roommap.json');
+    const story = Object.keys(game.files).find(n => /^logic\/.+\.z\d$/.test(n));
+    const be = createBackend(game.files[story], {
+      roommap: JSON.parse(rmFile.toString('utf8')), seed: 1234
+    });
+    // The Z-machine parses a whole typed line; the world engine takes verb+noun.
+    // Normalising here keeps the play loop identical for both.
+    return { game, backend: be, send: (line) => be.zm.input(line) };
   }
-  const rmFile = game.files['presentation/roommap.json'];
-  if (!rmFile) throw new Error('game is missing presentation/roommap.json');
-  const story = Object.keys(game.files).find(n => /^logic\/.+\.z\d$/.test(n));
-  const backend = createBackend(game.files[story], {
-    roommap: JSON.parse(rmFile.toString('utf8')),
-    seed: 1234
-  });
-  return { game, backend };
+
+  if (game.manifest.logicType === 'world') {
+    const be = world.createBackend(game.files['logic/world.json'], { seed: 1234 });
+    return {
+      game,
+      backend: be,
+      send: (line) => {
+        const [verb, ...rest] = line.split(/\s+/);
+        return be.submit(verb, rest.length ? rest.join(' ').toUpperCase() : null).prose;
+      }
+    };
+  }
+
+  throw new Error('unknown logicType "' + game.manifest.logicType + '"');
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -58,13 +78,24 @@ try {
       console.log(col + x.level.toUpperCase() + C.off + ' ' + C.dim + x.code + C.off + '  ' + x.msg);
       if (x.hint) console.log('        ' + C.dim + x.hint + C.off);
     }
-    const badge = r.ok ? C.green + 'VALID' + C.off : C.red + 'INVALID' + C.off;
+    const badge = !r.ok ? C.red + 'INVALID' + C.off
+      : r.tier === 'playable' ? C.green + 'PLAYABLE' + C.off
+      : C.green + 'VALID' + C.off;
     console.log('\n' + badge + '  ' + path.basename(file) + '  ' + C.dim + r.summary + C.off);
-    // Honest about what has not been checked. A badge that implies more
-    // verification than was performed is the one thing that would discredit
-    // the whole certification story.
-    console.log(C.dim + '  checked T0 schema + T1 integrity. Not yet checked: ' +
-      'T2 graph, T3 completability, T4 design.' + C.off);
+    if (r.stats && r.stats.won !== undefined) {
+      console.log(C.dim + '  completed in ' + r.stats.moves + ' moves for ' + r.stats.score +
+        ' points, ' + r.stats.roomCoverage + '% of rooms visited' + C.off);
+    }
+    // Honest about what has not been checked. A badge implying more verification
+    // than was performed is the one thing that would discredit certification
+    // entirely, so every run states its own limits.
+    const all = ['T0', 'T1', 'T2', 'T3', 'T4'];
+    const missing = all.filter(t => !r.ran.includes(t));
+    console.log(C.dim + '  ran ' + r.ran.join(', ') +
+      (missing.length ? '. Not checked: ' + missing.join(', ') : '') + C.off);
+    if (r.tier === 'playable') {
+      console.log(C.dim + '  "playable" means a path exists, not that a human can find it.' + C.off);
+    }
     process.exit(r.ok ? 0 : 1);
 
   } else if (cmd === 'info') {
@@ -86,14 +117,14 @@ try {
   } else if (cmd === 'play') {
     const [file] = args;
     if (!file) throw new Error('usage: folio play <file.folio>');
-    const { game, backend } = openGame(file);
+    const { game, backend, send } = openGame(file);
     console.log(C.bold + game.manifest.title + C.off + C.dim + '  (ctrl-c to quit)' + C.off + '\n');
     console.log(backend.banner.trim() + '\n');
     const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
     const prompt = () => {
       const s = backend.state();
       rl.question(C.dim + s.roomId + '  ' + s.score + '/' + s.moves + C.off + ' > ', (line) => {
-        if (line.trim()) console.log('\n' + (backend.zm.input(line.trim()) || '').trim() + '\n');
+        if (line.trim()) console.log('\n' + (send(line.trim()) || '').trim() + '\n');
         prompt();
       });
     };
