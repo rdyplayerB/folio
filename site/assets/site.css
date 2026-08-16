@@ -24,6 +24,12 @@
   --crimson:#a3252b;
   --bezel:#e8e6dc;
   --green:#92cc41;
+  /* Panels are opaque and a step lighter than any point on the ground ramp, so
+     they occlude the starfield instead of letting it shine through them. A panel
+     you can see stars inside stops reading as an object in front of the sky, and
+     that layering is most of what makes the page feel deep rather than printed
+     flat. */
+  --panel:#121a3a;
 
   --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans: "Inter var","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -36,16 +42,25 @@ html{
   -webkit-text-size-adjust:100%;scroll-behavior:smooth;
   /* The field spans the document, not the viewport. Anchoring it to the viewport
      made a long page run past the end of the ramp and snap back to black, which
-     read as a seam under the wall. */
+     read as a seam under the wall.
+
+     The floor stops well short of --navy on purpose. --navy is a panel colour,
+     and when the ramp climbed all the way to it the ground got bright enough
+     that the faint stars lost their contrast and started reading as dust on the
+     screen instead of as a sky. Ground stays dark; navy stays furniture. */
   min-height:100%;
-  background:linear-gradient(180deg, #020206 0%, var(--ink) 18%, #0a0c1e 52%, #101c46 82%, var(--navy) 100%) no-repeat;
+  background:linear-gradient(180deg, #010104 0%, var(--ink) 18%, #070a1c 52%, #08102c 82%, #0a1434 100%) no-repeat;
   background-attachment:scroll;
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
 /* One continuous field, no letterboxing. The stars themselves are painted to a
-   canvas by assets/starfield.js and laid over this ramp, because CSS gradients
-   cannot vary brightness, size and clustering the way a real sky does. */
+   canvas by assets/starfield.js and laid onto this element, because CSS
+   gradients cannot vary brightness, size and clustering the way a real sky does.
+
+   The field scrolls with the document rather than being pinned to the viewport.
+   Pinned, the stars held still while the ground moved under them, which reads as
+   marks on the glass rather than as a backdrop the page is printed on. */
 body{
   margin:0;color:var(--paper);font:16px/1.65 var(--sans);min-height:100vh;
   position:relative;
@@ -116,7 +131,7 @@ p{color:rgba(232,228,218,.82)}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 22px}
 .filters button{
   font:600 11.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;
-  padding:10px 15px;border:1px solid rgba(232,228,218,.3);background:rgba(232,228,218,.05);
+  padding:10px 15px;border:1px solid rgba(232,228,218,.3);background:var(--panel);
   color:var(--gray);cursor:pointer;
 }
 .filters button:hover{color:var(--paper);border-color:rgba(232,228,218,.55)}
@@ -160,9 +175,13 @@ p{color:rgba(232,228,218,.82)}
 .empty{color:var(--gray);font-size:15px;padding:26px 0;grid-column:1/-1}
 
 /* -------------------------------------------------------------------- cards */
+/* The same furniture the game tiles wear: a solid face, a dark rim, and a hard
+   stepped shadow rather than a soft blur. Print could not blur, so a soft glow
+   is the tell that gives away a modern imitation. */
 .card{
-  border:1px solid rgba(232,228,218,.22);background:rgba(232,228,218,.04);
+  border:1px solid rgba(232,228,218,.22);background:var(--panel);
   padding:26px;
+  box-shadow:0 3px 0 rgba(0,0,0,.55), 0 10px 24px rgba(0,0,0,.45);
 }
 .card h3{font:italic 700 20px/1.25 var(--slab);color:var(--palegold);margin:0 0 10px}
 .card p{margin:0 0 14px;font-size:15px}
@@ -172,7 +191,7 @@ p{color:rgba(232,228,218,.82)}
 
 code,kbd{font-family:var(--mono);font-size:.9em;color:var(--palegold)}
 pre{
-  font:12.5px/1.8 var(--mono);background:rgba(0,0,0,.42);
+  font:12.5px/1.8 var(--mono);background:#06091a;
   border:1px solid rgba(232,228,218,.18);padding:16px 18px;overflow-x:auto;
   color:var(--gray);margin:0 0 16px;
 }

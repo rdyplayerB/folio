@@ -22,7 +22,16 @@
     .toc{position:static}
     .toc a{display:inline-block;border-left:0;padding:6px 16px 6px 0}
   }
-  article{max-width:72ch;min-width:0}
+  /* Documentation is the one page here that gets read line by line rather than
+     scanned, so the prose sits on a solid panel instead of directly on the sky.
+     Stars behind running text are atmosphere on a poster and grit in a manual. */
+  article{
+    max-width:calc(72ch + 76px);min-width:0;
+    background:var(--panel);border:1px solid rgba(232,228,218,.16);
+    padding:34px 38px 40px;
+    box-shadow:0 3px 0 rgba(0,0,0,.55), 0 10px 24px rgba(0,0,0,.45);
+  }
+  @media (max-width:620px){article{padding:26px 20px 30px}}
   article h2{font:italic 700 24px/1.3 var(--slab);color:var(--palegold);
     margin:48px 0 14px;padding-top:18px;border-top:1px solid rgba(155,155,164,.28)}
   article p,article li{font-size:15.5px}

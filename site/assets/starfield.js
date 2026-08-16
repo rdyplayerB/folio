@@ -95,15 +95,23 @@
     // into a soft grey smudge, which is most of what "flat" looked like.
     var dpr = Math.min(3, Math.max(1, Math.round(root.devicePixelRatio || 1)));
     var url = paint(dpr);
+
+    // Two layers on the body, and the difference between them is the point.
+    //
+    // The stars scroll with the document, so they behave like a backdrop the page
+    // is printed on. The vignette is fixed to the viewport, so it behaves like
+    // light falling on that backdrop rather than like part of it. Pinning both
+    // made the sky read as marks on the glass; scrolling both lost the sense that
+    // the middle of the screen is nearer than the corners.
     var s = document.createElement('style');
     s.textContent =
-      'body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;' +
-      'background-image:url(' + url + ');background-size:' + TILE + 'px ' + TILE + 'px;' +
-      'background-repeat:repeat;}' +
-      // A vignette pushes the corners back and lets the middle of the page sit
-      // forward, which is the depth a flat field was missing.
-      'body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;' +
-      'background:radial-gradient(120% 80% at 50% 22%, rgba(0,0,0,0) 40%, rgba(0,0,0,.55) 100%);}';
+      'body{' +
+      'background-image:radial-gradient(125% 85% at 50% 26%, rgba(0,0,0,0) 42%, rgba(0,0,0,.5) 100%),' +
+      'url(' + url + ');' +
+      'background-attachment:fixed,scroll;' +
+      'background-repeat:no-repeat,repeat;' +
+      'background-size:100% 100%,' + TILE + 'px ' + TILE + 'px;' +
+      '}';
     document.head.appendChild(s);
   }
 
