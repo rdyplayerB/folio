@@ -1,0 +1,11 @@
+[
+  {
+    "id": "cellar-door",
+    "title": "Cellar Door",
+    "author": "Folio conformance suite",
+    "series": "Mystery Series",
+    "tier": "playable",
+    "file": "../site/games/cellar-door.folio",
+    "shot": "./shots/cellar-door.png"
+  }
+]

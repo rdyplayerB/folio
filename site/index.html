@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>folio.games — the library</title>
+<meta name="description" content="Every text adventure deserves the NES port it never got. Play community-made graphic adventures in your browser.">
+<style>
+  /* The library wall. Paper is the site; phosphor is the library; the border
+     between them is the brand's own line. Uniform chrome is precisely what lets
+     the games inside diverge wildly without the wall falling apart. */
+  :root {
+    --paper:#f6f4ec; --ink:#0f0f14; --line:#d8d5c8;
+    --wall:#0a0a12; --wall2:#141428;
+    --gold:#f8d878; --amber:#e8a020; --red:#e76e55;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --slab: "Iowan Old Style", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font:15px/1.6 var(--mono);
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 20px; }
+
+  /* Masthead: the ink-bordered window the whole system is built from. */
+  header { padding:34px 0 22px; }
+  .box { border:4px solid var(--ink); background:#fff; padding:20px 22px; }
+  .mark {
+    font:700 30px/1 var(--mono); letter-spacing:.14em; margin:0 0 6px;
+  }
+  .mark span { color:var(--red); }
+  .tag { margin:0; color:#57575f; }
+  nav { display:flex; gap:2px; margin-top:16px; flex-wrap:wrap; }
+  nav a {
+    font:700 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink); text-decoration:none; padding:9px 13px; border:3px solid var(--ink);
+    background:#fff;
+  }
+  nav a:hover, nav a:focus-visible { background:var(--gold); outline:none; }
+  nav a[aria-current] { background:var(--ink); color:var(--paper); }
+
+  /* The wall itself — a television set into the page. */
+  .wall-title {
+    display:flex; align-items:center; gap:12px; margin:30px 0 0;
+    font:700 12px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  }
+  .wall-title::after { content:""; flex:1; height:3px; background:var(--ink); }
+  .wall {
+    border:4px solid var(--ink); margin-top:10px;
+    background:radial-gradient(120% 90% at 50% 0%, var(--wall2), var(--wall));
+    padding:22px; position:relative; overflow:hidden;
+  }
+  .banner {
+    background:var(--red); color:#fff; margin:-22px -22px 20px;
+    padding:9px 16px; display:flex; justify-content:space-between; gap:12px;
+    font:700 12px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
+    flex-wrap:wrap;
+  }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:22px 18px; }
+  .cart { display:flex; flex-direction:column; gap:8px; }
+  /* Rounded barrel-cornered bezel: curvature is what makes a tile read as a
+     screen rather than a card. */
+  .screen {
+    border:3px solid #e8e6dc; border-radius:16px; overflow:hidden;
+    background:#000; aspect-ratio:4/3; display:block; width:100%;
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.6);
+  }
+  .screen img, .screen canvas { width:100%; height:100%; display:block; image-rendering:pixelated; }
+  .meta { display:flex; gap:8px; align-items:flex-start; }
+  .tick {
+    width:17px; height:17px; flex:none; margin-top:3px; border:3px solid #fff;
+    background:transparent; cursor:pointer; padding:0;
+  }
+  .tick[aria-pressed="true"] { background:var(--gold); border-color:var(--gold); }
+  .tick:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+  .name {
+    font:italic 700 16px/1.15 var(--slab); color:var(--gold);
+    text-decoration:none; letter-spacing:.01em;
+  }
+  .name:hover { text-decoration:underline; }
+  .sub {
+    font:11px/1.5 var(--mono); color:#8d8da0; letter-spacing:.06em;
+    text-transform:uppercase; margin-top:3px;
+  }
+  .sub .cert { color:#92cc41; }
+  .foot {
+    display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-top:20px; padding-top:14px; border-top:1px solid #2a2a3c;
+    font:11px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:#8d8da0;
+  }
+  .make { margin:26px 0 40px; }
+  .make h2 { font:700 22px/1.2 var(--mono); letter-spacing:.06em; margin:0 0 8px; }
+  .make p { margin:0 0 14px; max-width:62ch; color:#3a3a44; }
+  .cta {
+    display:inline-block; font:700 13px/1 var(--mono); letter-spacing:.08em;
+    text-transform:uppercase; background:var(--red); color:#fff; text-decoration:none;
+    padding:13px 18px; border:3px solid var(--ink);
+  }
+  .cta:hover { background:var(--ink); }
+  footer { border-top:3px solid var(--ink); padding:18px 0 40px; font-size:12px; color:#57575f; }
+  @media (prefers-reduced-motion:no-preference) {
+    .cart:hover .screen { transform:translateY(-2px); transition:transform .12s; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="box">
+      <h1 class="mark">FOLIO<span>▾</span></h1>
+      <p class="tag">Every text adventure deserves the 8-bit port it never got.</p>
+      <nav>
+        <a href="./" aria-current="page">The Wall</a>
+        <a href="./make/">Make One</a>
+        <a href="./docs/">Docs</a>
+        <a href="https://github.com/rdyplayerB/folio">Source</a>
+      </nav>
+    </div>
+  </header>
+
+  <h2 class="wall-title">The Library</h2>
+  <div class="wall">
+    <div class="banner">
+      <span id="count">Loading the wall…</span>
+      <span>New every Thursday</span>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="foot">
+      <span id="progress"></span>
+      <span>☑ = you finished it</span>
+    </div>
+  </div>
+
+  <section class="make">
+    <h2>Your game goes here.</h2>
+    <p>
+      Bring a story — a novel, a script, something you wrote — and the Studio turns
+      it into a playable <code>.folio</code>. You steer, the compiler builds, and the
+      validator proves it is finishable before it ships. Or bring a Z-machine game
+      you already have and give it the pictures it never got.
+    </p>
+    <a class="cta" href="./make/">Open the Studio</a>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    Open source · MIT · Every certified folio is proven completable ·
+    A <a href="https://mochilabs.xyz">Mochi Labs</a> project
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  const grid = document.getElementById('grid');
+  const countEl = document.getElementById('count');
+  const progEl = document.getElementById('progress');
+
+  // Completions live in the browser first and merge into an account only if one
+  // is ever created. Ticking a box must never require signing up: friction at the
+  // moment of delight is where platforms lose people.
+  const KEY = 'folio.finished';
+  const finished = new Set(JSON.parse(localStorage.getItem(KEY) || '[]'));
+  const persist = () => localStorage.setItem(KEY, JSON.stringify([...finished]));
+
+  fetch('./games.json')
+    .then(r => r.json())
+    .then(render)
+    .catch(() => { countEl.textContent = 'The wall could not be loaded.'; });
+
+  function render(games) {
+    countEl.textContent = games.length + ' playable folios · ' +
+      new Set(games.map(g => g.author)).size + ' makers';
+    grid.innerHTML = '';
+    for (const g of games) grid.appendChild(cart(g));
+    progress(games);
+  }
+
+  function cart(g) {
+    const el = document.createElement('article');
+    el.className = 'cart';
+
+    const a = document.createElement('a');
+    a.className = 'screen';
+    a.href = '../dist/player.html?game=' + encodeURIComponent(g.file);
+    a.setAttribute('aria-label', 'Play ' + g.title);
+    const img = document.createElement('img');
+    img.src = g.shot || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+    img.alt = '';
+    a.appendChild(img);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+
+    const tick = document.createElement('button');
+    tick.className = 'tick';
+    tick.type = 'button';
+    tick.setAttribute('aria-pressed', finished.has(g.id) ? 'true' : 'false');
+    tick.setAttribute('aria-label', 'Mark ' + g.title + ' as finished');
+    tick.addEventListener('click', () => {
+      finished.has(g.id) ? finished.delete(g.id) : finished.add(g.id);
+      tick.setAttribute('aria-pressed', finished.has(g.id) ? 'true' : 'false');
+      persist();
+      progress(window.__games || []);
+    });
+
+    const txt = document.createElement('div');
+    const name = document.createElement('a');
+    name.className = 'name';
+    name.href = a.href;
+    name.textContent = g.title;
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.innerHTML = (g.series || 'Adventure Series') +
+      (g.tier === 'certified' ? ' · <span class="cert">Certified</span>' :
+       g.tier === 'playable' ? ' · Playable' : '') +
+      '<br>by ' + g.author;
+    txt.append(name, sub);
+
+    meta.append(tick, txt);
+    el.append(a, meta);
+    window.__games = window.__games || [];
+    return el;
+  }
+
+  function progress(games) {
+    const n = games.length || (window.__games || []).length;
+    progEl.textContent = 'You have finished ' + finished.size + ' of ' + n;
+  }
+})();
+</script>
+</body>
+</html>
