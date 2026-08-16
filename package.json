@@ -7,6 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js"
+    "test": "node packages/zmachine/test/smoke.js && node packages/format/test/roundtrip.js && node packages/validator/test/catches.js"
+  },
+  "bin": {
+    "folio": "packages/cli/folio.js"
   }
 }
