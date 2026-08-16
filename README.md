@@ -216,9 +216,10 @@ another model needs.
   any language. `folio validate` checks against this same file.
 - **Compact spec**: [folio.games/llms.txt](https://folio.games/llms.txt) is the whole
   authoring format in one fetch.
-- **MCP server**: `folio-mcp` is a stdio server exposing eight tools, with no
-  dependencies. It buys a tight write-check-fix loop, and its play tools let an agent
-  work a game with the walkthrough withheld.
+- **MCP server**: `folio-mcp` is a stdio server exposing ten tools, with no
+  dependencies. `folio_next` reads whatever exists and says what to do next;
+  `folio_validate` checks after every edit; `folio_pack` returns the finished file;
+  and the play tools let an agent work a game with the walkthrough withheld.
 
 ```json
 { "mcpServers": { "folio": { "command": "folio-mcp" } } }

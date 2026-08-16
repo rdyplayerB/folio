@@ -38,6 +38,9 @@ const readline = require('readline');
 
 const world = require('../world/index.js');
 const { validate } = require('../validator/index.js');
+const { pack: packDir, load } = require('../format/pack.js');
+const zip = require('../format/zip.js');
+const crypto = require('crypto');
 const { validateWorld, WORLD_SCHEMA } = require('../format/schema.js');
 const brief = require('../format/brief.js');
 
@@ -47,6 +50,21 @@ const SPEC = path.join(ROOT, 'site', 'llms.txt');
 // stdout belongs to the protocol. Anything else said out loud corrupts the
 // stream, so diagnostics go to stderr and nowhere else.
 const log = (...a) => process.stderr.write(a.join(' ') + '\n');
+
+// Build a container from files already in memory. pack.js walks a directory,
+// which an agent holding a world in its context does not have; the checksum and
+// required-entry rules are the same, and load() verifies them either way.
+function packFiles(files) {
+  for (const req of ['manifest.json', 'walkthrough.folioscript']) {
+    if (!files[req]) throw new Error('a .folio needs ' + req);
+  }
+  const sums = {};
+  for (const name of Object.keys(files).sort()) {
+    sums[name] = crypto.createHash('sha256').update(files[name]).digest('hex');
+  }
+  files['checksums.json'] = Buffer.from(JSON.stringify(sums, null, 2), 'utf8');
+  return zip.write(files);
+}
 
 // ---------------------------------------------------------------- play sessions
 // Held in memory and keyed by an opaque id. A session is a running world, which
@@ -244,6 +262,102 @@ const TOOLS = [
     handler: (args) => json({ closed: sessions.delete(args.session) })
   },
   {
+    name: 'folio_pack',
+    description:
+      'Assemble a finished game into a .folio file and return it base64 encoded. ' +
+      'This is the last step: the result is a single self-contained file that runs ' +
+      'in a browser with no server. Validates on the way through and reports what ' +
+      'the game may claim.',
+    inputSchema: {
+      type: 'object',
+      required: ['world', 'walkthrough', 'manifest'],
+      additionalProperties: false,
+      properties: {
+        world: { type: 'object' },
+        walkthrough: { type: 'string', description: 'Newline-separated commands that reach the ending.' },
+        manifest: {
+          type: 'object',
+          required: ['id', 'title', 'author', 'license', 'contentRating'],
+          description: 'folioVersion and logicType are filled in for you.',
+          properties: {
+            id: { type: 'string' }, title: { type: 'string' }, author: { type: 'string' },
+            license: { type: 'string', description: 'An SPDX id, or "unknown" (playable, not hostable).' },
+            contentRating: { type: 'string', enum: ['all-ages', 'teen', 'mature'] },
+            capabilities: { type: 'array', items: { type: 'string' } },
+            aiDisclosure: { type: 'object', description: 'What was generated, what a human reviewed.' }
+          }
+        },
+        brief: { type: 'object', description: 'Ship it and the design audit grades against your intent.' },
+        presentation: {
+          type: 'object',
+          description: 'Optional presentation files, as {"scenes.js": "...source..."}. ' +
+            'They land under presentation/ in the container.',
+          additionalProperties: { type: 'string' }
+        }
+      }
+    },
+    handler: (args) => {
+      const m = Object.assign({ folioVersion: '0.1.0', logicType: 'world' }, args.manifest);
+      const files = {
+        'manifest.json': Buffer.from(JSON.stringify(m, null, 2), 'utf8'),
+        'walkthrough.folioscript': Buffer.from(args.walkthrough, 'utf8'),
+        'logic/world.json': Buffer.from(JSON.stringify(args.world, null, 2), 'utf8')
+      };
+      if (args.brief) files['brief.json'] = Buffer.from(JSON.stringify(args.brief), 'utf8');
+      for (const [name, src] of Object.entries(args.presentation || {})) {
+        // Keep it inside presentation/ whether or not the caller said so, and
+        // refuse anything trying to climb out of the container.
+        const clean = String(name).replace(/^presentation\//, '');
+        if (/(^\/|\.\.)/.test(clean)) throw new Error('bad presentation path: ' + name);
+        files['presentation/' + clean] = Buffer.from(String(src), 'utf8');
+      }
+
+      const buf = packFiles(files);
+      const game = load(buf);
+      const r = validate(game);
+      return json({
+        filename: m.id + '.folio',
+        bytes: buf.length,
+        base64: buf.toString('base64'),
+        tier: r.tier,
+        ok: r.ok,
+        ranTiers: r.ran,
+        stats: r.stats,
+        findings: r.findings.map(f => ({ level: f.level, code: f.code, message: f.msg })),
+        note: r.ok
+          ? 'Write the base64 to a file as ' + m.id + '.folio. It runs in a browser ' +
+            'with no server and keeps working offline.'
+          : 'Packed, but it will not be hosted while it has errors.'
+      });
+    }
+  },
+  {
+    name: 'folio_next',
+    description:
+      'What to do next. Reads whatever exists so far and returns the ordered list ' +
+      'of remaining work with the reason for each. Call it any time you are unsure ' +
+      'where you are, including at the very start with nothing.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        world: { type: 'object', description: 'Omit if you have not started one.' },
+        walkthrough: { type: 'string' },
+        manifest: { type: 'object' },
+        brief: { type: 'object' },
+        presentation: {
+          type: 'object', additionalProperties: { type: 'string' },
+          description: 'Same shape as folio_pack takes.'
+        },
+        goal: {
+          type: 'string', enum: ['create', 'port'],
+          description: 'Porting an existing Z-machine game is a different, shorter path.'
+        }
+      }
+    },
+    handler: (args) => nextSteps(args)
+  },
+  {
     name: 'folio_brief',
     description:
       'Resolve authoring dials into concrete targets and thresholds. The same ' +
@@ -305,6 +419,164 @@ const TOOLS = [
     }
   }
 ];
+
+// ------------------------------------------------------------------ staging
+//
+//  The step-by-step, expressed as checks on the work rather than as a menu.
+//
+//  A wizard would be the obvious shape and the wrong one. The agent calling these
+//  tools is already the conversational layer and is better at asking what someone
+//  wants than any script we could ship. What it lacks is a sense of whether the
+//  thing is sound yet, and a wizard breaks the moment somebody arrives holding a
+//  half-finished world, or does the steps out of order, or comes back a week
+//  later. Reading the artifact survives all three.
+//
+//  The order below is not arbitrary. Structure comes before prose because that is
+//  what stops a long source compiling into six rooms and a walk: bad structure is
+//  thrown away while it still costs nothing, rather than after forty room
+//  descriptions are written. The walkthrough belongs with structure rather than at
+//  the end, because once the puzzle graph exists the solution path is already
+//  known, and it is the proof the whole certification rests on.
+
+const CREATE_START = [
+  { do: 'folio_spec', why: 'Read the format once. It is short and it is the whole thing.' },
+  { do: 'folio_brief', why: 'Set intent first. The dials become the targets everything else is graded against, and shipping the brief means the design audit judges you against what you asked for rather than against Zork.' },
+  { do: 'Draft structure with no prose', why: 'Rooms, exits, items and rules as bare ids. Write the walkthrough at the same time, because the solution path is known once the graph is. Leave every description empty for now.' },
+  { do: 'folio_validate', why: 'Prove the shape holds and nothing is a dead end while it is still cheap to rearrange.' },
+  { do: 'Write the prose', why: 'Descriptions, names, and the failure branches. The unguarded fallback rules are where a world stops feeling like a form.' },
+  { do: 'folio_pack', why: 'Assemble the file.' }
+];
+
+const PORT_START = [
+  { do: 'folio_spec', why: 'The container and manifest are the same on both paths.' },
+  { do: 'folio_calibrate', why: 'Derive the room map from the story file. Everything structural comes out exact; a handful of attribute flags come back as a census for you to confirm by reading the object names.' },
+  { do: 'Write a verb map', why: 'A Z-machine parser has idioms, so a click has to be turned into a line its parser accepts. Path B does not need this; Path A does.' },
+  { do: 'Write a walkthrough', why: 'Nothing mechanical can prove a port completable yet, so this one is a human promise. Write it anyway.' },
+  { do: 'Pack it', why: 'Path A packing is a CLI job today: folio pack <dir> <out.folio>.' }
+];
+
+function nextSteps(args) {
+  args = args || {};
+  const steps = [];
+  const done = [];
+  const push = (doThis, why, detail) => steps.push(detail ? { do: doThis, why, detail } : { do: doThis, why });
+
+  if (args.goal === 'port') {
+    return json({ path: 'port',
+      note: 'Porting is a binding problem rather than a design one: the game already ' +
+            'has its map, its puzzles and its prose. You are supplying the parts that ' +
+            'let the engine draw it.',
+      steps: PORT_START });
+  }
+
+  if (!args.world || !Object.keys(args.world).length) {
+    return json({ path: 'create', stage: 'nothing yet',
+      note: 'Nothing to read yet, so this is the whole route.',
+      steps: CREATE_START });
+  }
+
+  // --- shape ---------------------------------------------------------------
+  const shape = validateWorld(args.world);
+  if (!shape.ok) {
+    return json({ path: 'create', stage: 'the world does not parse as a world',
+      problems: shape.errors.slice(0, 10),
+      steps: [{ do: 'Fix the schema errors above', why: 'Nothing further can be checked until the shape is right. Each one names its exact path.' },
+              { do: 'folio_schema', why: 'Constrain generation against it and these stop happening.' }] });
+  }
+  done.push('the world matches the schema');
+
+  const rooms = args.world.rooms || [];
+  const items = args.world.items || [];
+  const rules = args.world.rules || [];
+
+  // --- structure -----------------------------------------------------------
+  const g = require('../validator/graph.js').analyse(args.world);
+  const gErrors = g.findings.filter(f => f.level === 'error');
+  if (gErrors.length) {
+    return json({ path: 'create', stage: 'the structure has holes',
+      have: { rooms: rooms.length, items: items.length, rules: rules.length },
+      problems: gErrors.map(f => ({ code: f.code, message: f.msg, hint: f.hint })),
+      steps: [{ do: 'Fix the reachability errors above', why: 'Do this before writing any prose. Rearranging a graph is cheap; rewriting forty descriptions after rearranging it is not.' }] });
+  }
+  done.push('every room is reachable and the ending can be reached');
+
+  // --- the walkthrough -----------------------------------------------------
+  if (!args.walkthrough || !args.walkthrough.trim()) {
+    push('Write walkthrough.folioscript', 'One command per line, from a cold start, ending in the win. It is the proof of completability and nothing can certify without it. You already know the path: the graph just proved it exists.');
+  } else {
+    const r = require('../validator/replay.js').replay(args.world, args.walkthrough);
+    if (!r.ok) {
+      return json({ path: 'create', stage: 'the walkthrough does not finish the game',
+        problems: r.findings.map(f => ({ code: f.code, message: f.msg, hint: f.hint })),
+        steps: [{ do: 'Fix the walkthrough, or the world it walks through', why: 'A path exists, since the graph found one. This particular sequence is not it.' }] });
+    }
+    done.push('the walkthrough reaches the ending in ' + r.stats.moves + ' moves');
+  }
+
+  // --- prose ---------------------------------------------------------------
+  const bareRooms = rooms.filter(r => !r.prose || !r.prose.trim()).map(r => r.id);
+  if (bareRooms.length) {
+    push('Write room descriptions', 'Structure is sound, so prose is now safe to write: it will not be thrown away.',
+      bareRooms.length + ' room' + (bareRooms.length > 1 ? 's' : '') + ' with no prose: ' + bareRooms.slice(0, 8).join(', '));
+  }
+  const unnamed = items.filter(i => !i.name).map(i => i.id);
+  if (unnamed.length) {
+    push('Name the items', 'The id is what the rules match on; the name is what a player is shown.',
+      unnamed.slice(0, 8).join(', '));
+  }
+
+  // --- the four dead buttons ----------------------------------------------
+  const usedVerbs = new Set(rules.map(r => ((r.on || {}).verb || '').toUpperCase()));
+  const dead = ['CLOSE', 'USE', 'HIT', 'SPEAK'].filter(v => !usedVerbs.has(v));
+  if (dead.length) {
+    push('Give the idle verbs something to do', 'The board shows eight verbs and only four of them have built-in behaviour. Without rules these answer meta.defaults.unknown, which reads to a player as a broken button.',
+      'no rules for ' + dead.join(', '));
+  }
+  if (!((args.world.meta || {}).defaults || {}).unknown) {
+    push('Set meta.defaults.unknown', 'It is the line a player hears every time they try something you did not anticipate, which makes it the single most-heard sentence in most games.');
+  }
+
+  // --- art -----------------------------------------------------------------
+  const sceneSrc = Object.values(args.presentation || {}).join('\n');
+  const drawn = new Set([...sceneSrc.matchAll(/scenes\s*\[\s*['"]([^'"]+)['"]\s*\]/g)].map(m => m[1]));
+  const undrawn = rooms.filter(r => !drawn.has(r.id)).map(r => r.id);
+  if (undrawn.length) {
+    push('Scene art', 'Rooms with no scene render as a placeholder. The rest of the board is drawn for you; only the picture is yours.',
+      undrawn.length + ' of ' + rooms.length + ' rooms undrawn');
+  }
+
+  // --- packaging -----------------------------------------------------------
+  const need = ['id', 'title', 'author', 'license', 'contentRating']
+    .filter(k => !(args.manifest || {})[k]);
+  if (need.length) push('Fill in the manifest', 'Packaging metadata, needed once at the end.', 'missing ' + need.join(', '));
+  if (!args.brief) push('Consider shipping brief.json', 'Without it the design audit grades you against generic defaults. With it, a deliberately short or linear game is judged against what you asked for.');
+
+  // --- design opinions -----------------------------------------------------
+  let design = [];
+  if (args.walkthrough) {
+    const d = require('../validator/design.js')
+      .audit(args.world, args.brief ? { thresholds: brief.resolve(args.brief).thresholds } : {});
+    design = d.findings.map(f => ({ code: f.code, message: f.msg, hint: f.hint }));
+  }
+
+  if (!steps.length) {
+    push('folio_pack', 'Everything checks out. Assemble the file.');
+  }
+
+  return json({
+    path: 'create',
+    stage: steps.length && steps[0].do === 'folio_pack' ? 'ready to pack' : 'in progress',
+    done,
+    have: { rooms: rooms.length, items: items.length, rules: rules.length,
+            actors: (args.world.actors || []).length, timers: (args.world.timers || []).length },
+    steps,
+    designNotes: design.length ? design : undefined,
+    note: design.length
+      ? 'The design notes are advice, not faults. A shallow game is still a game; it ' +
+        'simply cannot claim to be a finished one.'
+      : undefined
+  });
+}
 
 const text = (s) => ({ content: [{ type: 'text', text: s }] });
 const json = (o, isError) => ({

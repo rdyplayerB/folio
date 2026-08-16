@@ -89,7 +89,7 @@ const body = (res) => JSON.parse(res.result.content[0].text);
 
   const list = await c.rpc('tools/list', {});
   const names = list.result.tools.map(t => t.name);
-  ok('tools/list returns every tool', names.length === 8, names.join(', '));
+  ok('tools/list returns every tool', names.length === 10, names.join(', '));
   ok('every tool declares an input schema',
     list.result.tools.every(t => t.inputSchema && t.inputSchema.type === 'object'));
 
@@ -174,6 +174,115 @@ const body = (res) => JSON.parse(res.result.content[0].text);
     s2.state.blockedExits.includes('DOWN'),
     'open=' + s2.state.exits.join(',') + ' blocked=' + s2.state.blockedExits.join(','));
   await c.rpc('tools/call', { name: 'folio_play_end', arguments: { session: s2.session } });
+
+
+  // ---- the journey ---------------------------------------------------------
+  // folio_next is the step-by-step, expressed as checks on the work rather than
+  // as a menu. These walk it from nothing to a packed file.
+  const next = async (a) => body(await c.rpc('tools/call',
+    { name: 'folio_next', arguments: a }));
+
+  const n0 = await next({});
+  ok('with nothing at all, it lays out the whole route',
+    n0.steps.length >= 5 && /folio_brief/.test(JSON.stringify(n0.steps)),
+    n0.stage);
+  ok('and it puts intent before structure',
+    JSON.stringify(n0.steps).indexOf('folio_brief') <
+    JSON.stringify(n0.steps).indexOf('prose'));
+
+  const nPort = await next({ goal: 'port' });
+  ok('porting gets a different, shorter route',
+    nPort.path === 'port' && /folio_calibrate/.test(JSON.stringify(nPort.steps)),
+    nPort.steps.length + ' steps');
+
+  const nBroken = await next({ world: broken });
+  ok('a world with holes is stopped at structure, before any prose work',
+    /structure/.test(nBroken.stage) &&
+    nBroken.steps.every(s => !/prose/i.test(s.do)),
+    nBroken.stage);
+
+  const skeleton = JSON.parse(JSON.stringify(WORLD));
+  skeleton.rooms.forEach(r => { delete r.prose; });
+  const nSkel = await next({ world: skeleton });
+  ok('a sound skeleton is told to write prose next',
+    nSkel.steps.some(s => /prose|description/i.test(s.do)),
+    (nSkel.steps[0] || {}).do);
+  ok('and it credits what already holds',
+    nSkel.done.some(d => /reachable/.test(d)), (nSkel.done || []).join('; '));
+
+  const nFull = await next({
+    world: WORLD,
+    walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
+      'light lantern\ndown\ntake locket',
+    manifest: { id: 'cd', title: 'Cellar Door', author: 'me', license: 'MIT',
+      contentRating: 'all-ages' }
+  });
+  ok('a finished-but-undrawn game is told about its art',
+    nFull.steps.some(s => /scene|art/i.test(s.do)),
+    nFull.steps.map(s => s.do).join(' | '));
+  ok('it notices the verbs with no rules behind them',
+    nFull.steps.some(s => /idle verbs/i.test(s.do)),
+    (nFull.steps.find(s => /idle verbs/i.test(s.do)) || {}).detail);
+  ok('design notes come back as advice once a walkthrough exists',
+    Array.isArray(nFull.designNotes) && nFull.designNotes.length > 0,
+    (nFull.designNotes || []).map(d => d.code).join(','));
+
+  // ---- packing -------------------------------------------------------------
+  const packed = body(await c.rpc('tools/call', {
+    name: 'folio_pack',
+    arguments: {
+      world: WORLD,
+      walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
+        'light lantern\ndown\ntake locket',
+      manifest: { id: 'cellar-door', title: 'Cellar Door', author: 'test',
+        license: 'MIT', contentRating: 'all-ages' },
+      presentation: { 'scenes.js': "GUE.scenes={};GUE.scenes['PORCH']={draw:function(){}};" }
+    }
+  }));
+  ok('a game packs into a real file', packed.bytes > 500 && !!packed.base64,
+    packed.filename + ', ' + packed.bytes + ' bytes');
+  ok('and the packed file validates on the way out',
+    packed.ok === true && packed.tier === 'playable', 'tier=' + packed.tier);
+
+  // The bytes have to be a genuine .folio, not just base64 of something.
+  const raw = Buffer.from(packed.base64, 'base64');
+  ok('the bytes are a zip with the right magic', raw.slice(0, 2).toString() === 'PK',
+    raw.slice(0, 2).toString('hex'));
+  const { load: loadFolio } = require(path.join(__dirname, '..', '..', 'format', 'pack.js'));
+  let round = null;
+  try { round = loadFolio(raw); } catch (e) { round = { err: e.message }; }
+  ok('it survives a checksum-verified load', !!(round && round.manifest &&
+    round.manifest.id === 'cellar-door'), round.err || 'ok');
+  ok('presentation files land under presentation/',
+    !!(round.files && round.files['presentation/scenes.js']));
+
+  const escape = await c.rpc('tools/call', {
+    name: 'folio_pack',
+    arguments: {
+      world: WORLD, walkthrough: 'look',
+      manifest: { id: 'x', title: 'x', author: 'x', license: 'MIT', contentRating: 'all-ages' },
+      presentation: { '../../etc/passwd': 'nope' }
+    }
+  });
+  ok('a presentation path trying to climb out is refused',
+    /bad presentation path/.test(JSON.stringify(escape.result || escape)),
+    'refused');
+
+  const nDone = await next({
+    world: WORLD,
+    walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
+      'light lantern\ndown\ntake locket',
+    manifest: { id: 'cd', title: 'Cellar Door', author: 'me', license: 'MIT',
+      contentRating: 'all-ages' },
+    brief: { length: 'short', difficulty: 'gentle' },
+    presentation: { 'scenes.js':
+      "GUE.scenes['PORCH']={};GUE.scenes['HALL']={};GUE.scenes['CELLAR']={};" },
+    // every idle verb answered
+    world2: null
+  });
+  ok('a game with everything answered is told to pack',
+    nDone.steps.some(s => /folio_pack|idle verbs/.test(s.do)),
+    nDone.steps.map(s => s.do).join(' | '));
 
   // ---- the rest -----------------------------------------------------------
   const br = body(await c.rpc('tools/call', {

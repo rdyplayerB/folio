@@ -251,7 +251,7 @@
       None of the above needs a connection. What a connection buys is the loop: write a
       world, check it, read the exact failure, fix it, without a person moving files
       between a chat window and a terminal. <code>folio-mcp</code> is a stdio MCP server
-      exposing eight tools, and it has no dependencies of its own.
+      exposing ten tools, and it has no dependencies of its own.
     </p>
 <pre><span class="c">// claude_desktop_config.json, or any MCP client</span>
 {
@@ -262,6 +262,7 @@
     <div class="scroll">
     <table>
       <tr><th>Tool</th><th>Does</th></tr>
+      <tr><td><code>folio_next</code></td><td>What to do next, read off whatever exists so far</td></tr>
       <tr><td><code>folio_spec</code></td><td>The whole authoring format in one call</td></tr>
       <tr><td><code>folio_schema</code></td><td>The JSON Schema, for constrained generation</td></tr>
       <tr><td><code>folio_validate</code></td><td>Check a world inline. Works on a draft with no walkthrough yet</td></tr>
@@ -269,9 +270,25 @@
       <tr><td><code>folio_play_send</code></td><td>Send one command, get the response and state</td></tr>
       <tr><td><code>folio_play_end</code></td><td>Discard a session</td></tr>
       <tr><td><code>folio_brief</code></td><td>Resolve the dials into targets</td></tr>
+      <tr><td><code>folio_pack</code></td><td>Assemble the finished game and return the file</td></tr>
       <tr><td><code>folio_calibrate</code></td><td>Derive a Path A room map from a story file</td></tr>
     </table>
     </div>
+    <p>
+      <code>folio_next</code> is the part that makes this a process rather than a pile
+      of tools. It reads whatever exists and returns the ordered remaining work with a
+      reason for each, so an agent can start from nothing, from a half-written world, or
+      from a week-old draft and get the same answer. It is deliberately not a wizard:
+      the agent asking the questions is better at that than a script could be, and a
+      wizard breaks the moment somebody arrives holding something half-finished.
+    </p>
+    <p>
+      The order it enforces has one load-bearing rule. <strong>Structure before
+      prose</strong>: rooms, exits, rules and the walkthrough first, with every
+      description left empty, and only then the writing. That is what stops a long
+      source compiling into six rooms and a walk, because a bad map is thrown away
+      while it still costs nothing rather than after forty descriptions are written.
+    </p>
     <p>
       The play tools are the interesting pair. Point an agent at a game with the
       walkthrough withheld and you have a blind solver, which is the check Folio cannot
