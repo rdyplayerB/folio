@@ -31,6 +31,7 @@ const html=`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Folio Player</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   :root{color-scheme:dark}
   *{box-sizing:border-box}
@@ -92,14 +93,35 @@ ${shell}
     var f=e.dataTransfer.files&&e.dataTransfer.files[0];
     if(f) boot(await f.arrayBuffer());
   });
-  var url=new URLSearchParams(location.search).get('game');
-  if(url) fetch(url).then(r=>r.arrayBuffer()).then(boot)
-    .catch(e=>{errEl.textContent='could not fetch '+url+': '+e.message;});
+  // ?game= takes a library id (short, stable) or a full URL (so anyone can host
+  // their own game and still use this player).
+  var q=new URLSearchParams(location.search).get('game');
+  if(q){
+    if(/^https?:/i.test(q)||q.indexOf('/')>=0){ fetchGame(q); }
+    else {
+      fetch('/games.json').then(function(r){return r.json();}).then(function(list){
+        var g=list.filter(function(x){return x.id===q;})[0];
+        if(!g) throw new Error('no game with id "'+q+'"');
+        titleEl.textContent=g.title+'  ·  by '+g.author;
+        return fetchGame(g.file);
+      }).catch(function(e){errEl.textContent=e.message;});
+    }
+  }
+  function fetchGame(u){
+    return fetch(u).then(function(r){
+      if(!r.ok) throw new Error('could not load the game ('+r.status+')');
+      return r.arrayBuffer();
+    }).then(boot).catch(function(e){errEl.textContent=e.message;});
+  }
   window.__folioBoot=boot;
 })();
 </script>
 </body></html>`;
 
-fs.mkdirSync(path.join(ROOT,'dist'),{recursive:true});
-fs.writeFileSync(path.join(ROOT,'dist','player-full.html'),html);
-console.log('built dist/player-full.html  ('+Math.round(html.length/1024)+' KB)');
+// Built into the site so the whole thing deploys as one static directory, and
+// also into dist/ for anyone who wants to host the player themselves.
+for (const out of ['dist/player-full.html','site/play/index.html']) {
+  fs.mkdirSync(path.dirname(path.join(ROOT,out)),{recursive:true});
+  fs.writeFileSync(path.join(ROOT,out),html);
+}
+console.log('built site/play/index.html and dist/player-full.html  ('+Math.round(html.length/1024)+' KB)');

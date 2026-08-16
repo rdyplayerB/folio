@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Docs — Folio</title>
+<meta name="description" content="How the .folio format, the World State Contract, and certification work.">
+<link rel="canonical" href="https://folio.games/docs/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<style>
+  .layout{display:grid;grid-template-columns:210px 1fr;gap:44px;padding:44px 0 0;align-items:start}
+  @media (max-width:900px){.layout{grid-template-columns:1fr;gap:20px}}
+  .toc{position:sticky;top:82px;font-size:14px}
+  .toc p{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 12px}
+  .toc a{display:block;padding:6px 0;color:var(--body);text-decoration:none;border-left:2px solid var(--line);
+    padding-left:12px}
+  .toc a:hover{color:var(--ink);border-color:var(--muted)}
+  @media (max-width:900px){.toc{position:static}.toc a{display:inline-block;border:0;padding:6px 12px 6px 0}}
+  article{max-width:74ch}
+  article h1{font:700 clamp(28px,3.6vw,40px)/1.12 var(--sans);margin:0 0 14px}
+  article h2{font:700 22px/1.3 var(--sans);margin:46px 0 12px;padding-top:14px;border-top:1px solid var(--line)}
+  article h3{font:700 16px/1.4 var(--sans);margin:26px 0 8px}
+  article p,article li{color:var(--body);font-size:15.5px}
+  article ul{padding-left:20px}
+  article li{margin:6px 0}
+  article strong{color:var(--ink)}
+  .callout{border-left:3px solid var(--red);background:var(--wash);padding:14px 18px;
+    border-radius:0 9px 9px 0;margin:18px 0}
+  .callout p{margin:0;font-size:15px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">FOLIO<i>▾</i></a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="btn ghost hide-sm" href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap layout">
+
+  <aside class="toc">
+    <p>On this page</p>
+    <a href="#start">Getting started</a>
+    <a href="#format">The .folio format</a>
+    <a href="#contract">The contract</a>
+    <a href="#cert">Certification</a>
+    <a href="#dials">The dials</a>
+    <a href="#embed">Embedding</a>
+  </aside>
+
+  <article>
+    <p class="kicker">Documentation</p>
+    <h1>How Folio works</h1>
+    <p class="lede">
+      An engine, a file format, and a way of proving a game is finishable. The full
+      reference lives with the source; this is the shape of it.
+    </p>
+
+    <h2 id="start">Getting started</h2>
+    <pre><b>npm i -g folio-engine</b>
+
+<b>folio pack</b> my-game/ my-game.folio    <span style="opacity:.6"># assemble</span>
+<b>folio validate</b> my-game.folio         <span style="opacity:.6"># prove it works</span>
+<b>folio play</b> my-game.folio             <span style="opacity:.6"># play in the terminal</span>
+<b>folio profile</b> my-game.folio          <span style="opacity:.6"># measure its design shape</span></pre>
+    <p>
+      A game directory needs a <code>manifest.json</code>, a
+      <code>walkthrough.folioscript</code>, and either a Z-machine story file or a
+      <code>world.json</code>. Everything else is presentation.
+    </p>
+
+    <h2 id="format">The .folio format</h2>
+    <p>
+      A <code>.folio</code> is a zip with a fixed layout. It carries everything a game
+      needs, because the one thing every archive of community work has taught is that
+      <strong>what lives inside the file survives and what lives outside it rots</strong>.
+    </p>
+    <pre>my-game.folio
+├── manifest.json            <span style="opacity:.6">id, title, author, licence, rating…</span>
+├── walkthrough.folioscript  <span style="opacity:.6">required: the proof it can be finished</span>
+├── logic/
+│   ├── game.z3              <span style="opacity:.6">a Z-machine story, or…</span>
+│   └── world.json           <span style="opacity:.6">…a declarative world</span>
+├── presentation/            <span style="opacity:.6">scenes, sprites, verb map, bindings</span>
+└── checksums.json           <span style="opacity:.6">written on pack, verified on load</span></pre>
+    <p>
+      Three manifest fields are mandatory and each exists because an earlier archive
+      wished it had them: <strong>licence</strong> (unknown means playable but not
+      hostable), <strong>content rating</strong>, and a structured
+      <strong>AI disclosure</strong>.
+    </p>
+
+    <h2 id="contract">The World State Contract</h2>
+    <p>
+      The renderer reads exactly one thing: a plain object describing the world right
+      now. It never learns which kind of game produced it, which is what lets the same
+      code draw a 1988 binary and a world compiled from a novel last week.
+    </p>
+    <pre>{
+  roomId:    "LIVING-ROOM",
+  score: 35, moves: 13, dark: false,
+  objects:   ["LAMP","SWORD","RUG"],
+  inventory: ["LAMP"],
+  exits:     { NORTH:"KITCHEN", EAST:false },
+  flags:     { LAMP:{ ONBIT:true } }
+}</pre>
+    <p>
+      Note that <code>exits</code> has three states, not two: a room id means you can
+      go, <code>false</code> means the way exists but is blocked, and absent means
+      there is no way at all. That middle state is what lets the compass grey out a
+      door you can see and cannot yet open.
+    </p>
+
+    <h2 id="cert">Certification</h2>
+    <p>Games are checked in tiers, and the badge claims only what was actually verified.</p>
+    <table>
+      <tr><th>Tier</th><th>Proves</th></tr>
+      <tr><td><b>T0</b> schema</td><td>The manifest is complete and well-formed</td></tr>
+      <tr><td><b>T1</b> integrity</td><td>References resolve, assets decode, capabilities are supported</td></tr>
+      <tr><td><b>T2</b> graph</td><td><b>No dead ends exist</b> — computed from the world, not asserted</td></tr>
+      <tr><td><b>T3</b> replay</td><td><b>One path completes</b> — cold start, no state injection, no privileged verbs</td></tr>
+      <tr><td><b>T4</b> design</td><td>It is a <i>game</i>: chain depth, item economy, map shape, pacing</td></tr>
+    </table>
+    <p>
+      T2 and T3 are complementary and neither implies the other. The cold-start rule in
+      T3 is the whole point: a test that may teleport the player or conjure an item
+      proves a scene works from a fabricated state, not that the game can be finished.
+    </p>
+    <div class="callout">
+      <p>
+        <strong>“Playable” means a path exists. It does not mean a human can find it.</strong>
+        Those are different claims and the badge does not blur them.
+      </p>
+    </div>
+
+    <h2 id="dials">The dials</h2>
+    <p>
+      Thresholds are calibrated against Zork I — measured by replaying it, not
+      estimated. Its shape: 82 rooms, 0.67 loops per room, a 43% take rate, a reward
+      about every 11.5 moves, and one stretch of <strong>69 moves</strong> with no
+      reward at all.
+    </p>
+    <p>
+      Two of those numbers overturned an assumption. Most of Zork's world is scenery
+      <em>on purpose</em>, so a world where everything is useful reads as a shopping
+      list rather than a place. And a single loop in a fifty-room map is still a
+      corridor, so map shape has to be measured per room.
+    </p>
+    <p>
+      Scale is the one thing not taken from the corpus. Zork has 82 rooms because Zork
+      is Zork; a game adapted from a short story should not be held to that, so
+      absolute size follows your source or your brief.
+    </p>
+
+    <h2 id="embed">Embedding a game</h2>
+    <p>
+      The player is a single self-contained file with no dependencies. Host a
+      <code>.folio</code> anywhere and point at it:
+    </p>
+    <pre>&lt;iframe src="https://folio.games/play/?game=<b>https://example.com/my-game.folio</b>"
+        width="720" height="680" style="border:0"&gt;&lt;/iframe&gt;</pre>
+    <p>
+      Or download the player and serve both yourself. There is no server-side component
+      to a game of Folio — it runs entirely in the browser, which is why it keeps
+      working on a static host, offline, and after we are gone.
+    </p>
+  </article>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/make/">Make one</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+</body>
+</html>

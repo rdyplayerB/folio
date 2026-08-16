@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- The message window: an ink-bordered box with the continue triangle that says
+       there is more story. Drawn on a 16px grid so it stays sharp at tab size. -->
+  <rect width="16" height="16" fill="#f7f5ef"/>
+  <rect x="1" y="3" width="14" height="10" fill="#12121a"/>
+  <rect x="2" y="4" width="12" height="8" fill="#f7f5ef"/>
+  <rect x="3" y="6" width="8" height="1" fill="#12121a"/>
+  <rect x="3" y="8" width="6" height="1" fill="#12121a"/>
+  <path d="M11 9h3v1h-2v1h-1z" fill="#e05a44"/>
+</svg>

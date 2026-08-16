@@ -7,8 +7,8 @@
     "series": "The Great Underground Empire",
     "tier": "certified",
     "featured": true,
-    "file": "../site/games/zork-1.folio",
-    "shot": "./shots/zork-1.png"
+    "file": "/games/zork-1.folio",
+    "shot": "/shots/zork-1.png"
   },
   {
     "id": "cellar-door",
@@ -16,7 +16,7 @@
     "author": "Folio conformance suite",
     "genre": "Mystery",
     "tier": "playable",
-    "file": "../site/games/cellar-door.folio",
-    "shot": "./shots/cellar-door.png"
+    "file": "/games/cellar-door.folio",
+    "shot": "/shots/cellar-door.png"
   }
 ]
