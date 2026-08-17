@@ -28,7 +28,15 @@ npm i -g folio-engine
 folio pack my-game/ my-game.folio     # assemble
 folio validate my-game.folio          # check. do this constantly
 folio play my-game.folio              # play in the terminal
+folio info my-game.folio              # what is inside
+folio profile my-game.folio           # measure its design shape
+folio brief brief.json                # resolve the dials into targets
+folio calibrate story.z3              # Path A only: derive a room map
 ```
+
+`folio brief` takes the dials below. To scale a game to a source rather than to a
+default, count the places the source actually visits and pass them:
+`{"source": {"locations": 30}}`. A flat `"source.locations"` key is ignored.
 
 ## A game is a directory
 
@@ -101,10 +109,12 @@ Failure line numbers count **commands**, not file lines.
 ### meta
 
 - `start` (required): room id the player begins in
-- `title`, `seed`, `magicWords[]`
+- `title`, `seed`
+- `magicWords[]`: words no player would guess, offered as one-tap buttons on the
+  on-screen keyboard. Presentation only; the logic never reads them.
 - `defaults`: overrides for built-in responses. Keys:
   `blocked`, `dark`, `what`, `already`, `absent`, `fixed`, `taken`, `nothave`,
-  `dropped`, `alreadyOpen`, `locked`, `empty`, `unknown`, `wait`.
+  `dropped`, `alreadyOpen`, `locked`, `empty`, `unknown`, `wait`, `plain`.
   `unknown` is the most-heard line in most games. Write it.
 
 ### rooms
@@ -132,13 +142,19 @@ One way only. A return journey is a second exit on the other room.
 - `condition`: blocked until it passes
 - `door`: item id, blocked while that item is closed
 - `hidden`: while blocked, vanish rather than show as blocked
+- `blocked`: what to say when this way is closed. Without it every locked door in
+  the game shares one sentence
 
 Three states reach the compass: a room id (open), `false` (blocked but visible),
 absent (nothing there).
 
 ### items
 
-`id`, `location` (required), plus `name`, `roomProse`, `attributes`, `fuel`.
+`id`, `location` (required), plus `name`, `description`, `roomProse`,
+`attributes`, `fuel`.
+
+`description` is what `LOOK` at the thing says. **`LOOK` with a noun is examine**,
+so you do not need to hand-roll inspection as `USE` rules.
 
 `location` is a room id, another item's id (inside a container), `"PLAYER"`, or
 `"NOWHERE"`. `roomProse` appears in the room description until the item moves.
@@ -164,6 +180,14 @@ The only place anything interesting happens.
 }
 ```
 
+`on.enter` fires when the player **arrives** in that room instead of on a command:
+a floor that gives way, an ambush, a door closing behind you. A rule with `enter`
+is never matched by anything typed or clicked.
+
+**A rule can match a direction, and it preempts the move.** `{"verb": "NORTH",
+"room": "QUAY"}` runs instead of walking north, and if its conditions fail it falls
+through to the exit as normal. That is the idiom for a gate that explains itself.
+
 `on.second` is a second object, for pairings like using a key on a door. The board
 asks the player for one whenever a rule pairs objects under that verb.
 
@@ -181,7 +205,7 @@ above the general one. A rule whose conditions fail does not block later rules, 
 the standard shape is a guarded rule followed by an unguarded fallback for the same
 trigger. That fallback is where the writing goes.
 
-### conditions (all ten)
+### conditions (all sixteen)
 
 | type | fields | true when |
 |---|---|---|
@@ -202,7 +226,7 @@ trigger. That fallback is where the writing goes.
 | `all` | `conditions` | every one holds |
 | `any` | `conditions` | at least one holds |
 
-### effects (all fourteen)
+### effects (all sixteen)
 
 | type | fields | does |
 |---|---|---|
@@ -226,7 +250,11 @@ trigger. That fallback is where the writing goes.
 Tick once per move, after the command's rule.
 
 `turns` (required), `do` (required), plus `startFlag` (do not tick until true),
-`repeat`, `fuelFor` (publish elapsed as an item's fuel used, driving the lamp gauge).
+`stopFlag` (cancel when true), `if` (only tick while these hold), `repeat`,
+`fuelFor` (publish elapsed as an item's fuel used, driving the lamp gauge).
+
+A countdown the player can defeat needs `stopFlag`. Without one, a `lose` in a
+timer is a cutscene rather than a hazard.
 
 ### internal flags
 
@@ -239,8 +267,12 @@ write them directly.
 
 ### built-in verbs
 
-The engine answers only: the twelve directions, `LOOK`, `TAKE`, `DROP`, `OPEN`
-(refuses or reports; cannot actually open anything), `INVENTORY`, and `WAIT`.
+The engine answers only: the twelve directions, `LOOK` (the room, or a thing if
+you name one), `TAKE`, `DROP`, `OPEN` (refuses or reports; cannot actually open
+anything), `INVENTORY`, and `WAIT`.
+
+`WAIT` has no button. It exists for typing and for walkthroughs, so answer it if
+you like but **never require it** to make progress.
 
 **The player is shown eight verbs: `LOOK TAKE DROP OPEN CLOSE USE HIT SPEAK`.
 Four of them (CLOSE, USE, HIT, SPEAK) do nothing without rules.** Assume every
@@ -404,7 +436,10 @@ erroring, so a typo costs you the dial without telling you.
 
 - Most of the world should be scenery. Zork keeps over half its objects as pure
   texture, and that is what makes the useful ones feel chosen. A world where
-  everything matters reads as a shopping list.
+  everything matters reads as a shopping list. Writing a flavour response for a
+  prop does **not** make it load-bearing; only being required by a condition, or
+  changed by an effect, does. So write a verb for everything and still expect a
+  large minority of your items to be mute.
 - Failure branches are where the prose lives. A guarded rule with no fallback
   means the player who tries the right idea at the wrong time hears nothing.
 - Distance makes a puzzle. A key in the same room as its lock is a formality.

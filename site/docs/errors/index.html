@@ -210,6 +210,16 @@
         <b>A room is unreachable.</b> Nothing the player can do leads there. Usually a
         missing return exit or a condition nothing satisfies.
       </dd>
+      <dt><span class="code w">W510</span></dt>
+      <dd>
+        <b>An item can be left behind before a passage with no way back.</b> T2
+        proves a path exists and is optimistic about ordering, so it assumes you
+        picked things up while they were still reachable. A one-way passage is
+        exactly what breaks that assumption. A game certified with a player who
+        left the explosives in Hamburg unwinnable ninety moves later, because a path
+        did exist: the one where you took them. Give the passage a warning, move the
+        item past it, or open a way back.
+      </dd>
       <dt><span class="code w">W312</span></dt>
       <dd><b>An item can never be reached.</b> It exists but no player will ever see it. Often left in a room you later made unreachable.</dd>
       <dt><span class="code w">W313</span></dt>
@@ -279,7 +289,9 @@
       </dd>
       <dt><span class="code w">W502</span></dt>
       <dd>
-        <b>Too few items do anything.</b> Almost nothing is load-bearing. Zork carries a
+        <b>Too few items do anything.</b> Almost nothing is load-bearing. Answering
+        when a player pokes at something does not count: only being required by a
+        condition, or changed by an effect, makes an item load-bearing. Zork carries a
         lot of scenery too, only 43% of what a player sees is ever picked up, but below
         about a quarter the world stops rewarding attention.
       </dd>
@@ -294,6 +306,11 @@
         Zork runs 0.67 loops per room, so nearly every room sits on a circuit, which is
         what lets a player take a shortcut and feel the map as a place rather than a menu.
         Measured per room, because one loop in a fifty-room map is still a corridor.
+        Counted as connections minus rooms plus one, where a connection is any pair of
+        rooms joined in either direction, so <strong>a one-way passage counts in
+        full</strong>. It used to halve the count of directed exits, which quietly
+        penalised every honest one-way drop and disagreed with what
+        <code>folio profile</code> reported for the same file.
       </dd>
       <dt><span class="code w">W505</span></dt>
       <dd>

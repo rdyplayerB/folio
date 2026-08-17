@@ -173,6 +173,10 @@
         "wait": {
           "type": "string",
           "description": "Letting a turn pass."
+        },
+        "plain": {
+          "type": "string",
+          "description": "Examining something with no description of its own."
         }
       }
     },
@@ -255,7 +259,8 @@
             }
           }
         }
-      }
+      },
+      "description": "A place. `variants` change its description as the world changes; an `enter` rule makes something happen because the player arrived."
     },
     "exit": {
       "description": "One way out, in one direction only. A return journey is a second exit on the other room.",
@@ -283,6 +288,10 @@
         "hidden": {
           "type": "boolean",
           "description": "While blocked, vanish entirely rather than showing as blocked. Use only when the passage itself is the secret."
+        },
+        "blocked": {
+          "type": "string",
+          "description": "What to say when this way is closed. Without it every locked door in the game shares one sentence."
         }
       }
     },
@@ -316,6 +325,10 @@
           "type": "integer",
           "minimum": 0,
           "description": "Turns of light remaining, for a LIGHTSOURCE. Drives the lamp gauge. Burn it down with a timer's fuelFor."
+        },
+        "description": {
+          "type": "string",
+          "description": "What LOOK at this thing says. LOOK with a noun is examine."
         }
       }
     },
@@ -343,6 +356,10 @@
         },
         "attributes": {
           "$ref": "#/$defs/attributes"
+        },
+        "description": {
+          "type": "string",
+          "description": "What LOOK at them says."
         }
       }
     },
@@ -373,6 +390,10 @@
             "second": {
               "$ref": "#/$defs/id",
               "description": "A second object, for pairings like USE KEY ON DOOR. USE and HIT ask the player for one on the board. A rule without `second` will not match a two-object command, so write the pairing above the single-object fallback."
+            },
+            "enter": {
+              "$ref": "#/$defs/id",
+              "description": "Fires when the player arrives in this room, instead of on a command. Use it for a floor that gives way, an ambush, a door closing behind you. A rule with `enter` is never matched by a typed or clicked command."
             }
           }
         },
@@ -423,6 +444,17 @@
           "items": {
             "$ref": "#/$defs/effect"
           }
+        },
+        "stopFlag": {
+          "type": "string",
+          "description": "Cancel the timer when this flag is true. A countdown that cannot be defeated is a cutscene."
+        },
+        "if": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "description": "The timer only ticks while every one of these holds."
         }
       }
     },

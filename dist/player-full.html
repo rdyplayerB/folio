@@ -4260,6 +4260,14 @@ class World {
     return a;
   }
 
+  /** Is this thing somewhere the player could look at it? */
+  visibleHere(id) {
+    if (this.loc[id] === 'PLAYER' || this.loc[id] === this.here) return true;
+    if (this.actorLoc[id] === this.here) return true;
+    const where = this.loc[id];
+    return !!(where && this.items[where] && this.loc[where] === this.here && this.isOpen(where));
+  }
+
   isOpen(id) {
     if (this.flags['_open_' + id] !== undefined) return !!this.flags['_open_' + id];
     const it = this.items[id] || {};
@@ -4327,6 +4335,10 @@ class World {
 
   matches(rule, verb, noun, indirect) {
     const on = rule.on || {};
+    // An arrival rule is dispatched by fireEnter and nowhere else. Every other
+    // field here is optional, so without this an enter rule matched the first
+    // command of any kind and answered everything in the game.
+    if (on.enter) return false;
     if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
     if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
     if (on.room && on.room !== this.here) return false;
@@ -4385,7 +4397,7 @@ class World {
         case 'close': this.flags['_open_' + e.item] = false; break;
         case 'light': this.flags['_lit_' + e.item] = true; break;
         case 'extinguish': this.flags['_lit_' + e.item] = false; break;
-        case 'goto': this.here = e.room; this.visited.add(e.room); break;
+        case 'goto': this.here = e.room; this.visited.add(e.room); break;   // arrival fires via goTo
         case 'score': this.score += e.value; break;
         case 'set-counter': this.counters[e.counter] = e.value; break;
         case 'add-counter':
@@ -4404,6 +4416,12 @@ class World {
     for (const t of this.timers) {
       if (t.done) continue;
       if (t.startFlag && !this.flags[t.startFlag]) continue;
+      // A countdown you cannot defeat is a cutscene. Without a stop condition
+      // the most Verne-appropriate mechanic in the book, dying of thirst unless
+      // you find water, was unwritable: a lose inside a timer could not be
+      // cancelled or guarded by any means the format offered.
+      if (t.stopFlag && this.flags[t.stopFlag]) { t.done = true; continue; }
+      if (t.if && !t.if.every(c => this.test(c))) continue;
       t.elapsed++;
       if (t.fuelFor) this.flags['_fuelUsed_' + t.fuelFor] = t.elapsed;
       if (t.elapsed >= t.turns) {
@@ -4416,6 +4434,39 @@ class World {
     return fired.join('\n');
   }
 
+  /**
+   * Move the player, then let the room react to their arrival.
+   *
+   * Nothing could happen BECAUSE the player arrived somewhere: every consequence
+   * had to hang off a verb, so a floor that gives way when you step on it, or an
+   * ambush, or a door closing behind you, were all unwritable. That is a large
+   * part of what an adventure does to you rather than for you.
+   */
+  goTo(dest, depth) {
+    this.here = dest;
+    this.visited.add(dest);
+    let text = this.describe();
+    const extra = this.fireEnter(dest, depth || 0);
+    return extra ? text + '\n\n' + extra : text;
+  }
+
+  fireEnter(room, depth) {
+    if (depth > 8) return '';         // an entry rule that walks you onward
+    for (const rule of this.rules) {
+      const on = rule.on || {};
+      if (on.enter !== room) continue;
+      if (rule.if && !rule.if.every(c => this.test(c))) continue;
+      const before = this.here;
+      const said = this.apply(rule.do || []);
+      // If the rule moved the player on, describe where they ended up.
+      if (this.here !== before) {
+        return said + (said ? '\n\n' : '') + this.goTo(this.here, depth + 1);
+      }
+      return said;
+    }
+    return '';
+  }
+
   endText() {
     return this.ended ? this.ended.reason : '';
   }
@@ -4426,13 +4477,29 @@ class World {
     const tone = (this.def.meta && this.def.meta.defaults) || {};
     if (DIRS.includes(verb)) {
       const dest = this.exits()[verb];
-      if (!dest) return tone.blocked || 'You cannot go that way.';
-      this.here = dest;
-      this.visited.add(dest);
-      return this.describe();
+      if (!dest) {
+        // A refusal that belongs to the passage rather than to the whole game.
+        // One global `blocked` string was shown for a locked gate in Hamburg and
+        // a granite wall thirty leagues under the Atlantic, and the only way to
+        // say anything specific was a guarded rule sitting above every exit.
+        const ex = ((room.exits || []).find(x => x.dir === verb) || {});
+        return ex.blocked || tone.blocked || 'You cannot go that way.';
+      }
+      return this.goTo(dest);
     }
     switch (verb) {
-      case 'LOOK': return this.describe();
+      case 'LOOK': {
+        // LOOK with a noun is EXAMINE. It used to ignore the noun entirely and
+        // re-describe the room, so clicking LOOK on an object told you about the
+        // floor, and inspecting anything had to be hand-rolled as a USE rule,
+        // which then counted the object as load-bearing.
+        if (!noun) return this.describe();
+        const it = this.items[noun] || this.actors[noun];
+        if (!it) return tone.absent || 'You do not see that here.';
+        if (!this.visibleHere(noun)) return tone.absent || 'You do not see that here.';
+        return it.description || tone.plain ||
+          ('You see nothing special about the ' + (it.name || String(noun).toLowerCase()) + '.');
+      }
       // Letting a turn go by is a move in its own right, and every parser since
       // 1977 has had it. LOOK passed a turn as a side effect, which is not the
       // same as being able to say "I wait".

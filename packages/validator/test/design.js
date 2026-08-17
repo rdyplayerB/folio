@@ -65,11 +65,20 @@ check('a world that is almost entirely scenery is flagged',
 
 // Every item load-bearing, in a world big enough for the judgement to be fair —
 // the >6-item guard exists so a four-object fixture is not nagged about scenery.
+//
+// Each gem is REQUIRED by a rule rather than merely answered by one. Answering
+// is what makes a thing scenery, and counting that as participation meant an
+// author who wrote a flavour line per prop was told their world was a shopping
+// list and had to delete the texture to pass.
 const shoppingList = cellar();
 for (let i = 0; i < 6; i++) {
   shoppingList.items.push({ id: 'GEM' + i, name: 'gem', location: 'HALL',
     attributes: { TAKEBIT: true } });
-  shoppingList.rules.push({ on: { verb: 'RUB', noun: 'GEM' + i },
+  shoppingList.rules.push({ on: { verb: 'USE', noun: 'ALTAR' },
+    // The door is named in a condition too, so every single item in the world is
+    // depended on and the fixture really is 100 per cent load-bearing.
+    if: [{ type: 'carrying', item: 'GEM' + i },
+         { type: 'open', item: 'CELLAR-DOOR' }],
     do: [{ type: 'print', text: 'It glows.' }] });
 }
 const slAudit = audit(shoppingList);
@@ -171,6 +180,19 @@ const ongrid = JSON.parse(JSON.stringify(offgrid));
 ongrid.rules[0].on.verb = 'USE';
 check('the same rule on USE is not flagged',
   !audit(ongrid).findings.some(f => f.code === 'W509'));
+
+
+// The other half of the same fix: a world full of flavour responses is textured,
+// not load-bearing, and must not be told it is a shopping list.
+const textured = cellar();
+for (let i = 0; i < 6; i++) {
+  textured.items.push({ id: 'PROP' + i, name: 'prop', location: 'HALL', attributes: {} });
+  textured.rules.push({ on: { verb: 'USE', noun: 'PROP' + i },
+    do: [{ type: 'print', text: 'Nothing turns on it.' }] });
+}
+check('flavour responses do not make a world read as a shopping list',
+  !audit(textured).findings.some(f => f.code === 'W507'),
+  audit(textured).metrics.itemParticipation + '% participate');
 
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

@@ -75,9 +75,12 @@ function profile(backend, walkthrough, opts) {
   // Cyclomatic complexity over the observed graph. A corridor scores ~0; a map
   // that loops back on itself scores higher, and looping is what lets a player
   // build a mental model instead of following a rail.
+  // Same definition the design audit uses. These two reported different numbers
+  // for the same world until they were made to share one.
+  const shape = require('./mapshape.js');
   const n = rooms.size;
-  const e = edges.size;
-  const loops = n ? Math.max(0, e - n + 1) : 0;
+  const conns = shape.connections([...edges].map(k => k.split('>')));
+  const loops = shape.loops(conns.size, n);
 
   // ------------------------------------------------------------ the pacing curve
   // Where the rewards fall across the run. A game that pays out evenly reads as a

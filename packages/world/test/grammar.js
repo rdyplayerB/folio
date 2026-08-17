@@ -144,6 +144,77 @@ const base = (extra) => Object.assign({
   ok('and it costs a move', be.state().moves === 1, 'moves=' + be.state().moves);
 }
 
+
+// ---- arriving somewhere ---------------------------------------------------
+{
+  const be = boot({
+    meta: { start: 'LEDGE' }, items: [],
+    rooms: [{ id: 'LEDGE', prose: 'A ledge.', exits: [{ dir: 'DOWN', to: 'PIT' }] },
+            { id: 'PIT', prose: 'A pit.', exits: [] }],
+    rules: [{ on: { enter: 'PIT' },
+      do: [{ type: 'print', text: 'The floor gives way.' }, { type: 'set-flag', flag: 'fell' }] }]
+  });
+  // Every field on `on` is optional, so without an explicit guard an arrival
+  // rule matched the first command of any kind and answered the whole game.
+  ok('an arrival rule does not answer ordinary commands',
+    !/gives way/.test(be.submit('LOOK').prose), be.submit('LOOK').prose.split('\n')[0]);
+  const arrived = be.submit('DOWN').prose;
+  ok('it fires on arrival', /gives way/.test(arrived), arrived.replace(/\n+/g, ' | '));
+  ok('and its effects land', be.state().globals.fell === true);
+}
+
+// ---- refusals that belong to the passage ----------------------------------
+{
+  const be = boot({
+    meta: { start: 'A', defaults: { blocked: 'You cannot go that way.' } },
+    flags: { tied: false }, items: [],
+    rooms: [{ id: 'A', exits: [
+        { dir: 'NORTH', to: 'B', condition: { type: 'flag', flag: 'tied' },
+          blocked: 'The rope is not tied off yet.' },
+        { dir: 'EAST', to: 'B', condition: { type: 'flag', flag: 'tied' } }] },
+      { id: 'B', exits: [] }]
+  });
+  ok('a blocked exit can speak for itself',
+    be.submit('NORTH').prose === 'The rope is not tied off yet.');
+  ok('and falls back to the global refusal when it does not',
+    be.submit('EAST').prose === 'You cannot go that way.');
+}
+
+// ---- examining ------------------------------------------------------------
+{
+  const be = boot({
+    meta: { start: 'A' }, rooms: [{ id: 'A', prose: 'A room.', exits: [] }],
+    items: [{ id: 'ROPE', name: 'rope', location: 'A',
+              description: 'Hemp, and older than you are.', attributes: {} },
+            { id: 'MOSS', name: 'moss', location: 'A', attributes: {} },
+            { id: 'FAR', name: 'far thing', location: 'B', attributes: {} }],
+    rules: []
+  });
+  ok('LOOK with a noun examines rather than re-describing the room',
+    be.submit('LOOK', 'ROPE').prose === 'Hemp, and older than you are.');
+  ok('something with no description still answers',
+    /nothing special/.test(be.submit('LOOK', 'MOSS').prose));
+  ok('and something that is not here is refused',
+    /do not see/.test(be.submit('LOOK', 'FAR').prose));
+  ok('a bare LOOK still describes the room', /A room/.test(be.submit('LOOK').prose));
+}
+
+// ---- countdowns you can defeat --------------------------------------------
+{
+  const world = {
+    meta: { start: 'A' }, flags: { drank: false }, items: [],
+    rooms: [{ id: 'A', exits: [] }], rules: [],
+    timers: [{ turns: 3, stopFlag: 'drank', do: [{ type: 'lose', text: 'Thirst finishes you.' }] }]
+  };
+  let be = boot(world);
+  be.submit('WAIT'); be.submit('WAIT'); be.submit('WAIT');
+  ok('an unanswered countdown kills you', !!be.world.ended);
+  be = boot(world);
+  be.world.flags.drank = true;
+  be.submit('WAIT'); be.submit('WAIT'); be.submit('WAIT'); be.submit('WAIT');
+  ok('and one you answered does not', !be.world.ended);
+}
+
 console.log('\n' + (fail ? '\x1b[31m' + fail + ' failed\x1b[0m, ' : '') +
   '\x1b[32m' + pass + ' passed\x1b[0m\n');
 process.exit(fail ? 1 : 0);

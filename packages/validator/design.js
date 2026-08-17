@@ -57,8 +57,13 @@ function audit(world, opts) {
   // mostly decoration is a set, not a game.
   const referenced = new Set();
   for (const r of rules) {
+    // NOT r.on.noun. Answering when a player pokes at something is what makes it
+    // scenery, not what makes it matter, and counting it meant an author who
+    // wrote a flavour line for every prop was told their world was 100 per cent
+    // load-bearing and had to strip the texture back out to pass. The spec says
+    // write every verb; this said the opposite. Depended on, or changed, is the
+    // test. A pairing counts, because you have to be holding the second thing.
     for (const c of (r.if || [])) if (c.item) referenced.add(c.item);
-    if (r.on && r.on.noun) referenced.add(r.on.noun);
     if (r.on && r.on.second) referenced.add(r.on.second);
     for (const e of (r.do || [])) if (e.item) referenced.add(e.item);
   }
@@ -77,9 +82,11 @@ function audit(world, opts) {
   // Corridors are the signature of a generated map. Real adventure maps loop: they
   // let a player wander, return, and recognise. Cyclomatic complexity over the room
   // graph distinguishes the two — a tree scores 1, a looping map scores higher.
-  let exitCount = 0;
-  for (const rm of rooms) exitCount += (rm.exits || []).length;
-  const loops = rooms.length ? (exitCount / 2) - rooms.length + 1 : 0;
+  // Shared with the corpus profiler, because these two used to disagree about
+  // the same file and only a probe told the author which one the audit believed.
+  const shape = require('./mapshape.js');
+  const conns = shape.connections(shape.passagesOf(world));
+  const loops = shape.loops(conns.size, rooms.length);
 
   // -------------------------------------------------------- 4. gate separation
   //
@@ -118,8 +125,9 @@ function audit(world, opts) {
     puzzleChainDepth: depth,
     itemParticipation,
     roomUtility,
-    mapLoops: Math.max(0, loops),
-    loopsPerRoom: rooms.length ? Math.round((Math.max(0, loops) / rooms.length) * 100) / 100 : 0,
+    mapLoops: loops,
+    mapConnections: conns.size,
+    loopsPerRoom: rooms.length ? Math.round((loops / rooms.length) * 100) / 100 : 0,
     meanGateDistance,
     scoringMoments: scoringRules,
     hasDeathState: hasDeath
@@ -190,6 +198,9 @@ function audit(world, opts) {
   if (metrics.loopsPerRoom < T.minLoopsPerRoom) {
     warn('W504', 'the map runs ' + metrics.loopsPerRoom + ' loops per room' +
       (metrics.mapLoops === 0 ? ' (a tree)' : ''),
+      'Counted as connections minus rooms plus one, where a connection is any pair ' +
+      'of rooms joined in either direction: ' + metrics.mapConnections + ' connections ' +
+      'across ' + metrics.rooms + ' rooms. One-way passages count in full. ' +
       'Corridor maps are the signature of generated geography. Zork runs 0.67 ' +
       'loops per room — nearly every room sits on a circuit — which is what lets ' +
       'a player take a shortcut and feel the map as a place rather than a menu.');
@@ -246,8 +257,11 @@ function audit(world, opts) {
   // unnoticed through the spec, the quickstart and a screenshot on the docs page.
   // The first person to build a game from the spec avoided the trap by instinct,
   // having no way to know it was there.
+  // WAIT is here because the engine answers it and meta.defaults invites you to
+  // word it. It has no button, so it must never gate progress, but flagging a
+  // flavour response to it as an unclickable custom verb was pure noise.
   const CLICKABLE = ['LOOK', 'TAKE', 'DROP', 'OPEN', 'CLOSE', 'USE', 'HIT', 'SPEAK',
-    'INVENTORY', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW',
+    'INVENTORY', 'WAIT', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW',
     'UP', 'DOWN', 'IN', 'OUT'];
   const offGrid = [...new Set(rules
     .map(r => ((r.on || {}).verb || '').toUpperCase())

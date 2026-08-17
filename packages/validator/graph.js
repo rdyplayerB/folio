@@ -339,6 +339,80 @@ function analyse(world) {
     }
   }
 
+  // One-way passages you can walk through under-equipped.
+  //
+  // T2 proves a path exists. It is optimistic about ordering, so it assumes the
+  // player picks everything up while it is still reachable, and that assumption
+  // is exactly what a one-way passage breaks. A Verne adaptation certified with a
+  // player who leaves the gun cotton in Hamburg unwinnable ninety moves later,
+  // with no warning anywhere, because a path did exist: the one where you took it.
+  //
+  // So: for each passage with no way back, anything required on the far side and
+  // obtainable only on the near side is a trap the player cannot undo.
+  const canReturn = (from, to) => {
+    const seen = new Set([to]);
+    const queue = [to];
+    while (queue.length) {
+      const at = queue.shift();
+      if (at === from) return true;
+      for (const ex of ((rooms[at] || {}).exits || [])) {
+        if (!seen.has(ex.to)) { seen.add(ex.to); queue.push(ex.to); }
+      }
+    }
+    return false;
+  };
+  const reachableFrom = (start) => {
+    const seen = new Set([start]);
+    const queue = [start];
+    while (queue.length) {
+      const at = queue.shift();
+      for (const ex of ((rooms[at] || {}).exits || [])) {
+        if (!seen.has(ex.to)) { seen.add(ex.to); queue.push(ex.to); }
+      }
+    }
+    return seen;
+  };
+  const neededBy = new Map();      // item -> a rule that requires carrying it
+  rules.forEach((r, i) => {
+    for (const c of (r.if || [])) {
+      const walk = (x) => {
+        if (!x) return;
+        if (x.type === 'carrying' && !neededBy.has(x.item)) neededBy.set(x.item, i);
+        if (x.type === 'not') walk(x.condition);
+        for (const sub of (x.conditions || [])) walk(sub);
+      };
+      walk(c);
+    }
+    if ((r.on || {}).second && !neededBy.has(r.on.second)) neededBy.set(r.on.second, i);
+  });
+
+  const traps = [];
+  for (const room of world.rooms) {
+    for (const ex of (room.exits || [])) {
+      if (!rooms[ex.to] || canReturn(room.id, ex.to)) continue;
+      const beyond = reachableFrom(ex.to);
+      for (const [itemId, ruleIdx] of neededBy) {
+        const it = items[itemId];
+        if (!it || !(it.attributes && it.attributes.TAKEBIT)) continue;
+        const home = itemLoc[itemId];
+        if (home === 'PLAYER' || beyond.has(home)) continue;     // still gettable
+        const gateRoom = (rules[ruleIdx].on || {}).room;
+        const gateNoun = (rules[ruleIdx].on || {}).noun;
+        const gateAt = gateRoom || (gateNoun && itemLoc[gateNoun]);
+        if (gateAt && !beyond.has(gateAt)) continue;             // needed before the drop
+        traps.push(itemId + ' (left behind at ' + home + ', needed past ' +
+          room.id + ' ' + ex.dir + ')');
+      }
+    }
+  }
+  if (traps.length) {
+    warn('W510', traps.length + ' item' + (traps.length > 1 ? 's' : '') +
+      ' can be left behind before a passage with no way back',
+      'The walkthrough works because it carries them. A player who does not is ' +
+      'stuck with no way to tell: ' + [...new Set(traps)].slice(0, 4).join('; ') +
+      '. Give the passage a warning, put the item past it, or open a way back.');
+  }
+
   // Softlock heuristic: an item that some rule destroys, and that another rule
   // still requires. Destroying it first is a dead end the player cannot undo.
   const destroyed = new Set();
