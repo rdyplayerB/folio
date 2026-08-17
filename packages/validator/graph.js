@@ -67,6 +67,9 @@ function analyse(world) {
           e.item && !items[e.item]) {
         err('E305', 'rule ' + i + ' acts on item "' + e.item + '", which does not exist');
       }
+      if (e.type === 'move-actor' && e.actor && !index(world.actors || [])[e.actor]) {
+        err('E305', 'rule ' + i + ' moves actor "' + e.actor + '", which does not exist');
+      }
     }
   }
 
@@ -113,7 +116,16 @@ function analyse(world) {
       case 'open': return flags.has('_open_' + c.item);
       case 'lit': return flags.has('_lit_' + c.item);
       case 'score-at-least': return true;   // score is monotonic; assume attainable
+      // Counters, like score, only ever climb toward a threshold, so a
+      // counter gate is assumed reachable for the same reason.
+      case 'counter-at-least': return true;
+      case 'counter-equals': return true;
+      case 'actor-here': return actorReachable(c.actor) ||
+        (actorLoc[c.actor] !== undefined && actorLoc[c.actor] !== 'NOWHERE');
+      case 'fighting': return (world.actors || []).some(a => a.hostile);
       case 'not': return !canSatisfy(c.condition);
+      case 'all': return (c.conditions || []).every(canSatisfy);
+      case 'any': return (c.conditions || []).some(canSatisfy);
       default: return false;
     }
   };
@@ -213,6 +225,9 @@ function analyse(world) {
       if (on.room && !reachRooms.has(on.room)) continue;
       // The noun must be present for the player to act on it at all.
       if (on.noun && !nounReachable(on.noun)) continue;
+      // A pairing needs both halves. Without this a rule gated on an unobtainable
+      // second object would be assumed firable and mask a real dead end.
+      if (on.second && !nounReachable(on.second)) continue;
       if (r.if && !r.if.every(canSatisfy)) continue;
 
       firedRules.add(i);
@@ -314,7 +329,8 @@ function analyse(world) {
     if (firedRules.has(i)) continue;
     const on = rules[i].on || {};
     const roomDead = on.room && !reachRooms.has(on.room);
-    const nounDead = on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun);
+    const nounDead = (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) ||
+      (on.second && !nounReachable(on.second) && !everPresent.has(on.second));
     if (roomDead || nounDead) {
       warn('W313', 'rule ' + i + ' (' + (on.verb || '?') + ' ' + (on.noun || '') +
         ') can never fire',

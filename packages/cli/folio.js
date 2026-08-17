@@ -50,8 +50,12 @@ function openGame(file) {
       game,
       backend: be,
       send: (line) => {
+        // "use door key" is a two-object command. Splitting noun from indirect
+        // here keeps the terminal able to express everything the board can.
         const [verb, ...rest] = line.split(/\s+/);
-        return be.submit(verb, rest.length ? rest.join(' ').toUpperCase() : null).prose;
+        const noun = rest.length ? String(rest.shift()).toUpperCase() : null;
+        const second = rest.length ? rest.join(' ').toUpperCase() : null;
+        return be.submit(verb, noun, second).prose;
       }
     };
   }

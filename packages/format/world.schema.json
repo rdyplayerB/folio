@@ -4,325 +4,992 @@
   "title": "Folio world",
   "description": "A Path B game world. Data only: this format cannot express executable code, which is why a .folio from a stranger is safe to open. The condition and effect vocabularies are closed on purpose, so a validator can see statically everything a game is able to do.",
   "type": "object",
-  "required": ["meta", "rooms", "items"],
+  "required": [
+    "meta",
+    "rooms",
+    "items"
+  ],
   "additionalProperties": false,
-
   "properties": {
-    "meta": { "$ref": "#/$defs/meta" },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
     "flags": {
       "description": "Named booleans you invent. This is the memory of the world; every puzzle that has to remember something remembers it here.",
       "type": "object",
-      "additionalProperties": { "type": "boolean" }
+      "additionalProperties": {
+        "type": "boolean"
+      }
     },
-    "rooms":  { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/room" } },
-    "items":  { "type": "array", "items": { "$ref": "#/$defs/item" } },
-    "actors": { "type": "array", "items": { "$ref": "#/$defs/actor" } },
-    "rules":  { "type": "array", "items": { "$ref": "#/$defs/rule" } },
-    "timers": { "type": "array", "items": { "$ref": "#/$defs/timer" } }
+    "rooms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/room"
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "actors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/actor"
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    },
+    "timers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/timer"
+      }
+    },
+    "counters": {
+      "description": "Named integers. Flags are booleans; without these there is no way to say \"the third time\" except by chaining near-identical rules.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    }
   },
-
   "$defs": {
     "id": {
       "description": "A stable identifier. Convention is upper case with hyphens, matching what the Z-machine path produces.",
       "type": "string",
       "minLength": 1
     },
-
     "direction": {
       "type": "string",
-      "enum": ["NORTH", "SOUTH", "EAST", "WEST", "NE", "NW", "SE", "SW", "UP", "DOWN", "IN", "OUT"]
+      "enum": [
+        "NORTH",
+        "SOUTH",
+        "EAST",
+        "WEST",
+        "NE",
+        "NW",
+        "SE",
+        "SW",
+        "UP",
+        "DOWN",
+        "IN",
+        "OUT"
+      ]
     },
-
     "meta": {
       "type": "object",
-      "required": ["start"],
+      "required": [
+        "start"
+      ],
       "additionalProperties": false,
       "properties": {
-        "start": { "$ref": "#/$defs/id", "description": "Room the player begins in. Must name a real room or nothing boots." },
-        "title": { "type": "string" },
-        "seed":  { "type": "integer", "description": "Seeds the world RNG. Runs are deterministic; the CLI and validator override this so a replay is reproducible across machines." },
+        "start": {
+          "$ref": "#/$defs/id",
+          "description": "Room the player begins in. Must name a real room or nothing boots."
+        },
+        "title": {
+          "type": "string"
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Seeds the world RNG. Runs are deterministic; the CLI and validator override this so a replay is reproducible across machines."
+        },
         "magicWords": {
           "description": "Words no player would guess to type, offered as buttons on the on-screen keyboard. Read by the presentation layer, not by the logic.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
-        "defaults": { "$ref": "#/$defs/defaults" }
+        "defaults": {
+          "$ref": "#/$defs/defaults"
+        }
       }
     },
-
     "defaults": {
       "description": "Overrides for the engine's built-in responses. These are what a player hears when no rule of yours matched, so they decide whether the world feels responsive or dead.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "blocked":     { "type": "string", "description": "Walking a direction with no exit." },
-        "dark":        { "type": "string", "description": "Looking in an unlit dark room." },
-        "what":        { "type": "string", "description": "TAKE with no noun." },
-        "already":     { "type": "string", "description": "Taking something already carried." },
-        "absent":      { "type": "string", "description": "Acting on something that is not here." },
-        "fixed":       { "type": "string", "description": "Taking something without TAKEBIT." },
-        "taken":       { "type": "string", "description": "A successful take." },
-        "nothave":     { "type": "string", "description": "Dropping something not carried." },
-        "dropped":     { "type": "string", "description": "A successful drop." },
-        "alreadyOpen": { "type": "string", "description": "Opening something already open." },
-        "locked":      { "type": "string", "description": "Opening something that will not open." },
-        "empty":       { "type": "string", "description": "INVENTORY while empty-handed." },
-        "unknown":     { "type": "string", "description": "Any verb with no rule and no built-in. The most-heard line in most games." }
+        "blocked": {
+          "type": "string",
+          "description": "Walking a direction with no exit."
+        },
+        "dark": {
+          "type": "string",
+          "description": "Looking in an unlit dark room."
+        },
+        "what": {
+          "type": "string",
+          "description": "TAKE with no noun."
+        },
+        "already": {
+          "type": "string",
+          "description": "Taking something already carried."
+        },
+        "absent": {
+          "type": "string",
+          "description": "Acting on something that is not here."
+        },
+        "fixed": {
+          "type": "string",
+          "description": "Taking something without TAKEBIT."
+        },
+        "taken": {
+          "type": "string",
+          "description": "A successful take."
+        },
+        "nothave": {
+          "type": "string",
+          "description": "Dropping something not carried."
+        },
+        "dropped": {
+          "type": "string",
+          "description": "A successful drop."
+        },
+        "alreadyOpen": {
+          "type": "string",
+          "description": "Opening something already open."
+        },
+        "locked": {
+          "type": "string",
+          "description": "Opening something that will not open."
+        },
+        "empty": {
+          "type": "string",
+          "description": "INVENTORY while empty-handed."
+        },
+        "unknown": {
+          "type": "string",
+          "description": "Any verb with no rule and no built-in. The most-heard line in most games."
+        },
+        "wait": {
+          "type": "string",
+          "description": "Letting a turn pass."
+        }
       }
     },
-
     "attributes": {
       "description": "Booleans the engine understands. Anything else you add is carried through to the presentation layer and ignored by the logic.",
       "type": "object",
-      "additionalProperties": { "type": "boolean" },
+      "additionalProperties": {
+        "type": "boolean"
+      },
       "properties": {
-        "TAKEBIT":     { "type": "boolean", "description": "The player can pick it up." },
-        "LIGHTSOURCE": { "type": "boolean", "description": "Counts as light when lit, defeating a dark room." },
-        "ONBIT":       { "type": "boolean", "description": "Starts lit." },
-        "OPENBIT":     { "type": "boolean", "description": "Starts open." },
-        "TRANSPARENT": { "type": "boolean", "description": "Contents are visible without opening it." }
+        "TAKEBIT": {
+          "type": "boolean",
+          "description": "The player can pick it up."
+        },
+        "LIGHTSOURCE": {
+          "type": "boolean",
+          "description": "Counts as light when lit, defeating a dark room."
+        },
+        "ONBIT": {
+          "type": "boolean",
+          "description": "Starts lit."
+        },
+        "OPENBIT": {
+          "type": "boolean",
+          "description": "Starts open."
+        },
+        "TRANSPARENT": {
+          "type": "boolean",
+          "description": "Contents are visible without opening it."
+        }
       }
     },
-
     "room": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id":    { "$ref": "#/$defs/id" },
-        "name":  { "type": "string", "description": "The heading the player sees. Falls back to the id, which looks like a bug." },
-        "prose": { "type": "string", "description": "Printed on entry and on LOOK." },
-        "dark":  { "type": "boolean", "description": "Unreadable unless a lit LIGHTSOURCE is carried or present." },
-        "exits": { "type": "array", "items": { "$ref": "#/$defs/exit" } }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "description": "The heading the player sees. Falls back to the id, which looks like a bug."
+        },
+        "prose": {
+          "type": "string",
+          "description": "Printed on entry and on LOOK."
+        },
+        "dark": {
+          "type": "boolean",
+          "description": "Unreadable unless a lit LIGHTSOURCE is carried or present."
+        },
+        "exits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exit"
+          }
+        },
+        "variants": {
+          "description": "Alternative descriptions, tried in order; the first whose conditions all hold replaces `prose`. This is how a room changes once something has happened in it.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "prose"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "if": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/condition"
+                }
+              },
+              "prose": {
+                "type": "string"
+              }
+            }
+          }
+        }
       }
     },
-
     "exit": {
       "description": "One way out, in one direction only. A return journey is a second exit on the other room.",
       "type": "object",
-      "required": ["dir", "to"],
+      "required": [
+        "dir",
+        "to"
+      ],
       "additionalProperties": false,
       "properties": {
-        "dir":       { "$ref": "#/$defs/direction" },
-        "to":        { "$ref": "#/$defs/id" },
-        "condition": { "$ref": "#/$defs/condition", "description": "Blocked until this passes." },
-        "door":      { "$ref": "#/$defs/id", "description": "An item id. Blocked while that item is closed." },
-        "hidden":    { "type": "boolean", "description": "While blocked, vanish entirely rather than showing as blocked. Use only when the passage itself is the secret." }
+        "dir": {
+          "$ref": "#/$defs/direction"
+        },
+        "to": {
+          "$ref": "#/$defs/id"
+        },
+        "condition": {
+          "$ref": "#/$defs/condition",
+          "description": "Blocked until this passes."
+        },
+        "door": {
+          "$ref": "#/$defs/id",
+          "description": "An item id. Blocked while that item is closed."
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "While blocked, vanish entirely rather than showing as blocked. Use only when the passage itself is the secret."
+        }
       }
     },
-
     "item": {
       "type": "object",
-      "required": ["id", "location"],
+      "required": [
+        "id",
+        "location"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id":   { "$ref": "#/$defs/id" },
-        "name": { "type": "string", "description": "What the player is shown." },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "description": "What the player is shown."
+        },
         "location": {
           "$ref": "#/$defs/id",
           "description": "A room id, another item's id to start inside a container, \"PLAYER\" to start carried, or \"NOWHERE\" to keep it out of play."
         },
-        "roomProse": { "type": "string", "description": "A line appended to the room description while the item is still lying there. Stops appearing once it moves." },
-        "attributes": { "$ref": "#/$defs/attributes" },
-        "fuel": { "type": "integer", "minimum": 0, "description": "Turns of light remaining, for a LIGHTSOURCE. Drives the lamp gauge. Burn it down with a timer's fuelFor." }
+        "roomProse": {
+          "type": "string",
+          "description": "A line appended to the room description while the item is still lying there. Stops appearing once it moves."
+        },
+        "attributes": {
+          "$ref": "#/$defs/attributes"
+        },
+        "fuel": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Turns of light remaining, for a LIGHTSOURCE. Drives the lamp gauge. Burn it down with a timer's fuelFor."
+        }
       }
     },
-
     "actor": {
       "description": "Something that is somebody. Projected into the scene like an item, but cannot be carried.",
       "type": "object",
-      "required": ["id", "location"],
+      "required": [
+        "id",
+        "location"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id":       { "$ref": "#/$defs/id" },
-        "name":     { "type": "string" },
-        "location": { "$ref": "#/$defs/id" },
-        "hostile":  { "type": "boolean", "description": "While present, the contract reports fighting: true. Does no harm by itself; the harm is a rule or a timer." },
-        "attributes": { "$ref": "#/$defs/attributes" }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/id"
+        },
+        "hostile": {
+          "type": "boolean",
+          "description": "While present, the contract reports fighting: true. Does no harm by itself; the harm is a rule or a timer."
+        },
+        "attributes": {
+          "$ref": "#/$defs/attributes"
+        }
       }
     },
-
     "rule": {
       "description": "A trigger, a guard, and a consequence. Rules are tried in array order and the FIRST match wins, so the specific case goes above the general one.",
       "type": "object",
-      "required": ["do"],
+      "required": [
+        "do"
+      ],
       "additionalProperties": false,
       "properties": {
         "on": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "verb": { "type": "string", "description": "Matched case-insensitively. Omit to match any verb." },
-            "noun": { "type": "string", "description": "Matched case-insensitively against the object id. Omit to match any noun, including none." },
-            "room": { "$ref": "#/$defs/id", "description": "Only fires while the player is here." }
+            "verb": {
+              "type": "string",
+              "description": "Matched case-insensitively. Omit to match any verb."
+            },
+            "noun": {
+              "type": "string",
+              "description": "Matched case-insensitively against the object id. Omit to match any noun, including none."
+            },
+            "room": {
+              "$ref": "#/$defs/id",
+              "description": "Only fires while the player is here."
+            },
+            "second": {
+              "$ref": "#/$defs/id",
+              "description": "A second object, for pairings like USE KEY ON DOOR. USE and HIT ask the player for one on the board. A rule without `second` will not match a two-object command, so write the pairing above the single-object fallback."
+            }
           }
         },
-        "if": { "type": "array", "items": { "$ref": "#/$defs/condition" }, "description": "Every one must pass." },
-        "do": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
+        "if": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "description": "Every one must pass."
+        },
+        "do": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        }
       }
     },
-
     "timer": {
       "description": "Ticks once per move, after the command's rule has run. How anything happens that the player did not directly cause.",
       "type": "object",
-      "required": ["turns", "do"],
+      "required": [
+        "turns",
+        "do"
+      ],
       "additionalProperties": false,
       "properties": {
-        "turns":     { "type": "integer", "minimum": 1 },
-        "startFlag": { "type": "string", "description": "Does not tick at all until this flag is true. Without it, counts from move one." },
-        "repeat":    { "type": "boolean", "description": "Fire every `turns` moves instead of once." },
-        "fuelFor":   { "$ref": "#/$defs/id", "description": "An item id. Elapsed ticks are published as that item's fuel consumption, which moves the lamp gauge." },
-        "do": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
+        "turns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "startFlag": {
+          "type": "string",
+          "description": "Does not tick at all until this flag is true. Without it, counts from move one."
+        },
+        "repeat": {
+          "type": "boolean",
+          "description": "Fire every `turns` moves instead of once."
+        },
+        "fuelFor": {
+          "$ref": "#/$defs/id",
+          "description": "An item id. Elapsed ticks are published as that item's fuel consumption, which moves the lamp gauge."
+        },
+        "do": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        }
       }
     },
-
     "condition": {
-      "description": "Ten types, and no more. An unrecognised type evaluates to false rather than throwing, so a typo silently disables a rule.",
+      "description": "Sixteen types, and no more. An unrecognised type evaluates to false rather than throwing, so a typo silently disables a rule.",
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "oneOf": [
         {
-          "title": "flag", "additionalProperties": false,
+          "title": "flag",
+          "additionalProperties": false,
           "properties": {
-            "type": { "const": "flag" },
-            "flag": { "type": "string" },
-            "value": { "type": "boolean", "description": "Defaults to true." }
+            "type": {
+              "const": "flag"
+            },
+            "flag": {
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean",
+              "description": "Defaults to true."
+            }
           },
-          "required": ["type", "flag"]
+          "required": [
+            "type",
+            "flag"
+          ]
         },
         {
-          "title": "carrying", "additionalProperties": false,
-          "properties": { "type": { "const": "carrying" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
+          "title": "carrying",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "carrying"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
         },
         {
-          "title": "in-room", "additionalProperties": false,
-          "properties": { "type": { "const": "in-room" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
+          "title": "in-room",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "in-room"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
         },
         {
-          "title": "present", "additionalProperties": false,
-          "properties": { "type": { "const": "present" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
+          "title": "present",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "present"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
         },
         {
-          "title": "at", "additionalProperties": false,
-          "properties": { "type": { "const": "at" }, "room": { "$ref": "#/$defs/id" } },
-          "required": ["type", "room"]
+          "title": "at",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "at"
+            },
+            "room": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "room"
+          ]
         },
         {
-          "title": "visited", "additionalProperties": false,
-          "properties": { "type": { "const": "visited" }, "room": { "$ref": "#/$defs/id" } },
-          "required": ["type", "room"]
+          "title": "visited",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "visited"
+            },
+            "room": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "room"
+          ]
         },
         {
-          "title": "open", "additionalProperties": false,
-          "properties": { "type": { "const": "open" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
+          "title": "open",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "open"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
         },
         {
-          "title": "lit", "additionalProperties": false,
-          "properties": { "type": { "const": "lit" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
+          "title": "lit",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "lit"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
         },
         {
-          "title": "score-at-least", "additionalProperties": false,
-          "properties": { "type": { "const": "score-at-least" }, "value": { "type": "integer" } },
-          "required": ["type", "value"]
+          "title": "score-at-least",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "score-at-least"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ]
         },
         {
-          "title": "not", "additionalProperties": false,
-          "properties": { "type": { "const": "not" }, "condition": { "$ref": "#/$defs/condition" } },
-          "required": ["type", "condition"]
+          "title": "not",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "not"
+            },
+            "condition": {
+              "$ref": "#/$defs/condition"
+            }
+          },
+          "required": [
+            "type",
+            "condition"
+          ]
+        },
+        {
+          "title": "counter-at-least",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "counter-at-least"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ]
+        },
+        {
+          "title": "counter-equals",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "counter-equals"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ]
+        },
+        {
+          "title": "actor-here",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "actor-here"
+            },
+            "actor": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "actor"
+          ]
+        },
+        {
+          "title": "fighting",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "fighting"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "A hostile actor shares the room."
+        },
+        {
+          "title": "all",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "all"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "title": "any",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "any"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ]
         }
       ]
     },
-
     "effect": {
-      "description": "Fourteen types, and no more. An unrecognised type is inert at runtime and rejected by validation.",
+      "description": "Sixteen types, and no more. An unrecognised type is inert at runtime and rejected by validation.",
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "oneOf": [
         {
-          "title": "print", "additionalProperties": false,
-          "properties": { "type": { "const": "print" }, "text": { "type": "string" } },
-          "required": ["type", "text"]
-        },
-        {
-          "title": "set-flag", "additionalProperties": false,
+          "title": "print",
+          "additionalProperties": false,
           "properties": {
-            "type": { "const": "set-flag" }, "flag": { "type": "string" },
-            "value": { "type": "boolean", "description": "Defaults to true." }
+            "type": {
+              "const": "print"
+            },
+            "text": {
+              "type": "string"
+            }
           },
-          "required": ["type", "flag"]
+          "required": [
+            "type",
+            "text"
+          ]
         },
         {
-          "title": "take", "additionalProperties": false,
-          "properties": { "type": { "const": "take" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"],
+          "title": "set-flag",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "set-flag"
+            },
+            "flag": {
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean",
+              "description": "Defaults to true."
+            }
+          },
+          "required": [
+            "type",
+            "flag"
+          ]
+        },
+        {
+          "title": "take",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "take"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ],
           "description": "Moves it to the player, ignoring TAKEBIT. The attribute governs what a player may take unaided; an effect is you deciding."
         },
         {
-          "title": "move-item", "additionalProperties": false,
+          "title": "move-item",
+          "additionalProperties": false,
           "properties": {
-            "type": { "const": "move-item" }, "item": { "$ref": "#/$defs/id" },
-            "to": { "$ref": "#/$defs/id", "description": "A room id, \"PLAYER\", a container id, or \"NOWHERE\"." }
+            "type": {
+              "const": "move-item"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            },
+            "to": {
+              "$ref": "#/$defs/id",
+              "description": "A room id, \"PLAYER\", a container id, or \"NOWHERE\"."
+            }
           },
-          "required": ["type", "item", "to"]
+          "required": [
+            "type",
+            "item",
+            "to"
+          ]
         },
         {
-          "title": "destroy", "additionalProperties": false,
-          "properties": { "type": { "const": "destroy" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
-        },
-        {
-          "title": "open", "additionalProperties": false,
-          "properties": { "type": { "const": "open" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
-        },
-        {
-          "title": "close", "additionalProperties": false,
-          "properties": { "type": { "const": "close" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
-        },
-        {
-          "title": "light", "additionalProperties": false,
-          "properties": { "type": { "const": "light" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
-        },
-        {
-          "title": "extinguish", "additionalProperties": false,
-          "properties": { "type": { "const": "extinguish" }, "item": { "$ref": "#/$defs/id" } },
-          "required": ["type", "item"]
-        },
-        {
-          "title": "goto", "additionalProperties": false,
-          "properties": { "type": { "const": "goto" }, "room": { "$ref": "#/$defs/id" } },
-          "required": ["type", "room"]
-        },
-        {
-          "title": "score", "additionalProperties": false,
-          "properties": { "type": { "const": "score" }, "value": { "type": "integer" } },
-          "required": ["type", "value"]
-        },
-        {
-          "title": "move-actor", "additionalProperties": false,
+          "title": "destroy",
+          "additionalProperties": false,
           "properties": {
-            "type": { "const": "move-actor" }, "actor": { "$ref": "#/$defs/id" },
-            "to": { "$ref": "#/$defs/id" }
+            "type": {
+              "const": "destroy"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
           },
-          "required": ["type", "actor", "to"]
+          "required": [
+            "type",
+            "item"
+          ]
         },
         {
-          "title": "win", "additionalProperties": false,
-          "properties": { "type": { "const": "win" }, "text": { "type": "string" } },
-          "required": ["type"],
+          "title": "open",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "open"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "close",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "close"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "light",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "light"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "extinguish",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "extinguish"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "goto",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "goto"
+            },
+            "room": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "room"
+          ]
+        },
+        {
+          "title": "score",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "score"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "title": "move-actor",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "move-actor"
+            },
+            "actor": {
+              "$ref": "#/$defs/id"
+            },
+            "to": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "actor",
+            "to"
+          ]
+        },
+        {
+          "title": "win",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "win"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
           "description": "At least one win must be reachable, or validation fails with E310."
         },
         {
-          "title": "lose", "additionalProperties": false,
-          "properties": { "type": { "const": "lose" }, "text": { "type": "string" } },
-          "required": ["type"]
+          "title": "lose",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "lose"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "title": "set-counter",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "set-counter"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ]
+        },
+        {
+          "title": "add-counter",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "add-counter"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ],
+          "description": "Negative values subtract."
         }
       ]
     }

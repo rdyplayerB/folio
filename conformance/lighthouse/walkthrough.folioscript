@@ -1,11 +1,10 @@
-# Written against the spec, not against the engine.
-# Clickable verbs only: a player can reach every one of these from the grid.
+# Clickable verbs only, and a two-object pairing the board can actually produce.
 open crate
 take biscuit
 take torch
 north
 expect: room PATH
-use dog
+use dog biscuit
 north
 expect: room BASE
 down

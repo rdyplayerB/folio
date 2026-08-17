@@ -80,8 +80,8 @@
     <div class="note">
       <span class="tag">Deliberately less expressive than Inform</span>
       <p>
-        The vocabulary below is closed. Ten conditions, fourteen effects, and no way to
-        add a fifteenth without a spec revision. That bound is the point: because every
+        The vocabulary below is closed. Sixteen conditions, sixteen effects, and no way
+        to add a seventeenth without a spec revision. That bound is the point: because every
         effect comes from a fixed list, the dependency graph can be computed statically
         rather than discovered by playing. You give up arbitrary logic and you get
         provable completability.
@@ -91,7 +91,8 @@
     <h2 id="shape">The top level</h2>
 <pre>{
   <span class="k">"meta"</span>:   { … },   <span class="c">// required</span>
-  <span class="k">"flags"</span>:  { … },   <span class="c">// optional, initial world state</span>
+  <span class="k">"flags"</span>:  { … },   <span class="c">// optional, your named booleans</span>
+  <span class="k">"counters"</span>: { … }, <span class="c">// optional, your named integers</span>
   <span class="k">"rooms"</span>:  [ … ],   <span class="c">// required</span>
   <span class="k">"items"</span>:  [ … ],   <span class="c">// required, may be empty</span>
   <span class="k">"actors"</span>: [ … ],   <span class="c">// optional</span>
@@ -172,6 +173,14 @@
       <dd><span class="t">boolean</span> The room is unreadable unless a lit <code>LIGHTSOURCE</code> is carried or present.</dd>
       <dt>exits</dt>
       <dd><span class="t">object[]</span> Ways out. See below.</dd>
+      <dt>variants</dt>
+      <dd>
+        <span class="t">object[]</span>
+        Alternative descriptions, each <code>{ if: [...], prose: "..." }</code>, tried in
+        order. The first whose conditions all hold replaces <code>prose</code>. This is
+        how a room changes once something has happened in it, and without it the only
+        dynamic room text was an item's <code>roomProse</code>.
+      </dd>
     </dl>
 
     <h2 id="exits">exits</h2>
@@ -287,6 +296,14 @@
     <dl class="fields">
       <dt>on.verb</dt><dd><span class="t">string</span> Matched case-insensitively. Omit to match any verb.</dd>
       <dt>on.noun</dt><dd><span class="t">string</span> Matched case-insensitively against the object id. Omit to match any noun, including none.</dd>
+      <dt>on.second</dt>
+      <dd>
+        <span class="t">string</span> A second object, for pairings like using a key on a
+        door. <code>USE</code> and <code>HIT</code> ask the player for one on the board
+        whenever a rule pairs objects under that verb. <strong>A rule without
+        <code>second</code> will never match a two-object command</strong>, so write the
+        pairing above the single-object fallback.
+      </dd>
       <dt>on.room</dt><dd><span class="t">string</span> Only fires while the player is in this room.</dd>
       <dt>if</dt><dd><span class="t">condition[]</span> Every one must pass. Omit for an unguarded rule.</dd>
       <dt>do</dt><dd><span class="t">effect[]</span> Applied in order. All <code>print</code> text is joined with newlines and returned as the response.</dd>
@@ -320,7 +337,13 @@
       <tr><td><code>open</code></td><td><code>item</code></td><td>It is open, by <code>OPENBIT</code>, <code>TRANSPARENT</code> or an <code>open</code> effect</td></tr>
       <tr><td><code>lit</code></td><td><code>item</code></td><td>It is currently alight</td></tr>
       <tr><td><code>score-at-least</code></td><td><code>value</code></td><td>Score is at or above the number</td></tr>
+      <tr><td><code>counter-at-least</code></td><td><code>counter</code>, <code>value</code></td><td>A counter is at or above the number</td></tr>
+      <tr><td><code>counter-equals</code></td><td><code>counter</code>, <code>value</code></td><td>A counter is exactly the number</td></tr>
+      <tr><td><code>actor-here</code></td><td><code>actor</code></td><td>That actor is in this room</td></tr>
+      <tr><td><code>fighting</code></td><td></td><td>A hostile actor shares the room</td></tr>
       <tr><td><code>not</code></td><td><code>condition</code></td><td>The nested condition is false</td></tr>
+      <tr><td><code>all</code></td><td><code>conditions</code></td><td>Every one holds</td></tr>
+      <tr><td><code>any</code></td><td><code>conditions</code></td><td>At least one holds</td></tr>
     </table>
     </div>
 <pre><span class="c">// carrying the key, and the door is not already unlocked</span>
@@ -346,6 +369,8 @@
       <tr><td><code>extinguish</code></td><td><code>item</code></td><td>Puts it out</td></tr>
       <tr><td><code>goto</code></td><td><code>room</code></td><td>Moves the player, marking the room visited</td></tr>
       <tr><td><code>score</code></td><td><code>value</code></td><td>Adds to the score. Negative numbers work</td></tr>
+      <tr><td><code>set-counter</code></td><td><code>counter</code>, <code>value</code></td><td>Sets a counter outright</td></tr>
+      <tr><td><code>add-counter</code></td><td><code>counter</code>, <code>value</code></td><td>Adds to a counter. Negative subtracts</td></tr>
       <tr><td><code>move-actor</code></td><td><code>actor</code>, <code>to</code></td><td>Moves an actor to a room id or <code>NOWHERE</code></td></tr>
       <tr><td><code>win</code></td><td><code>text</code></td><td>Ends the game as a win. At least one must be reachable or <span class="code e">E310</span></td></tr>
       <tr><td><code>lose</code></td><td><code>text</code></td><td>Ends the game as a loss</td></tr>
@@ -390,6 +415,7 @@
       <tr><td><code>DROP</code></td><td>Put down something carried</td></tr>
       <tr><td><code>OPEN</code></td><td>Reports open or refuses. It cannot actually open anything on its own</td></tr>
       <tr><td><code>INVENTORY</code></td><td>List what is carried</td></tr>
+      <tr><td><code>WAIT</code></td><td>Let a turn pass, worded by <code>defaults.wait</code></td></tr>
     </table>
     </div>
     <div class="gap">
@@ -461,6 +487,13 @@
       A repeating timer that prints a warning, and a second timer or a rule that applies
       <code>lose</code>. Foreshadowing a death is what separates a hazard from an ambush,
       and T4 measures whether you did it.
+    </p>
+
+    <h3>Counting</h3>
+    <p>
+      A counter and <code>counter-equals</code>, not a chain of near-identical rules.
+      Three visits to the same room reading trip number out of flag state works and is
+      the thing an author reaches for when there are no numbers; there are numbers now.
     </p>
 
     <h3>A consumable</h3>

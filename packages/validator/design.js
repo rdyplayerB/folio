@@ -59,6 +59,7 @@ function audit(world, opts) {
   for (const r of rules) {
     for (const c of (r.if || [])) if (c.item) referenced.add(c.item);
     if (r.on && r.on.noun) referenced.add(r.on.noun);
+    if (r.on && r.on.second) referenced.add(r.on.second);
     for (const e of (r.do || [])) if (e.item) referenced.add(e.item);
   }
   const takeable = items.filter(i => i.attributes && i.attributes.TAKEBIT);
@@ -275,6 +276,8 @@ function statesProduced(r) {
     if (e.type === 'take') out.push('carry:' + e.item);
     if (e.type === 'move-item') out.push('at:' + e.item + '@' + e.to);
     if (e.type === 'goto') out.push('room:' + e.room);
+    if (e.type === 'set-counter' || e.type === 'add-counter') out.push('count:' + e.counter);
+    if (e.type === 'move-actor') out.push('actor:' + e.actor + '@' + e.to);
   }
   return out;
 }
@@ -288,8 +291,16 @@ function statesRequired(r) {
     if (c.type === 'open') out.push('open:' + c.item);
     if (c.type === 'lit') out.push('lit:' + c.item);
     if (c.type === 'at' || c.type === 'visited') out.push('room:' + c.room);
+    if (c.type === 'counter-at-least' || c.type === 'counter-equals') out.push('count:' + c.counter);
+    if (c.type === 'actor-here') out.push('actor:' + c.actor);
     if (c.type === 'not') walk(c.condition);
+    // Composition nests, so the walk has to recurse through it or every
+    // dependency expressed with all/any becomes invisible to chain depth.
+    for (const sub of (c.conditions || [])) walk(sub);
   };
+  // A pairing depends on holding the second object, which is a real dependency
+  // edge and the commonest shape in a MacVenture-style game.
+  if (r.on && r.on.second) out.push('carry:' + r.on.second);
   for (const c of (r.if || [])) walk(c);
   return out;
 }

@@ -80,7 +80,9 @@ function replay(worldDef, walkthrough, opts) {
     const before = be.state();
     let r;
     try {
-      r = be.submit(verb, rest.length ? rest.join(' ').toUpperCase() : null);
+      const noun = rest.length ? String(rest.shift()).toUpperCase() : null;
+      const second = rest.length ? rest.join(' ').toUpperCase() : null;
+      r = be.submit(verb, noun, second);
     } catch (e) {
       err('E404', 'line ' + (i + 1) + ' ("' + line + '") threw: ' + e.message);
       break;

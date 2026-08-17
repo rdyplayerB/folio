@@ -65,6 +65,7 @@
       return {
         here: world.here, moves: world.moves, score: world.score,
         flags: JSON.parse(JSON.stringify(world.flags)),
+        counters: JSON.parse(JSON.stringify(world.counters || {})),
         loc: JSON.parse(JSON.stringify(world.loc)),
         actorLoc: JSON.parse(JSON.stringify(world.actorLoc)),
         visited: Array.from(world.visited),
@@ -79,6 +80,7 @@
       world.moves = snap.moves;
       world.score = snap.score;
       world.flags = JSON.parse(JSON.stringify(snap.flags));
+      world.counters = JSON.parse(JSON.stringify(snap.counters || {}));
       world.loc = JSON.parse(JSON.stringify(snap.loc));
       world.actorLoc = JSON.parse(JSON.stringify(snap.actorLoc));
       world.visited = new Set(snap.visited || []);
@@ -139,8 +141,14 @@
         // display name is only ever for the player's eyes.
         return v + ' ' + objId + (obj2Id ? ' ' + obj2Id : '');
       },
+      // Which verbs ask for a second target. Derived from the world rather than
+      // guessed: a rule that names `second` is the only reason to ask for one, so
+      // a game that never pairs objects never makes the player pick twice.
       needsSecond: function (verb) {
-        return /^(GIVE|UNLOCK|PUT|HIT|ATTACK)$/i.test(String(verb || ''));
+        var v = String(verb || '').toUpperCase();
+        return (def.rules || []).some(function (r) {
+          return r.on && r.on.second && String(r.on.verb || '').toUpperCase() === v;
+        });
       },
       magicWords: (def.meta && def.meta.magicWords) || []
     };

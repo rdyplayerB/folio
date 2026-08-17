@@ -32,6 +32,11 @@ class World {
     this.timers = (world.timers || []).map(t => Object.assign({ elapsed: 0 }, t));
 
     this.flags = Object.assign({}, world.flags);
+    // Numbers. Flags are booleans, and without counters an author has no way to
+    // say "the third time" except by chaining near-identical rules and reading
+    // trip number out of flag state. That was the workaround the first cold build
+    // reached for, and it called it out as the idiom nothing had taught it.
+    this.counters = Object.assign({}, world.counters);
     this.here = world.meta.start;
     this.moves = 0;
     this.score = 0;
@@ -87,7 +92,10 @@ class World {
       contents,
       flags,
       exits: this.exits(),
-      globals: Object.assign({}, this.flags),
+      // Counters live alongside flags in globals rather than in a key of their
+      // own, because the contract has to look identical on both paths and a
+      // Z-machine game has no counters to report.
+      globals: Object.assign({}, this.flags, this.counters),
       fighting: objects.some(id => this.actors[id] && this.actors[id].hostile),
       lampTurns: this.lampTurns()
     };
@@ -176,6 +184,8 @@ class World {
     verb = String(verb || '').toUpperCase();
     noun = noun ? String(noun).toUpperCase() : null;
 
+    indirect = indirect ? String(indirect).toUpperCase() : null;
+
     let prose = null;
     for (const rule of this.rules) {
       if (!this.matches(rule, verb, noun, indirect)) continue;
@@ -194,11 +204,23 @@ class World {
     return { prose, state: this.state() };
   }
 
-  matches(rule, verb, noun) {
+  matches(rule, verb, noun, indirect) {
     const on = rule.on || {};
     if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
     if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
     if (on.room && on.room !== this.here) return false;
+    // Two-object interactions: USE KEY ON DOOR, PUT EGG IN CASE.
+    //
+    // The board has always had this. TWO_OBJ marks USE and HIT as taking a
+    // second target, so the interface asks the player to click another thing and
+    // sends it. matches() then dropped it on the floor, and no rule could ever
+    // name it, so the player picked two objects and the game said nothing. The
+    // central MacVenture gesture was wired up at both ends and connected to
+    // nothing in the middle.
+    if (on.second && String(on.second).toUpperCase() !== indirect) return false;
+    // A rule with no `second` must not swallow a two-object command, or the
+    // one-object fallback fires first and the specific pairing never runs.
+    if (!on.second && indirect) return false;
     return true;
   }
 
@@ -214,7 +236,16 @@ class World {
       case 'open': return this.isOpen(c.item);
       case 'lit': return this.isLit(c.item);
       case 'score-at-least': return this.score >= c.value;
+      case 'counter-at-least': return (this.counters[c.counter] || 0) >= c.value;
+      case 'counter-equals': return (this.counters[c.counter] || 0) === c.value;
+      case 'actor-here': return this.actorLoc[c.actor] === this.here;
+      case 'fighting': return Object.keys(this.actorLoc).some(id =>
+        this.actorLoc[id] === this.here && this.actors[id] && this.actors[id].hostile);
       case 'not': return !this.test(c.condition);
+      // Boolean composition. Only `not` nested before, so an author needing OR
+      // had to mirror it into a flag by hand and keep the two in step.
+      case 'all': return (c.conditions || []).every(x => this.test(x));
+      case 'any': return (c.conditions || []).some(x => this.test(x));
       default: return false;
     }
   }
@@ -235,6 +266,9 @@ class World {
         case 'extinguish': this.flags['_lit_' + e.item] = false; break;
         case 'goto': this.here = e.room; this.visited.add(e.room); break;
         case 'score': this.score += e.value; break;
+        case 'set-counter': this.counters[e.counter] = e.value; break;
+        case 'add-counter':
+          this.counters[e.counter] = (this.counters[e.counter] || 0) + e.value; break;
         case 'move-actor': this.actorLoc[e.actor] = e.to; break;
         case 'win': this.ended = { win: true, reason: e.text || 'You have won.' }; break;
         case 'lose': this.ended = { win: false, reason: e.text || 'You have died.' }; break;
@@ -278,6 +312,10 @@ class World {
     }
     switch (verb) {
       case 'LOOK': return this.describe();
+      // Letting a turn go by is a move in its own right, and every parser since
+      // 1977 has had it. LOOK passed a turn as a side effect, which is not the
+      // same as being able to say "I wait".
+      case 'WAIT': case 'Z': return tone.wait || 'Time passes.';
       case 'TAKE': {
         if (!noun) return tone.what || 'Take what?';
         if (this.loc[noun] === 'PLAYER') return tone.already || 'You already have that.';
@@ -312,7 +350,20 @@ class World {
     }
     const room = this.rooms[this.here] || {};
     const here = Object.keys(this.loc).filter(i => this.loc[i] === this.here);
-    let out = (room.name || this.here) + '\n' + (room.prose || '');
+    // A room that reads the same before and after everything that happens in it
+    // is a backdrop rather than a place. Variants are tried in order and the
+    // first whose conditions hold wins, falling back to `prose`.
+    //
+    // Without this the only dynamic room text was an item's roomProse, so an
+    // author wanting a hall to change once the ogre wakes had to park scenery in
+    // NOWHERE and move it in. That trick worked and nothing had taught it, which
+    // is a sign the format was missing something rather than that the author was
+    // clever.
+    let body = room.prose || '';
+    for (const v of (room.variants || [])) {
+      if ((v.if || []).every(c => this.test(c))) { body = v.prose; break; }
+    }
+    let out = (room.name || this.here) + '\n' + body;
     for (const id of here) {
       const it = this.items[id];
       if (it && it.roomProse) out += '\n' + it.roomProse;

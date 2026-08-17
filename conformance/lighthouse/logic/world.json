@@ -9,97 +9,461 @@
       "unknown": "The wind takes the gesture and does nothing with it."
     }
   },
-  "flags": { "dogFed": false },
+  "flags": {
+    "dogFed": false
+  },
   "rooms": [
-    { "id": "SHORE", "name": "The Shore",
+    {
+      "id": "SHORE",
+      "name": "The Shore",
       "prose": "Shingle, and a smell of weed. A path climbs north toward the light.",
-      "exits": [ { "dir": "NORTH", "to": "PATH" } ] },
-    { "id": "PATH", "name": "The Cliff Path",
+      "exits": [
+        {
+          "dir": "NORTH",
+          "to": "PATH"
+        }
+      ]
+    },
+    {
+      "id": "PATH",
+      "name": "The Cliff Path",
       "prose": "The path narrows against the rock. Something is lying across it.",
       "exits": [
-        { "dir": "SOUTH", "to": "SHORE" },
-        { "dir": "NORTH", "to": "BASE", "condition": { "type": "flag", "flag": "dogFed" } }
-      ] },
-    { "id": "BASE", "name": "The Lighthouse Door",
+        {
+          "dir": "SOUTH",
+          "to": "SHORE"
+        },
+        {
+          "dir": "NORTH",
+          "to": "BASE",
+          "condition": {
+            "type": "flag",
+            "flag": "dogFed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "BASE",
+      "name": "The Lighthouse Door",
       "prose": "A stub of tower. Stairs go up into the dark, and a hatch goes down.",
       "exits": [
-        { "dir": "SOUTH", "to": "PATH" },
-        { "dir": "UP", "to": "LAMPROOM" },
-        { "dir": "DOWN", "to": "STORE" }
-      ] },
-    { "id": "STORE", "name": "The Store", "dark": true,
+        {
+          "dir": "SOUTH",
+          "to": "PATH"
+        },
+        {
+          "dir": "UP",
+          "to": "LAMPROOM"
+        },
+        {
+          "dir": "DOWN",
+          "to": "STORE"
+        }
+      ]
+    },
+    {
+      "id": "STORE",
+      "name": "The Store",
+      "dark": true,
       "prose": "Shelves of nothing much, and one heavy can.",
-      "exits": [ { "dir": "UP", "to": "BASE" } ] },
-    { "id": "LAMPROOM", "name": "The Lamp Room",
+      "exits": [
+        {
+          "dir": "UP",
+          "to": "BASE"
+        }
+      ]
+    },
+    {
+      "id": "LAMPROOM",
+      "name": "The Lamp Room",
       "prose": "Glass on every side, and the lamp dry in the middle of it.",
-      "exits": [ { "dir": "DOWN", "to": "BASE" } ] }
+      "exits": [
+        {
+          "dir": "DOWN",
+          "to": "BASE"
+        }
+      ],
+      "variants": [
+        {
+          "if": [
+            {
+              "type": "lit",
+              "item": "TORCH"
+            }
+          ],
+          "prose": "Glass on every side. Your torchlight comes back at you from all of it, and the lamp still sits dry in the middle."
+        }
+      ]
+    }
   ],
   "items": [
-    { "id": "CRATE", "name": "crate", "location": "SHORE",
+    {
+      "id": "CRATE",
+      "name": "crate",
+      "location": "SHORE",
       "roomProse": "A crate has come up with the tide, lid down.",
-      "attributes": {} },
-    { "id": "BISCUIT", "name": "ship's biscuit", "location": "CRATE",
-      "attributes": { "TAKEBIT": true } },
-    { "id": "TORCH", "name": "torch", "location": "SHORE",
+      "attributes": {}
+    },
+    {
+      "id": "BISCUIT",
+      "name": "ship's biscuit",
+      "location": "CRATE",
+      "attributes": {
+        "TAKEBIT": true
+      }
+    },
+    {
+      "id": "TORCH",
+      "name": "torch",
+      "location": "SHORE",
       "roomProse": "A torch is wedged upright in the shingle.",
-      "attributes": { "TAKEBIT": true, "LIGHTSOURCE": true }, "fuel": 45 },
-    { "id": "OIL", "name": "can of oil", "location": "STORE",
+      "attributes": {
+        "TAKEBIT": true,
+        "LIGHTSOURCE": true
+      },
+      "fuel": 45
+    },
+    {
+      "id": "OIL",
+      "name": "can of oil",
+      "location": "STORE",
       "roomProse": "The can sits where somebody left it.",
-      "attributes": { "TAKEBIT": true } },
-    { "id": "LAMP", "name": "lamp", "location": "LAMPROOM", "attributes": {} }
+      "attributes": {
+        "TAKEBIT": true
+      }
+    },
+    {
+      "id": "LAMP",
+      "name": "lamp",
+      "location": "LAMPROOM",
+      "attributes": {}
+    }
   ],
   "actors": [
-    { "id": "DOG", "name": "black dog", "location": "PATH", "hostile": true }
+    {
+      "id": "DOG",
+      "name": "black dog",
+      "location": "PATH",
+      "hostile": true
+    }
   ],
   "rules": [
-    { "on": { "verb": "OPEN", "noun": "CRATE" },
-      "if": [ { "type": "in-room", "item": "CRATE" } ],
+    {
+      "on": {
+        "verb": "LOOK",
+        "noun": "LAMP"
+      },
+      "if": [
+        {
+          "type": "all",
+          "conditions": [
+            {
+              "type": "at",
+              "room": "LAMPROOM"
+            },
+            {
+              "type": "not",
+              "condition": {
+                "type": "carrying",
+                "item": "OIL"
+              }
+            }
+          ]
+        }
+      ],
       "do": [
-        { "type": "open", "item": "CRATE" },
-        { "type": "print", "text": "The lid gives. Inside, one biscuit, hard as a tile." }
-      ] },
-    { "on": { "verb": "TAKE", "noun": "BISCUIT" },
-      "if": [ { "type": "at", "room": "SHORE" }, { "type": "open", "item": "CRATE" } ],
-      "do": [ { "type": "take", "item": "BISCUIT" }, { "type": "print", "text": "Taken." } ] },
-    { "on": { "verb": "USE", "noun": "DOG" },
-      "if": [ { "type": "carrying", "item": "BISCUIT" }, { "type": "at", "room": "PATH" } ],
+        {
+          "type": "add-counter",
+          "counter": "looks",
+          "value": 1
+        },
+        {
+          "type": "print",
+          "text": "Bone dry. Whatever feeds it is kept somewhere below."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "LOOK",
+        "noun": "LAMP"
+      },
+      "if": [
+        {
+          "type": "counter-at-least",
+          "counter": "looks",
+          "value": 2
+        }
+      ],
       "do": [
-        { "type": "destroy", "item": "BISCUIT" },
-        { "type": "move-actor", "actor": "DOG", "to": "NOWHERE" },
-        { "type": "set-flag", "flag": "dogFed", "value": true },
-        { "type": "score", "value": 10 },
-        { "type": "print", "text": "The dog takes it without gratitude and carries it off the path." }
-      ] },
-    { "on": { "verb": "USE", "noun": "DOG" },
-      "do": [ { "type": "print", "text": "It shows you the whole length of its teeth." } ] },
-    { "on": { "verb": "USE", "noun": "TORCH" },
-      "if": [ { "type": "carrying", "item": "TORCH" } ],
-      "do": [ { "type": "light", "item": "TORCH" }, { "type": "print", "text": "The torch takes." } ] },
-    { "on": { "verb": "TAKE", "noun": "OIL" },
-      "if": [ { "type": "in-room", "item": "OIL" }, { "type": "lit", "item": "TORCH" } ],
-      "do": [ { "type": "take", "item": "OIL" }, { "type": "score", "value": 5 },
-              { "type": "print", "text": "Heavier than it looks." } ] },
-    { "on": { "verb": "TAKE", "noun": "OIL" },
-      "if": [ { "type": "in-room", "item": "OIL" } ],
-      "do": [ { "type": "print", "text": "You feel along the shelf and find only dust." } ] },
-    { "on": { "verb": "LOOK", "noun": "LAMP" },
-      "if": [ { "type": "not", "condition": { "type": "visited", "room": "STORE" } } ],
-      "do": [ { "type": "print", "text": "Bone dry. Whatever feeds it is kept somewhere below." } ] },
-    { "on": { "verb": "USE", "noun": "LAMP" },
-      "if": [ { "type": "carrying", "item": "OIL" }, { "type": "at", "room": "LAMPROOM" } ],
+        {
+          "type": "print",
+          "text": "Still dry. Staring will not fill it."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "OPEN",
+        "noun": "CRATE"
+      },
+      "if": [
+        {
+          "type": "in-room",
+          "item": "CRATE"
+        }
+      ],
       "do": [
-        { "type": "destroy", "item": "OIL" },
-        { "type": "score", "value": 20 },
-        { "type": "print", "text": "The wick drinks, catches, and throws itself out across the water." },
-        { "type": "win", "text": "*** The light is lit ***" }
-      ] },
-    { "on": { "verb": "USE", "noun": "LAMP" },
-      "do": [ { "type": "print", "text": "Nothing in your hands will make it burn." } ] }
+        {
+          "type": "open",
+          "item": "CRATE"
+        },
+        {
+          "type": "print",
+          "text": "The lid gives. Inside, one biscuit, hard as a tile."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "TAKE",
+        "noun": "BISCUIT"
+      },
+      "if": [
+        {
+          "type": "at",
+          "room": "SHORE"
+        },
+        {
+          "type": "open",
+          "item": "CRATE"
+        }
+      ],
+      "do": [
+        {
+          "type": "take",
+          "item": "BISCUIT"
+        },
+        {
+          "type": "print",
+          "text": "Taken."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "USE",
+        "noun": "DOG",
+        "second": "BISCUIT"
+      },
+      "if": [
+        {
+          "type": "carrying",
+          "item": "BISCUIT"
+        },
+        {
+          "type": "at",
+          "room": "PATH"
+        }
+      ],
+      "do": [
+        {
+          "type": "destroy",
+          "item": "BISCUIT"
+        },
+        {
+          "type": "move-actor",
+          "actor": "DOG",
+          "to": "NOWHERE"
+        },
+        {
+          "type": "set-flag",
+          "flag": "dogFed",
+          "value": true
+        },
+        {
+          "type": "score",
+          "value": 10
+        },
+        {
+          "type": "print",
+          "text": "The dog takes it without gratitude and carries it off the path."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "USE",
+        "noun": "DOG"
+      },
+      "do": [
+        {
+          "type": "print",
+          "text": "It shows you the whole length of its teeth."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "USE",
+        "noun": "TORCH"
+      },
+      "if": [
+        {
+          "type": "carrying",
+          "item": "TORCH"
+        }
+      ],
+      "do": [
+        {
+          "type": "light",
+          "item": "TORCH"
+        },
+        {
+          "type": "print",
+          "text": "The torch takes."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "TAKE",
+        "noun": "OIL"
+      },
+      "if": [
+        {
+          "type": "in-room",
+          "item": "OIL"
+        },
+        {
+          "type": "lit",
+          "item": "TORCH"
+        }
+      ],
+      "do": [
+        {
+          "type": "take",
+          "item": "OIL"
+        },
+        {
+          "type": "score",
+          "value": 5
+        },
+        {
+          "type": "print",
+          "text": "Heavier than it looks."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "TAKE",
+        "noun": "OIL"
+      },
+      "if": [
+        {
+          "type": "in-room",
+          "item": "OIL"
+        }
+      ],
+      "do": [
+        {
+          "type": "print",
+          "text": "You feel along the shelf and find only dust."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "LOOK",
+        "noun": "LAMP"
+      },
+      "if": [
+        {
+          "type": "not",
+          "condition": {
+            "type": "visited",
+            "room": "STORE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "type": "print",
+          "text": "Bone dry. Whatever feeds it is kept somewhere below."
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "USE",
+        "noun": "LAMP"
+      },
+      "if": [
+        {
+          "type": "carrying",
+          "item": "OIL"
+        },
+        {
+          "type": "at",
+          "room": "LAMPROOM"
+        }
+      ],
+      "do": [
+        {
+          "type": "destroy",
+          "item": "OIL"
+        },
+        {
+          "type": "score",
+          "value": 20
+        },
+        {
+          "type": "print",
+          "text": "The wick drinks, catches, and throws itself out across the water."
+        },
+        {
+          "type": "win",
+          "text": "*** The light is lit ***"
+        }
+      ]
+    },
+    {
+      "on": {
+        "verb": "USE",
+        "noun": "LAMP"
+      },
+      "do": [
+        {
+          "type": "print",
+          "text": "Nothing in your hands will make it burn."
+        }
+      ]
+    }
   ],
   "timers": [
-    { "turns": 14, "repeat": true,
-      "do": [ { "type": "print", "text": "Below, the tide moves another yard up the shingle." } ] },
-    { "turns": 90,
-      "do": [ { "type": "lose", "text": "The sea closes over the path, and over you.\n\n*** You have drowned ***" } ] }
-  ]
+    {
+      "turns": 14,
+      "repeat": true,
+      "do": [
+        {
+          "type": "print",
+          "text": "Below, the tide moves another yard up the shingle."
+        }
+      ]
+    },
+    {
+      "turns": 90,
+      "do": [
+        {
+          "type": "lose",
+          "text": "The sea closes over the path, and over you.\n\n*** You have drowned ***"
+        }
+      ]
+    }
+  ],
+  "counters": {
+    "looks": 0
+  }
 }

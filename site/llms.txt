@@ -17,9 +17,9 @@ Two things are worth knowing because they change how you should work.
    from a cold start and requires it to reach the ending. It also computes the
    dependency graph and rejects worlds with dead ends. Write the walkthrough as
    you build, not at the end.
-2. **The vocabulary is closed.** Ten conditions, fourteen effects. There is no
+2. **The vocabulary is closed.** Sixteen conditions, sixteen effects. There is no
    scripting and no escape hatch. If you find yourself wanting one, the answer is
-   almost always a flag.
+   almost always a flag or a counter.
 
 ## The loop
 
@@ -87,8 +87,9 @@ Failure line numbers count **commands**, not file lines.
 
 ```
 {
-  "meta":   { ... },   required
-  "flags":  { ... },   optional, your named booleans
+  "meta":     { ... },   required
+  "flags":    { ... },   optional, your named booleans
+  "counters": { ... },   optional, your named integers
   "rooms":  [ ... ],   required
   "items":  [ ... ],   required, may be empty
   "actors": [ ... ],   optional
@@ -103,12 +104,24 @@ Failure line numbers count **commands**, not file lines.
 - `title`, `seed`, `magicWords[]`
 - `defaults`: overrides for built-in responses. Keys:
   `blocked`, `dark`, `what`, `already`, `absent`, `fixed`, `taken`, `nothave`,
-  `dropped`, `alreadyOpen`, `locked`, `empty`, `unknown`.
+  `dropped`, `alreadyOpen`, `locked`, `empty`, `unknown`, `wait`.
   `unknown` is the most-heard line in most games. Write it.
 
 ### rooms
 
-`id` (required), `name`, `prose`, `dark`, `exits[]`
+`id` (required), `name`, `prose`, `dark`, `exits[]`, `variants[]`
+
+`variants` is how a room changes once something has happened in it. Each is
+`{ "if": [conditions], "prose": "..." }`, tried in order; the first whose
+conditions all hold replaces `prose`.
+
+```json
+{ "id": "HALL", "prose": "The ogre is slumped in his chair, snoring.",
+  "variants": [
+    { "if": [{ "type": "flag", "flag": "awake" }],
+      "prose": "The ogre is on his feet, and he has seen you." }
+  ] }
+```
 
 ### exits
 
@@ -151,6 +164,18 @@ The only place anything interesting happens.
 }
 ```
 
+`on.second` is a second object, for pairings like using a key on a door. The board
+asks the player for one whenever a rule pairs objects under that verb.
+
+```json
+{ "on": { "verb": "USE", "noun": "CELLAR-DOOR", "second": "KEY" },
+  "do": [ { "type": "print", "text": "The key turns." } ] }
+```
+
+**A rule without `second` will never match a two-object command**, so write the
+pairing above the single-object fallback and the fallback still answers a bare
+`USE CELLAR-DOOR`.
+
 **Rules are tried in array order and the first match wins.** Put the specific case
 above the general one. A rule whose conditions fail does not block later rules, so
 the standard shape is a guarded rule followed by an unguarded fallback for the same
@@ -169,7 +194,13 @@ trigger. That fallback is where the writing goes.
 | `open` | `item` | it is open |
 | `lit` | `item` | it is alight |
 | `score-at-least` | `value` | score >= value |
+| `counter-at-least` | `counter`, `value` | counter >= value |
+| `counter-equals` | `counter`, `value` | counter is exactly value |
+| `actor-here` | `actor` | that actor is in this room |
+| `fighting` | | a hostile actor shares the room |
 | `not` | `condition` | nested condition is false |
+| `all` | `conditions` | every one holds |
+| `any` | `conditions` | at least one holds |
 
 ### effects (all fourteen)
 
@@ -184,6 +215,8 @@ trigger. That fallback is where the writing goes.
 | `light` / `extinguish` | `item` | light it or put it out |
 | `goto` | `room` | move the player |
 | `score` | `value` | add to score (negative works) |
+| `set-counter` | `counter`, `value` | set a counter |
+| `add-counter` | `counter`, `value` | add to a counter (negative subtracts) |
 | `move-actor` | `actor`, `to` | move an actor |
 | `win` | `text` | end as a win. At least one must be reachable |
 | `lose` | `text` | end as a loss |
@@ -207,7 +240,7 @@ write them directly.
 ### built-in verbs
 
 The engine answers only: the twelve directions, `LOOK`, `TAKE`, `DROP`, `OPEN`
-(refuses or reports; cannot actually open anything), `INVENTORY`.
+(refuses or reports; cannot actually open anything), `INVENTORY`, and `WAIT`.
 
 **The player is shown eight verbs: `LOOK TAKE DROP OPEN CLOSE USE HIT SPEAK`.
 Four of them (CLOSE, USE, HIT, SPEAK) do nothing without rules.** Assume every
@@ -375,4 +408,6 @@ erroring, so a typo costs you the dial without telling you.
 - Failure branches are where the prose lives. A guarded rule with no fallback
   means the player who tries the right idea at the wrong time hears nothing.
 - Distance makes a puzzle. A key in the same room as its lock is a formality.
+- Counting is a counter, not a chain of near-identical rules. `add-counter` on
+  each visit and `counter-equals` to branch is how you write "the third time".
 - Foreshadow deaths. An unannounced instant death is an ambush, not a hazard.
