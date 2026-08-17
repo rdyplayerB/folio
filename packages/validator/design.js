@@ -204,6 +204,27 @@ function audit(world, opts) {
       'a player carry something in the hope that it matters.');
   }
 
+  // Rules that fire and say nothing.
+  //
+  // Found by playing a freshly built game through the tools rather than by
+  // testing it. "unlock gate" set the flag, opened the way, and printed an empty
+  // line. The command had worked perfectly and the player had no way to know: a
+  // successful rule with no print is indistinguishable from a command the game
+  // did not understand.
+  //
+  // Only player-triggered rules count. A rule with no verb is machinery, and a
+  // timer appends to whatever else happened that turn.
+  const silent = (world.rules || []).filter(r =>
+    (r.on || {}).verb && !(r.do || []).some(e => e.type === 'print'));
+  if (silent.length) {
+    warn('W508', silent.length + ' rule' + (silent.length > 1 ? 's fire' : ' fires') +
+      ' without printing anything',
+      'A rule that succeeds silently looks exactly like a command the game did not ' +
+      'understand. Triggers: ' +
+      silent.slice(0, 5).map(r => (r.on.verb + ' ' + (r.on.noun || '')).trim()).join(', ') +
+      '. Add a print effect, even a short one.');
+  }
+
   return { metrics, findings };
 }
 

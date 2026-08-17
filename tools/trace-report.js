@@ -41,8 +41,14 @@ const stamps = events.map(e => e.at).filter(Boolean);
 const dur = stamps.length > 1 ? stamps[stamps.length - 1] - stamps[0]
   : events[events.length - 1].ms;
 console.log('\n=== ' + C.bold + 'authoring session' + C.off + ' ===\n');
-console.log('  ' + events.length + ' calls over ' +
-  (dur > 60000 ? Math.round(dur / 60000) + ' min' : Math.round(dur / 1000) + 's'));
+// Tool time, not human time: the clock starts at the first call, so thinking,
+// typing and reading are not in here. A session that reads as 138ms took a person
+// considerably longer, and that is the right thing to measure — the tools should
+// never be the slow part.
+const human = dur > 60000 ? Math.round(dur / 60000) + ' min'
+  : dur >= 1000 ? (dur / 1000).toFixed(1) + 's'
+  : dur + 'ms';
+console.log('  ' + events.length + ' calls, ' + human + ' of tool time');
 
 // ---------------------------------------------------------------- what ran
 const byName = new Map();

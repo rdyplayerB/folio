@@ -79,10 +79,30 @@ function around(kind, name, args, fn) {
   catch (e) { threw = e; }
   const detail = { args: shapeOf(args), took: Date.now() - t0 };
   if (threw) detail.threw = threw.message;
-  else if (out && typeof out === 'object') {
+
+  // An MCP tool answers with {content:[{type:'text',text:'...'}]}, so the thing
+  // worth recording is a JSON string inside an envelope. Without unwrapping it
+  // the trace was blind to every call made through the server, which is the path
+  // most authoring takes, and it reported a clean run as one that never came
+  // clean.
+  //
+  // Read into a SEPARATE variable. An earlier version reassigned `out` here and
+  // the tracer started returning the unwrapped body as the tool's actual reply,
+  // which broke every caller. An instrument that alters what it measures is
+  // worse than no instrument.
+  let seen = out;
+  if (!threw && seen && Array.isArray(seen.content) &&
+      seen.content[0] && seen.content[0].text) {
+    try {
+      const inner = JSON.parse(seen.content[0].text);
+      if (inner && typeof inner === 'object') seen = inner;
+    } catch (e) { /* plain text, such as the spec: nothing structured to read */ }
+  }
+
+  if (!threw && seen && typeof seen === 'object') {
     // Findings are the interesting part: which codes appeared, and how often the
     // same one had to appear again before it was understood.
-    const f = out.findings || (out.report && out.report.findings);
+    const f = seen.findings || (seen.report && seen.report.findings);
     if (Array.isArray(f)) {
       detail.codes = f.map(x => x.code).filter(Boolean);
       // Errors kept apart from warnings on purpose. Seeing the same ERROR again
@@ -92,8 +112,8 @@ function around(kind, name, args, fn) {
       detail.errorCodes = f.filter(x => x.level === 'error').map(x => x.code);
       detail.errors = detail.errorCodes.length;
     }
-    if (out.tier) detail.tier = out.tier;
-    if (out.ok !== undefined) detail.ok = out.ok;
+    if (seen.tier) detail.tier = seen.tier;
+    if (seen.ok !== undefined) detail.ok = seen.ok;
   }
   record(kind, name, detail);
   if (threw) throw threw;

@@ -109,5 +109,36 @@ check('a lose that only a timer can reach still counts as stakes',
   !audit(timed).findings.some(f => f.code === 'W505'),
   (audit(timed).findings.find(f => f.code === 'W505') || {}).msg || 'no W505');
 
+
+// A rule that succeeds and says nothing looks, to a player, exactly like a
+// command the game did not understand. Found by playing a freshly built game
+// rather than by testing it: "unlock gate" opened the way and printed a blank
+// line.
+const silentRule = {
+  meta: { start: 'A' },
+  rooms: [{ id: 'A', exits: [] }],
+  items: [{ id: 'GATE', location: 'A', attributes: {} }],
+  rules: [
+    { on: { verb: 'UNLOCK', noun: 'GATE' }, do: [{ type: 'set-flag', flag: 'open' }] },
+    { on: { verb: 'WAIT' }, do: [{ type: 'print', text: 'Time passes.' },
+                                 { type: 'win', text: 'done' }] }
+  ]
+};
+check('a player-triggered rule that prints nothing is flagged',
+  audit(silentRule).findings.some(f => f.code === 'W508'),
+  (audit(silentRule).findings.find(f => f.code === 'W508') || {}).hint || 'not flagged');
+
+// Machinery without a verb is not player-facing and must not be nagged about.
+const machinery = {
+  meta: { start: 'A' },
+  rooms: [{ id: 'A', exits: [] }],
+  items: [],
+  rules: [{ on: {}, do: [{ type: 'set-flag', flag: 'x' }] },
+          { on: { verb: 'WAIT' }, do: [{ type: 'print', text: 'ok' }, { type: 'win', text: 'd' }] }],
+  timers: [{ turns: 5, do: [{ type: 'set-flag', flag: 'y' }] }]
+};
+check('a rule with no verb, and a timer, are not flagged as silent',
+  !audit(machinery).findings.some(f => f.code === 'W508'));
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);
