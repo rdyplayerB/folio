@@ -221,6 +221,58 @@ try {
     }
     process.exit(rep.rooms > 0 ? 0 : 1);
 
+  } else if (cmd === 'solve') {
+    // Play the game with the walkthrough withheld and report whether the ending
+    // can be found, and how often more than one thing works on the way there.
+    const [file] = args;
+    if (!file) throw new Error('usage: folio solve <file.folio> [--seconds N]');
+    const si = args.indexOf('--seconds');
+    const secs = si > 0 ? Number(args[si + 1]) : 30;
+
+    const game = load(fs.readFileSync(file));
+    if (game.manifest.logicType !== 'world') {
+      throw new Error('folio solve works on declarative worlds. A Z-machine game is ' +
+        'opaque, so its state cannot be searched.');
+    }
+    const def = JSON.parse(game.files['logic/world.json'].toString('utf8'));
+    console.log(C.dim + 'searching, up to ' + secs + 's...' + C.off);
+    const r = require('../validator/solve.js').solve(def, { maxMs: secs * 1000 });
+
+    console.log('');
+    if (r.solvedBlind) {
+      console.log('  ' + C.green + 'FINDABLE' + C.off + '  the ending was reached without the walkthrough');
+      console.log('  ' + C.dim + r.solutionMoves + ' moves, ' +
+        r.statesExplored.toLocaleString() + ' states searched' + C.off);
+    } else {
+      console.log('  ' + C.yellow + 'NOT FOUND' + C.off + '  no route to the ending inside the budget');
+      console.log('  ' + C.dim + r.statesExplored.toLocaleString() + ' states searched. This is not ' +
+        'proof the game is unfair: a bigger' + C.off);
+      console.log('  ' + C.dim + 'game needs a bigger budget. Try --seconds 300.' + C.off);
+    }
+
+    if (r.solvedBlind) {
+      // The corridor number. Everything else the validator measures is about
+      // whether a game holds together; this is the only thing that speaks to
+      // whether the player was ever making a decision.
+      console.log('');
+      console.log('  ' + C.bold + 'choice' + C.off);
+      console.log('    ' + r.meanChoices + C.dim + ' actions advanced the world on average, per step' + C.off);
+      console.log('    ' + r.forcedFraction + '%' + C.dim + ' of steps had exactly one thing that worked' + C.off);
+      const verdict = r.forcedFraction >= 60
+        ? C.yellow + 'This is a corridor. At most steps only one action does anything.' + C.off
+        : r.forcedFraction >= 30
+          ? 'Guided. A player is choosing between a few live options at a time.'
+          : 'Open. There is usually more than one thing worth trying.';
+      console.log('    ' + verdict);
+      if (r.path.length && r.path.length <= 40) {
+        console.log('');
+        console.log('  ' + C.bold + 'the route it found' + C.off);
+        console.log('    ' + C.dim + r.path.map(p => p.command).join(' → ') + C.off);
+      }
+    }
+    console.log('');
+    process.exit(0);
+
   } else if (cmd === 'info') {
     const [file] = args;
     if (!file) throw new Error('usage: folio info <file.folio>');
@@ -262,6 +314,7 @@ try {
     console.log('  folio profile <file.folio>     measure its design shape');
     console.log('  folio brief [brief.json]       resolve authoring dials into targets');
     console.log('  folio calibrate <story.z3>     derive a room map from a Z-machine story');
+    console.log('  folio solve <file.folio>       play it blind: is the ending findable?');
     process.exit(cmd ? 1 : 0);
   }
 } catch (e) {

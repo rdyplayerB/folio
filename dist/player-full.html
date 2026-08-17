@@ -5823,9 +5823,23 @@ window.GUE = window.GUE || {};
     ctx.fillStyle = COL.dark; ctx.fillRect(w / 2 - 16, 28, 32, 32);
     ctx.fillStyle = '#000'; ctx.fillRect(w / 2 - 15, 29, 30, 30);
     textC('?', w / 2, 38, COL.gold);
+    // Wrapped to the SCENE's width, not the text pane's. wrap() measures against
+    // the pane, which is far wider, so a long room name came back as one line and
+    // was then hard-cut at 17 characters: "Inside the Fun-Vee" lost its tail and
+    // read as a rendering fault rather than as a name. Every Path B game shows
+    // this box until somebody draws the room, so it is the first thing a player
+    // sees of a new game.
     var nm = (S.roomName || S.roomId || 'UNMAPPED').toUpperCase();
-    var lines = wrap(nm).slice(0, 2);
-    for (var i = 0; i < lines.length; i++) textC(lines[i].slice(0, 17), w / 2, 72 + i * LH, COL.dim);
+    var per = 17, words = nm.split(/\s+/), lines = [], line = '';
+    for (var k = 0; k < words.length; k++) {
+      var word = words[k];
+      if (!line) { line = word.slice(0, per); continue; }
+      if (line.length + 1 + word.length <= per) { line += ' ' + word; continue; }
+      lines.push(line); line = word.slice(0, per);
+      if (lines.length === 3) break;
+    }
+    if (line && lines.length < 3) lines.push(line);
+    for (var i = 0; i < lines.length; i++) textC(lines[i], w / 2, 72 + i * LH, COL.dim);
   }
 
   function drawDark() {

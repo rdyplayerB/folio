@@ -32,7 +32,14 @@ folio info my-game.folio              # what is inside
 folio profile my-game.folio           # measure its design shape
 folio brief brief.json                # resolve the dials into targets
 folio calibrate story.z3              # Path A only: derive a room map
+folio solve my-game.folio             # play it blind: is the ending findable?
 ```
+
+`folio solve` plays your game with the walkthrough withheld, using only what a
+player can see, and answers the two questions certification cannot: can the ending
+be found without being told, and how often does more than one thing work. A game
+where exactly one action advances the world at every step is a corridor, however
+good the prose is.
 
 `folio brief` takes the dials below. To scale a game to a source rather than to a
 default, count the places the source actually visits and pass them:
@@ -434,7 +441,9 @@ It ends with one of four verdicts:
 - `CERTIFIED` — every tier ran and the design audit raised nothing. The top tier
 
 `PLAYABLE` and `CERTIFIED` both need a walkthrough that wins. Neither claims a
-human could *find* the solution; that check does not exist yet.
+human could *find* the solution, and neither can see whether the player ever had a
+choice. `folio solve` answers both, separately, and is worth running before you
+call a game finished.
 
 Errors block; warnings are advice. Full list: https://folio.games/docs/errors/
 

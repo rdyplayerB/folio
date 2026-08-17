@@ -166,6 +166,7 @@ unlock cellar-door
       <tr><td><code>folio profile &lt;file&gt;</code></td><td>Replay the walkthrough and measure the design shape</td></tr>
       <tr><td><code>folio brief [brief.json]</code></td><td>Resolve authoring dials into concrete targets and thresholds</td></tr>
       <tr><td><code>folio calibrate &lt;story.z3&gt;</code></td><td>Derive a Path A room map from a story file. <code>-o</code> writes it</td></tr>
+      <tr><td><code>folio solve &lt;file&gt;</code></td><td>Play it blind. Is the ending findable, and did the player ever have a choice? <code>--seconds N</code> for a bigger budget</td></tr>
     </table>
     </div>
 
@@ -200,9 +201,16 @@ unlock cellar-door
     <div class="note">
       <span class="tag">Playable means a path exists</span>
       <p>
-        It does not mean a human can find it. Those are separate claims and the badge keeps
-        them separate. The check that speaks to findability is a blind solver, which is
-        designed and not built.
+        It does not mean a human can find it, and no tier can see whether the player ever
+        had a choice. Those are separate claims and the badge keeps them separate.
+      </p>
+      <p>
+        <code>folio solve</code> answers both. It plays the game with the walkthrough
+        withheld, using only what a player can see, and reports whether it reached the
+        ending and how often more than one action advanced the world. A game where
+        exactly one thing works at every step is a corridor, however good the prose is,
+        and that is the one property every other check is structurally unable to
+        measure.
       </p>
     </div>
 

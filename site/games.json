@@ -19,5 +19,23 @@
     "tier": "playable",
     "file": "/games/cellar-door.folio",
     "shot": "/shots/cellar-door.png"
+  },
+  {
+    "id": "jack",
+    "title": "Jack and the Beanstalk",
+    "author": "Folio spec eval",
+    "genre": "Fantasy",
+    "tier": "certified",
+    "file": "/games/jack.folio",
+    "shot": "/shots/jack.png"
+  },
+  {
+    "id": "iron-man",
+    "title": "Iron Man",
+    "author": "Folio spec eval",
+    "genre": "Adventure",
+    "tier": "playable",
+    "file": "/games/iron-man.folio",
+    "shot": "/shots/iron-man.png"
   }
 ]
