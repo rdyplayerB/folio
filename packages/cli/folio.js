@@ -21,6 +21,7 @@ const { pack, load } = require('../format/pack.js');
 const { validate } = require('../validator/index.js');
 const { createBackend } = require('../zmachine/index.js');
 const world = require('../world/index.js');
+const trace = require('../format/trace.js');
 
 const C = { dim: '\x1b[2m', red: '\x1b[31m', yellow: '\x1b[33m', green: '\x1b[32m', bold: '\x1b[1m', off: '\x1b[0m' };
 
@@ -59,6 +60,7 @@ function openGame(file) {
 }
 
 const [cmd, ...args] = process.argv.slice(2);
+trace.record('cli', cmd || '(help)', { args: args.length });
 
 try {
   if (cmd === 'pack') {
@@ -73,6 +75,12 @@ try {
     if (!file) throw new Error('usage: folio validate <file.folio>');
     const game = load(fs.readFileSync(file));
     const r = validate(game);
+    trace.record('cli', 'validate:result', {
+      ok: r.ok, tier: r.tier, ran: r.ran,
+      codes: r.findings.map(f => f.code),
+      errorCodes: r.findings.filter(f => f.level === 'error').map(f => f.code),
+      errors: r.findings.filter(f => f.level === 'error').length
+    });
     for (const x of r.findings) {
       const col = x.level === 'error' ? C.red : C.yellow;
       console.log(col + x.level.toUpperCase() + C.off + ' ' + C.dim + x.code + C.off + '  ' + x.msg);

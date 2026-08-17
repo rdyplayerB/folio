@@ -21,7 +21,11 @@ function good() {
     files: {
       'logic/game.z3': story,
       'presentation/roommap.json': Buffer.from(JSON.stringify({
-        ROOMMAP: { 1: 'A' }, OBJMAP: { 2: 'B' }, ATTR: {}
+        ROOMMAP: { 1: 'A' }, OBJMAP: { 2: 'B' }, ADVENTURER: 44,
+        // The full table the bridge reads. This fixture used to carry an empty
+        // ATTR and pass, which is the defect E206 now catches.
+        ATTR: { TAKEBIT: 17, OPENBIT: 11, ONBIT: 19, DOORBIT: 22, CONTBIT: 18,
+                TRANSBIT: 12, SURFACEBIT: 10, LIGHTBIT: 31, INVISIBLE: 7, ACTORBIT: 30 }
       }))
     }
   };
@@ -82,6 +86,32 @@ expect('capability this format version cannot honour', g, 'E220');
 
 g = good(); g.files['art/cover.png'] = Buffer.from('definitely not a png');
 expect('a .png that is not a PNG', g, 'E230');
+
+
+// A room map that is present but unfinished.
+//
+// Found by porting a real game end to end for the first time. Two of the ten
+// attribute flags were filled in and everything passed: the game booted, played
+// correctly in a terminal, and would have been silently wrong everywhere it was
+// drawn, because attr() fails safe to false. Nothing takeable, no container ever
+// open, the lamp never lit, and no error anywhere to read.
+const FULL_ATTR = { TAKEBIT: 17, OPENBIT: 11, ONBIT: 19, DOORBIT: 22, CONTBIT: 18,
+  TRANSBIT: 12, SURFACEBIT: 10, LIGHTBIT: 31, INVISIBLE: 7, ACTORBIT: 30 };
+const withRoommap = (rm) => {
+  const gg = good();
+  gg.files['presentation/roommap.json'] = Buffer.from(JSON.stringify(rm));
+  return gg;
+};
+
+expect('a room map with most attribute flags missing',
+  withRoommap({ ROOMMAP: {}, OBJMAP: {}, ADVENTURER: 44, ATTR: { DOORBIT: 22 } }), 'E206');
+
+expect('a room map still carrying its calibration to-do list',
+  withRoommap({ ROOMMAP: {}, OBJMAP: {}, ADVENTURER: 44, ATTR: FULL_ATTR,
+    _confirm: { flags: ['TAKEBIT'] } }), 'E207');
+
+expect('a room map with no player object',
+  withRoommap({ ROOMMAP: {}, OBJMAP: {}, ATTR: FULL_ATTR }), 'E205');
 
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

@@ -43,6 +43,7 @@ const zip = require('../format/zip.js');
 const crypto = require('crypto');
 const { validateWorld, WORLD_SCHEMA } = require('../format/schema.js');
 const brief = require('../format/brief.js');
+const trace = require('../format/trace.js');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SPEC = path.join(ROOT, 'site', 'llms.txt');
@@ -615,7 +616,8 @@ function handle(msg) {
     const tool = TOOLS.find(t => t.name === (params && params.name));
     if (!tool) throw rpcError(-32602, 'unknown tool: ' + (params && params.name));
     try {
-      return tool.handler((params && params.arguments) || {});
+      const a = (params && params.arguments) || {};
+      return trace.around('tool', tool.name, a, () => tool.handler(a));
     } catch (e) {
       // A tool that throws is reported as a failed call rather than as a broken
       // server, so the agent can read the message and try something else.

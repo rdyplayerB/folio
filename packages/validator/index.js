@@ -111,8 +111,32 @@ function validate(game, opts) {
       try { rm = JSON.parse(files['presentation/roommap.json'].toString('utf8')); }
       catch (e) { err('E204', 'presentation/roommap.json is not valid JSON: ' + e.message); }
       if (rm) {
-        for (const key of ['ROOMMAP', 'OBJMAP', 'ATTR']) {
-          if (!rm[key]) err('E205', 'roommap.json is missing "' + key + '"');
+        for (const key of ['ROOMMAP', 'OBJMAP', 'ATTR', 'ADVENTURER']) {
+          if (rm[key] === undefined) err('E205', 'roommap.json is missing "' + key + '"');
+        }
+        // Present is not the same as finished.
+        //
+        // A room map with two of the ten attribute flags passes every check above
+        // and produces a game that boots, plays in a terminal, and is quietly
+        // wrong everywhere it is drawn: nothing reads as takeable, no container
+        // ever looks open, the lamp never looks lit. attr() fails safe to false,
+        // so there is no crash to notice and no error to read. This is exactly the
+        // shape of defect certification exists to catch.
+        const NEEDED = ['TAKEBIT', 'OPENBIT', 'ONBIT', 'DOORBIT', 'CONTBIT',
+          'TRANSBIT', 'SURFACEBIT', 'LIGHTBIT', 'INVISIBLE', 'ACTORBIT'];
+        const absent = rm.ATTR ? NEEDED.filter(f => rm.ATTR[f] === undefined) : [];
+        if (absent.length) {
+          err('E206', 'roommap.json ATTR is missing ' + absent.length +
+            ' flag' + (absent.length > 1 ? 's' : '') + ' the engine reads: ' + absent.join(', '),
+            'The game will run and draw wrongly, with nothing takeable and nothing ' +
+            'open. Run "folio calibrate" and read the census it prints: the bit whose ' +
+            'sample object names match the meaning is the right one.');
+        }
+        if (rm._confirm) {
+          err('E207', 'roommap.json still carries its _confirm block',
+            'Calibration leaves that block behind as a reminder of what it could not ' +
+            'work out. Finish those flags, then delete the block. A shipped game ' +
+            'should not be carrying its own to-do list.');
         }
       }
     }

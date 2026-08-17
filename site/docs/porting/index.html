@@ -157,10 +157,12 @@
       </dd>
     </dl>
     <p>
-      The validator checks that <code>ROOMMAP</code>, <code>OBJMAP</code> and
-      <code>ATTR</code> are present, and <span class="code e">E205</span> names whichever
-      is missing. The other three are not checked and their absence shows up as a game
-      that draws the wrong room or reports an empty inventory.
+      <code>ROOMMAP</code>, <code>OBJMAP</code>, <code>ATTR</code> and
+      <code>ADVENTURER</code> are all checked, and <span class="code e">E205</span> names
+      whichever is missing. <code>ATTR</code> is checked for completeness as well as
+      presence, because a half-filled table is worse than an absent one. The remaining
+      two are not checked, and their absence shows up as a game that draws the wrong
+      room or reports an empty inventory.
     </p>
 
     <h2 id="hard">Building it: folio calibrate</h2>
@@ -237,6 +239,15 @@
       without knowing anything about the game. Write the bit numbers into
       <code>ATTR</code>, delete the <code>_confirm</code> block the tool left in the file,
       and the map is complete.
+    </p>
+    <p>
+      This step is not optional, and validation enforces it with
+      <span class="code e">E206</span> and <span class="code e">E207</span>. A half-filled
+      table produces a game that boots and plays correctly in a terminal while being
+      wrong everywhere it is drawn, because a missing flag reads as false rather than
+      as an error. That combination, working and quietly incorrect, is the exact thing
+      certification exists to catch, and it was found by porting a real game end to end
+      rather than by any test.
     </p>
     <div class="gap">
       <span class="tag">Tested against one game</span>

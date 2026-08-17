@@ -131,8 +131,25 @@
       <dt><span class="code e">E205</span></dt>
       <dd>
         <b><code>roommap.json</code> is missing a key.</b> <code>ROOMMAP</code>,
-        <code>OBJMAP</code> and <code>ATTR</code> are all required. If you generated it,
+        <code>OBJMAP</code>, <code>ATTR</code> and <code>ADVENTURER</code> are all
+        required. If you generated it,
         you probably still have flags left in the <code>_confirm</code> block.
+      </dd>
+      <dt><span class="code e">E206</span></dt>
+      <dd>
+        <b>The room map's <code>ATTR</code> table is incomplete.</b> The engine reads
+        ten named ZIL flags and the message lists the ones you are missing. This is an
+        error rather than a warning because the game will boot, play correctly in a
+        terminal, and be silently wrong everywhere it is drawn: nothing reads as
+        takeable, no container ever looks open, the lamp never looks lit. Run
+        <code>folio calibrate</code> and read the census it prints, matching the bit
+        whose sample object names fit the meaning.
+      </dd>
+      <dt><span class="code e">E207</span></dt>
+      <dd>
+        <b>The room map still carries its <code>_confirm</code> block.</b> Calibration
+        leaves that behind listing what it could not work out. Fill those flags in and
+        delete the block. A shipped game should not be carrying its own to-do list.
       </dd>
       <dt><span class="code e">E210</span></dt>
       <dd><b>Declared <code>world</code> but no <code>logic/world.json</code>.</b></dd>
