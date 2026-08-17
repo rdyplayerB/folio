@@ -120,6 +120,10 @@ function analyse(world) {
       // counter gate is assumed reachable for the same reason.
       case 'counter-at-least': return true;
       case 'counter-equals': return true;
+      // Optimistic, like the rest of this analysis: a roll that can come up will.
+      // T3 then replays the real sequence and catches a game that actually
+      // depends on winning one.
+      case 'chance': return true;
       case 'actor-here': return actorReachable(c.actor) ||
         (actorLoc[c.actor] !== undefined && actorLoc[c.actor] !== 'NOWHERE');
       case 'fighting': return (world.actors || []).some(a => a.hostile);
@@ -156,6 +160,7 @@ function analyse(world) {
     if (!actors[id]) return false;
     const where = actorLoc[id];
     if (where === 'NOWHERE') return false;
+    if (where === 'PLAYER') return true;      // travelling with you, so always here
     return rooms[where] ? reachRooms.has(where) : false;
   }
 

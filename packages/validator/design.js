@@ -307,6 +307,7 @@ function statesRequired(r) {
     if (c.type === 'at' || c.type === 'visited') out.push('room:' + c.room);
     if (c.type === 'counter-at-least' || c.type === 'counter-equals') out.push('count:' + c.counter);
     if (c.type === 'actor-here') out.push('actor:' + c.actor);
+    if (c.type === 'chance') out.push('chance');
     if (c.type === 'not') walk(c.condition);
     // Composition nests, so the walk has to recurse through it or every
     // dependency expressed with all/any becomes invisible to chain depth.

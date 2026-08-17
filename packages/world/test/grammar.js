@@ -215,6 +215,71 @@ const base = (extra) => Object.assign({
   ok('and one you answered does not', !be.world.ended);
 }
 
+
+// ---- companions -----------------------------------------------------------
+{
+  const be = boot({
+    meta: { start: 'A' }, items: [],
+    rooms: [{ id: 'A', exits: [{ dir: 'NORTH', to: 'B' }] }, { id: 'B', exits: [] }],
+    actors: [{ id: 'HANS', name: 'Hans', location: 'PLAYER',
+               description: 'Silent, and always a step behind.' },
+             { id: 'GUIDE', name: 'guide', location: 'B' }],
+    rules: [
+      { on: { verb: 'SPEAK', noun: 'HANS' }, if: [{ type: 'actor-here', actor: 'HANS' }],
+        do: [{ type: 'print', text: 'Hans nods.' }] },
+      { on: { verb: 'SPEAK', noun: 'HANS' }, do: [{ type: 'print', text: 'He is not here.' }] }
+    ]
+  });
+  ok('an actor located on the player is present at the start',
+    be.submit('SPEAK', 'HANS').prose === 'Hans nods.');
+  ok('and is listed in the room', be.state().objects.indexOf('HANS') >= 0,
+    JSON.stringify(be.state().objects));
+  be.submit('NORTH');
+  ok('and comes with you', be.submit('SPEAK', 'HANS').prose === 'Hans nods.');
+  ok('while an actor left behind does not follow',
+    be.state().objects.indexOf('GUIDE') >= 0);   // GUIDE lives in B, we are in B
+  ok('a companion can be examined anywhere',
+    /step behind/.test(be.submit('LOOK', 'HANS').prose));
+}
+
+// ---- endings with more than one breath ------------------------------------
+{
+  const be = boot(base({
+    rules: [{ on: { verb: 'LOOK' },
+      do: [{ type: 'win', pages: ['The raft breaks the surface.',
+                                  'Stromboli, and the sun.',
+                                  'Hamburg, and nobody believes a word.'] }] }]
+  }));
+  be.submit('LOOK');
+  ok('an ending can be paced as beats', be.world.ended.pages.length === 3);
+  ok('and still reads as one block for anything that wants it',
+    /raft breaks[\s\S]*nobody believes/.test(be.world.ended.reason));
+}
+{
+  const be = boot(base({
+    rules: [{ on: { verb: 'LOOK' }, do: [{ type: 'win', text: 'Done.' }] }]
+  }));
+  be.submit('LOOK');
+  ok('a single-string ending still works', be.world.ended.pages.join('') === 'Done.');
+}
+
+// ---- chance ---------------------------------------------------------------
+{
+  const world = base({
+    rules: [{ on: { verb: 'HIT' }, if: [{ type: 'chance', percent: 50 }],
+              do: [{ type: 'print', text: 'hit' }] },
+            { on: { verb: 'HIT' }, do: [{ type: 'print', text: 'miss' }] }]
+  });
+  const roll = (seed) => {
+    const b = createBackend(world, { seed });
+    return [1, 2, 3, 4, 5, 6].map(() => b.submit('HIT').prose).join('');
+  };
+  const a = roll(7);
+  ok('rolls vary within a run', /hit/.test(a) && /miss/.test(a), a);
+  ok('and repeat exactly on the same seed', roll(7) === a);
+  ok('while a different seed gives a different fight', roll(99) !== a, roll(99));
+}
+
 console.log('\n' + (fail ? '\x1b[31m' + fail + ' failed\x1b[0m, ' : '') +
   '\x1b[32m' + pass + ' passed\x1b[0m\n');
 process.exit(fail ? 1 : 0);

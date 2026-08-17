@@ -80,8 +80,8 @@
     <div class="note">
       <span class="tag">Deliberately less expressive than Inform</span>
       <p>
-        The vocabulary below is closed. Sixteen conditions, sixteen effects, and no way
-        to add a seventeenth without a spec revision. That bound is the point: because every
+        The vocabulary below is closed. Seventeen conditions, sixteen effects, and no
+        way to add another without a spec revision. That bound is the point: because every
         effect comes from a fixed list, the dependency graph can be computed statically
         rather than discovered by playing. You give up arbitrary logic and you get
         provable completability.
@@ -272,7 +272,16 @@
     <dl class="fields">
       <dt>id</dt><dd><span class="t">string · required</span> Unique across items and actors.</dd>
       <dt>name</dt><dd><span class="t">string</span> What the player is shown.</dd>
-      <dt>location</dt><dd><span class="t">string · required</span> A room id, or <code>"NOWHERE"</code> until they arrive.</dd>
+      <dt>location</dt>
+      <dd>
+        <span class="t">string · required</span> A room id, <code>"NOWHERE"</code> until
+        they arrive, or <strong><code>"PLAYER"</code> to travel with the player</strong>.
+        A companion at <code>"PLAYER"</code> is present in every room you enter, so
+        speaking to them works everywhere instead of hitting the absent default. Move
+        someone into or out of the party with <code>move-actor</code>.
+      </dd>
+      <dt>description</dt>
+      <dd><span class="t">string</span> What <code>LOOK</code> at them says.</dd>
       <dt>hostile</dt>
       <dd>
         <span class="t">boolean</span> While a hostile actor shares your room, the contract
@@ -344,6 +353,7 @@
       <tr><td><code>not</code></td><td><code>condition</code></td><td>The nested condition is false</td></tr>
       <tr><td><code>all</code></td><td><code>conditions</code></td><td>Every one holds</td></tr>
       <tr><td><code>any</code></td><td><code>conditions</code></td><td>At least one holds</td></tr>
+      <tr><td><code>chance</code></td><td><code>percent</code></td><td>A roll off the world's seeded generator, default 50</td></tr>
     </table>
     </div>
 <pre><span class="c">// carrying the key, and the door is not already unlocked</span>
@@ -372,8 +382,8 @@
       <tr><td><code>set-counter</code></td><td><code>counter</code>, <code>value</code></td><td>Sets a counter outright</td></tr>
       <tr><td><code>add-counter</code></td><td><code>counter</code>, <code>value</code></td><td>Adds to a counter. Negative subtracts</td></tr>
       <tr><td><code>move-actor</code></td><td><code>actor</code>, <code>to</code></td><td>Moves an actor to a room id or <code>NOWHERE</code></td></tr>
-      <tr><td><code>win</code></td><td><code>text</code></td><td>Ends the game as a win. At least one must be reachable or <span class="code e">E310</span></td></tr>
-      <tr><td><code>lose</code></td><td><code>text</code></td><td>Ends the game as a loss</td></tr>
+      <tr><td><code>win</code></td><td><code>text</code> or <code>pages</code></td><td>Ends the game as a win. At least one must be reachable or <span class="code e">E310</span></td></tr>
+      <tr><td><code>lose</code></td><td><code>text</code> or <code>pages</code></td><td>Ends the game as a loss</td></tr>
     </table>
     </div>
     <p>
@@ -494,6 +504,21 @@
       A counter and <code>counter-equals</code>, not a chain of near-identical rules.
       Three visits to the same room reading trip number out of flag state works and is
       the thing an author reaches for when there are no numbers; there are numbers now.
+    </p>
+
+    <h3>An ending with pacing</h3>
+    <p>
+      <code>pages</code> instead of <code>text</code> on a <code>win</code> or
+      <code>lose</code>, so the last thing a player reads arrives in beats rather than
+      as one wall. A novel-length adaptation's whole epilogue was a single string, and
+      it read well and was a scroll rather than a scene.
+    </p>
+
+    <h3>A fight</h3>
+    <p>
+      <code>chance</code> against the world's seeded generator. Rolls differ within a
+      run and repeat exactly across runs, which is what keeps a walkthrough that passed
+      passing. Never gate the only route to the ending on one.
     </p>
 
     <h3>A consumable</h3>

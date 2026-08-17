@@ -165,8 +165,14 @@ opening).
 
 ### actors
 
-`id`, `location` (required), plus `name`, `hostile`, `attributes`. A hostile actor
-in the room sets `fighting` in the state. It does no harm by itself.
+`id`, `location` (required), plus `name`, `description`, `hostile`, `attributes`.
+A hostile actor in the room sets `fighting`, which you can read as a condition. It
+does no harm by itself; the harm is a rule or a timer.
+
+`location` is a room id, `"NOWHERE"` until they arrive, or **`"PLAYER"` to travel
+with the player**. A companion at `"PLAYER"` is present in every room you enter, so
+speaking to them works everywhere rather than hitting the absent default. Move
+someone into or out of the party with `move-actor` to `"PLAYER"` or to a room.
 
 ### rules
 
@@ -205,7 +211,7 @@ above the general one. A rule whose conditions fail does not block later rules, 
 the standard shape is a guarded rule followed by an unguarded fallback for the same
 trigger. That fallback is where the writing goes.
 
-### conditions (all sixteen)
+### conditions (all seventeen)
 
 | type | fields | true when |
 |---|---|---|
@@ -222,6 +228,7 @@ trigger. That fallback is where the writing goes.
 | `counter-equals` | `counter`, `value` | counter is exactly value |
 | `actor-here` | `actor` | that actor is in this room |
 | `fighting` | | a hostile actor shares the room |
+| `chance` | `percent` | a roll off the seeded generator, default 50 |
 | `not` | `condition` | nested condition is false |
 | `all` | `conditions` | every one holds |
 | `any` | `conditions` | at least one holds |
@@ -242,8 +249,14 @@ trigger. That fallback is where the writing goes.
 | `set-counter` | `counter`, `value` | set a counter |
 | `add-counter` | `counter`, `value` | add to a counter (negative subtracts) |
 | `move-actor` | `actor`, `to` | move an actor |
-| `win` | `text` | end as a win. At least one must be reachable |
-| `lose` | `text` | end as a loss |
+| `win` | `text` or `pages[]` | end as a win. At least one must be reachable |
+| `lose` | `text` or `pages[]` | end as a loss |
+
+`pages` is the ending in beats rather than one wall of text, so it can be paced.
+
+`chance` rolls off the world's own seeded generator: rolls differ within a run and
+repeat exactly across runs, so a walkthrough that passed keeps passing. Do not gate
+the only route to the ending on one.
 
 ### timers
 
@@ -384,6 +397,32 @@ use lantern
 down
 take locket
 ```
+
+## The pictures
+
+The engine draws the whole board except one pane: the scene, 144 by 104 pixels.
+Everything else, the verb grid, the compass, the text pane, the inventory strip and
+the status bar, is drawn for you and cannot be moved.
+
+Scene code is real JavaScript and ships inside the container as
+`presentation/scenes.js`:
+
+```js
+GUE.scenes = GUE.scenes || {};
+GUE.scenes['PORCH'] = {
+  // ctx is a 2D canvas already clipped to the pane; S is the state; t is a frame counter
+  draw: function (ctx, S, t) { /* draw in 144x104 coordinates, never scale */ },
+  // rectangles in the same space; obj is an item id, dir is a compass direction
+  hotspots: function (S) {
+    return [{ x: 44, y: 30, w: 56, h: 44, obj: 'HOUSE' },
+            { x: 0, y: 44, w: 20, h: 30, dir: 'NORTH' }];
+  }
+};
+```
+
+A room with no scene renders a placeholder and the game is still playable, so art
+is the last thing to do, not the first. Overlapping hotspots resolve smallest-first,
+so a mailbox in front of a house wins. Full reference: https://folio.games/docs/scenes/
 
 ## What validation will tell you
 

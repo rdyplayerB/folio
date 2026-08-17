@@ -348,7 +348,8 @@
           "type": "string"
         },
         "location": {
-          "$ref": "#/$defs/id"
+          "$ref": "#/$defs/id",
+          "description": "A room id, \"NOWHERE\" until they arrive, or \"PLAYER\" to travel with the player. A companion at \"PLAYER\" is present in every room you enter."
         },
         "hostile": {
           "type": "boolean",
@@ -459,7 +460,7 @@
       }
     },
     "condition": {
-      "description": "Sixteen types, and no more. An unrecognised type evaluates to false rather than throwing, so a typo silently disables a rule.",
+      "description": "Seventeen types, and no more. An unrecognised type evaluates to false rather than throwing, so a typo silently disables a rule.",
       "type": "object",
       "required": [
         "type"
@@ -735,6 +736,24 @@
             "type",
             "conditions"
           ]
+        },
+        {
+          "title": "chance",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "chance"
+            },
+            "percent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "A roll off the world's seeded generator, defaulting to 50. Rolls differ within a run and repeat exactly across runs, so a walkthrough that passed keeps passing."
         }
       ]
     },
@@ -960,6 +979,13 @@
             },
             "text": {
               "type": "string"
+            },
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The ending in beats, so it can be paced rather than arriving as one wall of text. Use this or `text`, not both."
             }
           },
           "required": [
@@ -976,6 +1002,13 @@
             },
             "text": {
               "type": "string"
+            },
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The ending in beats, so it can be paced rather than arriving as one wall of text. Use this or `text`, not both."
             }
           },
           "required": [

@@ -4196,7 +4196,15 @@ class World {
       }
     }
     for (const id of Object.keys(this.actorLoc)) {
-      if (this.actorLoc[id] === this.here) { objects.push(id); flags[id] = this.flagsOf(id); }
+      // "PLAYER" means travelling with you, the same way it means carried for an
+      // item. An adaptation of a novel about three people walking together had no
+      // way to say Hans follows, so he was teleported between his eight
+      // plot-critical rooms and existed as prose everywhere else, which meant
+      // speaking to him anywhere else hit the absent default.
+      if (this.actorLoc[id] === this.here || this.actorLoc[id] === 'PLAYER') {
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+      }
     }
 
     const inventory = Object.keys(this.loc).filter(id => this.loc[id] === 'PLAYER');
@@ -4263,7 +4271,7 @@ class World {
   /** Is this thing somewhere the player could look at it? */
   visibleHere(id) {
     if (this.loc[id] === 'PLAYER' || this.loc[id] === this.here) return true;
-    if (this.actorLoc[id] === this.here) return true;
+    if (this.actorLoc[id] === this.here || this.actorLoc[id] === 'PLAYER') return true;
     const where = this.loc[id];
     return !!(where && this.items[where] && this.loc[where] === this.here && this.isOpen(where));
   }
@@ -4368,12 +4376,18 @@ class World {
       case 'visited': return this.visited.has(c.room);
       case 'open': return this.isOpen(c.item);
       case 'lit': return this.isLit(c.item);
+      // Rolls come off the world's own seeded generator, so a game plays the same
+      // way every time it is played and a walkthrough that passed keeps passing.
+      // Within a single run the rolls differ, which is what a fight needs.
+      case 'chance': return this.rng() * 100 < (c.percent === undefined ? 50 : c.percent);
       case 'score-at-least': return this.score >= c.value;
       case 'counter-at-least': return (this.counters[c.counter] || 0) >= c.value;
       case 'counter-equals': return (this.counters[c.counter] || 0) === c.value;
-      case 'actor-here': return this.actorLoc[c.actor] === this.here;
+      case 'actor-here':
+        return this.actorLoc[c.actor] === this.here || this.actorLoc[c.actor] === 'PLAYER';
       case 'fighting': return Object.keys(this.actorLoc).some(id =>
-        this.actorLoc[id] === this.here && this.actors[id] && this.actors[id].hostile);
+        (this.actorLoc[id] === this.here || this.actorLoc[id] === 'PLAYER') &&
+        this.actors[id] && this.actors[id].hostile);
       case 'not': return !this.test(c.condition);
       // Boolean composition. Only `not` nested before, so an author needing OR
       // had to mirror it into a flag by hand and keep the two in step.
@@ -4403,8 +4417,13 @@ class World {
         case 'add-counter':
           this.counters[e.counter] = (this.counters[e.counter] || 0) + e.value; break;
         case 'move-actor': this.actorLoc[e.actor] = e.to; break;
-        case 'win': this.ended = { win: true, reason: e.text || 'You have won.' }; break;
-        case 'lose': this.ended = { win: false, reason: e.text || 'You have died.' }; break;
+        // An ending is allowed more than one breath. A single string made the
+        // whole epilogue of a novel-length adaptation one monolithic wall: it
+        // read well and it was a scroll rather than a scene.
+        case 'win':
+          this.ended = { win: true, reason: endingText(e), pages: endingPages(e) }; break;
+        case 'lose':
+          this.ended = { win: false, reason: endingText(e), pages: endingPages(e) }; break;
         default: break;   // unknown effects are inert; T1 rejects them at validation
       }
     }
@@ -4558,6 +4577,18 @@ class World {
     }
     return out;
   }
+}
+
+// An ending is either one string or a run of beats. Both collapse to `reason`
+// for anything that only wants the text; `pages` is there for a presentation
+// layer that can pace them.
+function endingPages(e) {
+  if (Array.isArray(e.pages) && e.pages.length) return e.pages.slice();
+  return [e.text || ''];
+}
+function endingText(e) {
+  return endingPages(e).filter(Boolean).join('\n\n') ||
+    (e.type === 'win' ? 'You have won.' : 'You have died.');
 }
 
 function index(list) {
