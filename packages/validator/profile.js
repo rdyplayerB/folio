@@ -102,7 +102,7 @@ function profile(backend, walkthrough, opts) {
 
   return {
     rooms: n,
-    mapEdges: e,
+    mapEdges: conns.size,
     mapLoops: loops,
     loopsPerRoom: n ? round2(loops / n) : 0,
     objectsSeen: seenObjects.size,

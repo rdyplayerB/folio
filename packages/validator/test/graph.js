@@ -148,5 +148,52 @@ check('an unreachable room names the flag that gates it',
   !!why && /asleep/.test(why.hint) && /nothing ever sets/.test(why.hint),
   why ? why.hint : 'no E311');
 
+
+// A rule standing in front of a rule.
+//
+// Two written, working scenes shipped certified and never played, because a
+// build step put expanded fallbacks above the room-specific rules they backed
+// up. First match wins, so the general one answered every time. The world was
+// sound and the walkthrough finished; the only way it was found was grepping a
+// play transcript for lines that should have been in it.
+const shadow = {
+  meta: { start: 'A' }, rooms: [{ id: 'A', exits: [] }],
+  items: [{ id: 'DESK', location: 'A', attributes: {} },
+          { id: 'KEY', location: 'A', attributes: { TAKEBIT: true } }],
+  actors: [{ id: 'CHRISTINE', location: 'A' }],
+  rules: [
+    { on: { verb: 'SPEAK', noun: 'CHRISTINE' }, do: [{ type: 'print', text: 'generic' }] },
+    { on: { verb: 'SPEAK', noun: 'CHRISTINE' }, do: [{ type: 'print', text: 'the real scene' }] },
+    { on: { verb: 'USE', noun: 'DESK' }, do: [{ type: 'print', text: 'bare' }] },
+    { on: { verb: 'USE', noun: 'DESK', second: 'KEY' },
+      do: [{ type: 'print', text: 'paired' }, { type: 'win', text: 'd' }] }
+  ]
+};
+const sh = analyse(shadow).findings.filter(f => f.code === 'W511');
+check('a scene buried behind an unguarded fallback is reported',
+  sh.length === 1 && /rule 1/.test(sh[0].hint), sh.length ? sh[0].hint : 'not flagged');
+check('a pairing is not shadowed by the bare rule above it',
+  !sh.length || !/rule 3/.test(sh[0].hint));
+
+// A guarded rule may fall through, so it shadows nothing.
+const guarded = JSON.parse(JSON.stringify(shadow));
+guarded.rules[0].if = [{ type: 'flag', flag: 'angry' }];
+check('a guarded rule does not shadow the one below it',
+  !analyse(guarded).findings.some(f => f.code === 'W511' && /rule 1/.test(f.hint)));
+
+// And the diagnosis has to go one link further than naming the flag.
+const chain = {
+  meta: { start: 'A' }, flags: { opened: false },
+  rooms: [{ id: 'A', exits: [{ dir: 'NORTH', to: 'HALL',
+             condition: { type: 'flag', flag: 'opened' } }] }, { id: 'HALL', exits: [] }],
+  items: [{ id: 'LEVER', location: 'A', attributes: {} },
+          { id: 'CRANK', location: 'VAULT', attributes: { TAKEBIT: true } }],
+  rules: [{ on: { verb: 'USE', noun: 'LEVER' }, if: [{ type: 'carrying', item: 'CRANK' }],
+            do: [{ type: 'set-flag', flag: 'opened', value: true }] }]
+};
+const chainWhy = analyse(chain).findings.find(f => f.code === 'E311');
+check('an unreachable room says why the rule that would open it cannot fire',
+  !!chainWhy && /CRANK/.test(chainWhy.hint), chainWhy ? chainWhy.hint : 'no E311');
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

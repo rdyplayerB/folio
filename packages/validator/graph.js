@@ -78,6 +78,20 @@ function analyse(world) {
   const held = new Set();
   const flags = new Set(
     Object.keys(world.flags || {}).filter(k => world.flags[k]));
+
+  // Seed the state the runtime already considers true at boot.
+  //
+  // isOpen() falls back to OPENBIT or TRANSPARENT and isLit() falls back to
+  // ONBIT, and this analysis knew about neither, so it began every run believing
+  // nothing was open and nothing was alight. A treasure in a chest declared open
+  // was therefore unreachable, and a puzzle gated on a lamp that starts lit could
+  // never be solved. Both play perfectly; only the checker could refuse to ship
+  // them, and it did.
+  for (const it of (world.items || [])) {
+    const a = it.attributes || {};
+    if (a.OPENBIT || a.TRANSPARENT) flags.add('_open_' + it.id);
+    if (a.ONBIT) flags.add('_lit_' + it.id);
+  }
   const firedRules = new Set();
   // Every noun that was reachable at any point in the analysis. Reachability is
   // not monotonic once actors and items start moving, so the final state is not a
@@ -95,7 +109,20 @@ function analyse(world) {
         case 'open': flags.add('_open_' + e.item); break;
         case 'light': flags.add('_lit_' + e.item); break;
         case 'take': held.add(e.item); break;
-        case 'move-item': itemLoc[e.item] = e.to; break;
+        // This fixpoint only ever ADDS capability, which is what makes it
+        // optimistic about ordering and therefore trustworthy: a T2 failure is a
+        // real defect rather than a scheduling quibble. destroy, close and
+        // extinguish only take capability away, and modelling them turned a
+        // perfectly ordinary pattern, spend an item after its last use, into a
+        // hard error the moment any later rule mentioned it. W314 is the check
+        // that owns that hazard, and it is advisory on purpose.
+        case 'move-item':
+          itemLoc[e.item] = e.to;
+          // Being handed something is the same as taking it. Without this an
+          // item a rule gave you was never counted as carried, so every
+          // condition depending on it failed and the win looked unreachable.
+          if (e.to === 'PLAYER') held.add(e.item);
+          break;
         case 'move-actor': actorLoc[e.actor] = e.to; break;
         case 'goto': reachRooms.add(e.room); break;
         case 'win': won = true; break;
@@ -257,16 +284,41 @@ function analyse(world) {
   // author most of a build. Every entrance to the room is now listed with the
   // reason it does not open.
   const setters = new Map();
-  const noteSetter = (list, what) => {
+  const noteSetter = (list, what, index) => {
     for (const e of (list || [])) {
       if (e.type === 'set-flag' && e.value !== false) {
-        if (!setters.has(e.flag)) setters.set(e.flag, what);
+        if (!setters.has(e.flag)) setters.set(e.flag, { what, index });
       }
     }
   };
   rules.forEach((r, i) => noteSetter(r.do, 'rule ' + i +
-    ' (' + (((r.on || {}).verb || '?') + ' ' + ((r.on || {}).noun || '')).trim() + ')'));
-  (world.timers || []).forEach((t, i) => noteSetter(t.do, 'timer ' + i));
+    ' (' + (((r.on || {}).verb || '?') + ' ' + ((r.on || {}).noun || '')).trim() + ')', i));
+  (world.timers || []).forEach((t, i) => noteSetter(t.do, 'timer ' + i, -1));
+
+  // Why can that rule not fire? Naming the flag and the rule that sets it was
+  // an improvement and still stopped one step short of the answer, which is
+  // always one link further down the chain.
+  function whyRuleStuck(idx) {
+    const r = rules[idx];
+    if (!r) return '';
+    const on = r.on || {};
+    if (on.room && !reachRooms.has(on.room)) {
+      return ', and that rule needs the player in "' + on.room + '", which is also unreachable';
+    }
+    if (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) {
+      return ', and that rule needs "' + on.noun + '", which the player can never reach';
+    }
+    if (on.second && !nounReachable(on.second) && !everPresent.has(on.second)) {
+      return ', and that rule needs "' + on.second + '" in hand, which the player can never get';
+    }
+    const bad = (r.if || []).find(c => !canSatisfy(c));
+    if (bad) {
+      const what = bad.item || bad.room || bad.flag || bad.actor || bad.counter;
+      return ', and that rule is itself waiting on ' + bad.type +
+        (what ? ' "' + what + '"' : '') + ', which never becomes true';
+    }
+    return '';
+  }
 
   function whyBlocked(ex, fromReachable) {
     if (!fromReachable) return 'its source room is itself unreachable';
@@ -276,9 +328,10 @@ function analyse(world) {
     if (ex.condition && !canSatisfy(ex.condition)) {
       const f = ex.condition.flag;
       if (f) {
-        return 'it is gated on flag "' + f + '", ' +
-          (setters.has(f) ? 'set by ' + setters.get(f) + ', which never becomes reachable'
-                          : 'which nothing ever sets');
+        if (!setters.has(f)) return 'it is gated on flag "' + f + '", which nothing ever sets';
+        const set = setters.get(f);
+        return 'it is gated on flag "' + f + '", set by ' + set.what +
+          ', which never becomes reachable' + whyRuleStuck(set.index);
       }
       return 'its condition is never satisfied';
     }
@@ -342,6 +395,51 @@ function analyse(world) {
         roomDead ? 'Its room "' + on.room + '" is unreachable.'
                  : 'Its noun "' + on.noun + '" can never be present.');
     }
+  }
+
+  // Rules standing in front of rules.
+  //
+  // Two written, working scenes shipped certified and never played, because a
+  // build step put expanded fallbacks above the room-specific rules they were
+  // meant to back up. First match wins, so the general rule answered every time
+  // and the specific one was dead. Nothing noticed: the world was sound, the
+  // walkthrough finished, and the only way it was found was grepping a play
+  // transcript for lines that should have been in it.
+  //
+  // A rule shadows a later one when it is unguarded and its trigger is at least
+  // as broad: same verb or no verb at all, same noun or any noun, same room or
+  // anywhere. The two-object case is the exception that matters, since a rule
+  // without `second` never matches a paired command and so cannot shadow one.
+  const broaderThan = (a, b) => {
+    const A = a.on || {}, B = b.on || {};
+    if (a.if && a.if.length) return false;              // guarded: may fall through
+    if (A.enter || B.enter) return A.enter === B.enter;  // arrivals are their own path
+    if (A.verb && String(A.verb).toUpperCase() !== String(B.verb || '').toUpperCase()) return false;
+    if (A.noun && String(A.noun).toUpperCase() !== String(B.noun || '').toUpperCase()) return false;
+    if (A.room && A.room !== B.room) return false;
+    if (A.second) {
+      return String(A.second).toUpperCase() === String(B.second || '').toUpperCase();
+    }
+    return !B.second;      // a bare rule cannot swallow a pairing
+  };
+  const shadowed = [];
+  for (let j = 0; j < rules.length; j++) {
+    for (let i = 0; i < j; i++) {
+      if (!broaderThan(rules[i], rules[j])) continue;
+      const on = rules[j].on || {};
+      shadowed.push('rule ' + j + ' (' +
+        ((on.verb || 'any') + ' ' + (on.noun || '')).trim() +
+        (on.room ? ' in ' + on.room : '') + ') is shadowed by rule ' + i);
+      break;
+    }
+  }
+  if (shadowed.length) {
+    warn('W511', shadowed.length + ' rule' + (shadowed.length > 1 ? 's are' : ' is') +
+      ' unreachable behind an earlier one',
+      'First match wins, so an unguarded rule answers every command a later, more ' +
+      'specific one was written for, and the later one never runs. The world still ' +
+      'works and the scene never plays. ' + shadowed.slice(0, 4).join('; ') +
+      '. Move the specific rules above the general ones.');
   }
 
   // One-way passages you can walk through under-equipped.

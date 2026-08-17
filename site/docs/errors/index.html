@@ -210,6 +210,16 @@
         <b>A room is unreachable.</b> Nothing the player can do leads there. Usually a
         missing return exit or a condition nothing satisfies.
       </dd>
+      <dt><span class="code w">W511</span></dt>
+      <dd>
+        <b>A rule can never fire because an earlier one always answers first.</b>
+        First match wins, so an unguarded rule with an equal-or-broader trigger
+        swallows every command a later, more specific rule was written for. The world
+        still validates and the scene simply never plays. Two written scenes shipped
+        certified this way and were found by grepping a play transcript for lines that
+        should have been in it. Move the specific rules above the general ones. A
+        guarded rule shadows nothing, because it can fall through.
+      </dd>
       <dt><span class="code w">W510</span></dt>
       <dd>
         <b>An item can be left behind before a passage with no way back.</b> T2
