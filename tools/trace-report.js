@@ -99,9 +99,13 @@ if (seen.size) {
   // working rather than failing.
   const stuck = [...seenErr].filter(([, n]) => n > 2);
   if (stuck.length) {
-    console.log('\n    ' + C.yellow + 'Worth rewording: ' + stuck.map(r => r[0]).join(', ') + C.off);
-    console.log('    ' + C.dim + 'An error that had to be read three times did not say enough ' +
-      'the first time.' + C.off);
+    // "Worth a look", not "worth rewording". The first cold run flagged E403 three
+    // times and the author's report called that message the best in the toolchain:
+    // they had simply renamed a room and were working through the consequences.
+    // A repeated error is a signal to go and read the account, not a verdict.
+    console.log('\n    ' + C.yellow + 'Worth a look: ' + stuck.map(r => r[0]).join(', ') + C.off);
+    console.log('    ' + C.dim + 'Seen three or more times as an error. That is sometimes a ' +
+      'message that did not teach, and sometimes one fix with several steps.' + C.off);
   } else {
     console.log('\n    ' + C.dim + 'No error had to be read more than twice.' + C.off);
   }

@@ -76,7 +76,7 @@ north
 take key
 expect: room HALL
 south
-unlock cellar-door
+use cellar-door
 expect: score 5
 ```
 
@@ -145,7 +145,7 @@ The only place anything interesting happens.
 
 ```json
 {
-  "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR", "room": "PORCH" },
+  "on": { "verb": "USE", "noun": "CELLAR-DOOR", "room": "PORCH" },
   "if": [ { "type": "carrying", "item": "KEY" } ],
   "do": [ { "type": "set-flag", "flag": "doorUnlocked", "value": true } ]
 }
@@ -213,6 +213,15 @@ The engine answers only: the twelve directions, `LOOK`, `TAKE`, `DROP`, `OPEN`
 Four of them (CLOSE, USE, HIT, SPEAK) do nothing without rules.** Assume every
 verb needs writing, or half the buttons read as broken.
 
+**Those eight, plus the compass and INVENTORY, are the ONLY verbs a player can
+click.** A rule triggered by anything else (`UNLOCK`, `LIGHT`, `GIVE`, `DIG`) can
+only be reached by opening the on-screen keyboard and typing it, which is the one
+thing this engine exists to avoid. Validation warns with `W509`.
+
+The idiom is to put custom actions on `USE`, which is deliberately vague so it can
+carry them: `USE CELLAR-DOOR` to unlock, `USE LANTERN` to light, `USE DOG` to feed
+it. Write for the buttons.
+
 ## Complete worked example
 
 Three rooms, a locked door, a lamp that runs out, and a win. This validates.
@@ -259,16 +268,16 @@ Three rooms, a locked door, a lamp that runs out, and a win. This validates.
       "attributes": { "TAKEBIT": true } }
   ],
   "rules": [
-    { "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+    { "on": { "verb": "USE", "noun": "CELLAR-DOOR" },
       "if": [ { "type": "carrying", "item": "KEY" } ],
       "do": [
         { "type": "set-flag", "flag": "doorUnlocked", "value": true },
         { "type": "print", "text": "The key turns with a sound like a cough." },
         { "type": "score", "value": 5 }
       ] },
-    { "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+    { "on": { "verb": "USE", "noun": "CELLAR-DOOR" },
       "do": [ { "type": "print", "text": "It is locked, and you have nothing to turn." } ] },
-    { "on": { "verb": "LIGHT", "noun": "LANTERN" },
+    { "on": { "verb": "USE", "noun": "LANTERN" },
       "if": [ { "type": "carrying", "item": "LANTERN" } ],
       "do": [
         { "type": "light", "item": "LANTERN" },
@@ -305,13 +314,23 @@ north
 take key
 take lantern
 south
-unlock cellar-door
-light lantern
+use cellar-door
+use lantern
 down
 take locket
 ```
 
 ## What validation will tell you
+
+It ends with one of four verdicts:
+
+- `INVALID` — at least one error. It will not be hosted
+- `VALID` — the manifest and integrity checks passed
+- `PLAYABLE` — a path to the ending was proved by replaying your walkthrough
+- `CERTIFIED` — every tier ran and the design audit raised nothing. The top tier
+
+`PLAYABLE` and `CERTIFIED` both need a walkthrough that wins. Neither claims a
+human could *find* the solution; that check does not exist yet.
 
 Errors block; warnings are advice. Full list: https://folio.games/docs/errors/
 
@@ -334,6 +353,19 @@ small or linear, ship `brief.json` and it is graded against your own intent:
 { "length": "short", "difficulty": "gentle", "deadliness": "none",
   "sprawl": "balanced", "density": "sparse" }
 ```
+
+Every dial and its legal values:
+
+| dial | values |
+|---|---|
+| `length` | `short` \| `standard` \| `epic`, or `{"rooms": n}` |
+| `difficulty` | `gentle` \| `standard` \| `cruel` |
+| `deadliness` | `none` \| `fair` \| `classic` |
+| `sprawl` | `linear` \| `balanced` \| `open` |
+| `density` | `sparse` \| `balanced` \| `packed` |
+
+An unrecognised value silently falls back to the middle setting rather than
+erroring, so a typo costs you the dial without telling you.
 
 ## Writing advice that the validator cannot check
 

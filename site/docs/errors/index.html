@@ -308,9 +308,21 @@
         formality rather than a puzzle. Distance is what makes a player carry something in
         the hope that it matters.
       </dd>
+      <dt><span class="code w">W509</span></dt>
+      <dd>
+        <b>A rule uses a verb the player cannot click.</b> The board has eight verb
+        buttons and a compass, and on Path B those buttons send exactly their own verb.
+        A rule triggered by anything else can be reached only by typing it on the
+        on-screen keyboard, which is the one thing this engine exists to avoid. Put
+        custom actions on <code>USE</code>, which is deliberately vague enough to carry
+        them. This project's own worked example failed this check, and went unnoticed
+        through the spec, the quickstart and a screenshot on the docs page.
+      </dd>
       <dt><span class="code w">W508</span></dt>
       <dd>
-        <b>A rule fires without printing anything.</b> To a player, a rule that
+        <b>A rule fires without printing anything.</b> <code>win</code> and
+        <code>lose</code> text counts as output, so a rule ending in either is not
+        silent. To a player, a rule that
         succeeds silently is indistinguishable from a command the game did not
         understand. The gate opens, the flag is set, and the response is a blank line.
         Only player-triggered rules are counted: a rule with no verb is machinery, and

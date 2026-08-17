@@ -101,7 +101,7 @@ const bDark = world.createBackend(
   JSON.parse(fs.readFileSync(path.join(__dirname, 'cellar-door', 'logic', 'world.json'), 'utf8')),
   { seed: 1234 });
 bDark.submit('NORTH'); bDark.submit('TAKE', 'KEY'); bDark.submit('SOUTH');
-bDark.submit('UNLOCK', 'CELLAR-DOOR'); bDark.submit('DOWN');
+bDark.submit('USE', 'CELLAR-DOOR'); bDark.submit('DOWN');
 check('Path B reports dark in an unlit room', bDark.state().dark === true,
   'room=' + bDark.state().roomId);
 
@@ -112,7 +112,7 @@ const bExit = world.createBackend(
   { seed: 1234 });
 const before = bExit.state().exits.DOWN;
 bExit.submit('NORTH'); bExit.submit('TAKE', 'KEY'); bExit.submit('SOUTH');
-bExit.submit('UNLOCK', 'CELLAR-DOOR');
+bExit.submit('USE', 'CELLAR-DOOR');
 const after = bExit.state().exits.DOWN;
 check('a locked passage shows as blocked, then becomes passable',
   before === false && after === 'CELLAR',

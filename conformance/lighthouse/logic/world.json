@@ -61,7 +61,7 @@
     { "on": { "verb": "TAKE", "noun": "BISCUIT" },
       "if": [ { "type": "at", "room": "SHORE" }, { "type": "open", "item": "CRATE" } ],
       "do": [ { "type": "take", "item": "BISCUIT" }, { "type": "print", "text": "Taken." } ] },
-    { "on": { "verb": "GIVE", "noun": "DOG" },
+    { "on": { "verb": "USE", "noun": "DOG" },
       "if": [ { "type": "carrying", "item": "BISCUIT" }, { "type": "at", "room": "PATH" } ],
       "do": [
         { "type": "destroy", "item": "BISCUIT" },
@@ -70,9 +70,9 @@
         { "type": "score", "value": 10 },
         { "type": "print", "text": "The dog takes it without gratitude and carries it off the path." }
       ] },
-    { "on": { "verb": "GIVE", "noun": "DOG" },
+    { "on": { "verb": "USE", "noun": "DOG" },
       "do": [ { "type": "print", "text": "It shows you the whole length of its teeth." } ] },
-    { "on": { "verb": "LIGHT", "noun": "TORCH" },
+    { "on": { "verb": "USE", "noun": "TORCH" },
       "if": [ { "type": "carrying", "item": "TORCH" } ],
       "do": [ { "type": "light", "item": "TORCH" }, { "type": "print", "text": "The torch takes." } ] },
     { "on": { "verb": "TAKE", "noun": "OIL" },

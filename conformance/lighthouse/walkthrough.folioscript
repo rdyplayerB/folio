@@ -1,14 +1,15 @@
 # Written against the spec, not against the engine.
+# Clickable verbs only: a player can reach every one of these from the grid.
 open crate
 take biscuit
 take torch
 north
 expect: room PATH
-give dog
+use dog
 north
 expect: room BASE
 down
-light torch
+use torch
 take oil
 expect: score 15
 up

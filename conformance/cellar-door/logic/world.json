@@ -72,7 +72,7 @@
 
   "rules": [
     {
-      "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+      "on": { "verb": "USE", "noun": "CELLAR-DOOR" },
       "if": [{ "type": "carrying", "item": "KEY" }],
       "do": [
         { "type": "set-flag", "flag": "doorUnlocked", "value": true },
@@ -81,11 +81,11 @@
       ]
     },
     {
-      "on": { "verb": "UNLOCK", "noun": "CELLAR-DOOR" },
+      "on": { "verb": "USE", "noun": "CELLAR-DOOR" },
       "do": [{ "type": "print", "text": "It is locked, and you have nothing to turn." }]
     },
     {
-      "on": { "verb": "LIGHT", "noun": "LANTERN" },
+      "on": { "verb": "USE", "noun": "LANTERN" },
       "if": [{ "type": "carrying", "item": "LANTERN" }],
       "do": [
         { "type": "light", "item": "LANTERN" },

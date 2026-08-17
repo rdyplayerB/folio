@@ -214,8 +214,16 @@ function audit(world, opts) {
   //
   // Only player-triggered rules count. A rule with no verb is machinery, and a
   // timer appends to whatever else happened that turn.
+  // win and lose carry their own text and the engine prints it, so a rule that
+  // ends in either is not silent. Counting print effects alone reported five
+  // perfectly good death scenes as saying nothing, and the author added redundant
+  // one-line prints in front of them purely to quiet the warning, which made the
+  // writing worse. A check that degrades the work it is auditing is worse than
+  // no check.
+  const speaks = (e) => e.type === 'print' ||
+    ((e.type === 'win' || e.type === 'lose') && e.text);
   const silent = (world.rules || []).filter(r =>
-    (r.on || {}).verb && !(r.do || []).some(e => e.type === 'print'));
+    (r.on || {}).verb && !(r.do || []).some(speaks));
   if (silent.length) {
     warn('W508', silent.length + ' rule' + (silent.length > 1 ? 's fire' : ' fires') +
       ' without printing anything',
@@ -223,6 +231,32 @@ function audit(world, opts) {
       'understand. Triggers: ' +
       silent.slice(0, 5).map(r => (r.on.verb + ' ' + (r.on.noun || '')).trim()).join(', ') +
       '. Add a print effect, even a short one.');
+  }
+
+  // Verbs a player cannot actually click.
+  //
+  // The board has eight verb buttons and a compass. On Path B those buttons send
+  // exactly their own verb, so a rule triggered by anything else can only be
+  // reached by opening the on-screen keyboard and typing it, which is the single
+  // thing this engine exists to avoid.
+  //
+  // This project's own worked example failed it. Cellar Door is built on UNLOCK
+  // and LIGHT and cannot be finished by pointing and clicking, and that went
+  // unnoticed through the spec, the quickstart and a screenshot on the docs page.
+  // The first person to build a game from the spec avoided the trap by instinct,
+  // having no way to know it was there.
+  const CLICKABLE = ['LOOK', 'TAKE', 'DROP', 'OPEN', 'CLOSE', 'USE', 'HIT', 'SPEAK',
+    'INVENTORY', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW',
+    'UP', 'DOWN', 'IN', 'OUT'];
+  const offGrid = [...new Set(rules
+    .map(r => ((r.on || {}).verb || '').toUpperCase())
+    .filter(v => v && !CLICKABLE.includes(v)))];
+  if (offGrid.length) {
+    warn('W509', offGrid.length + ' verb' + (offGrid.length > 1 ? 's are' : ' is') +
+      ' not on the verb grid: ' + offGrid.join(', '),
+      'A player can only click the eight grid verbs and the compass, so these can ' +
+      'be reached only by typing them on the on-screen keyboard. Rewrite them ' +
+      'against USE, OPEN, HIT or SPEAK, or accept that the game needs typing.');
   }
 
   return { metrics, findings };

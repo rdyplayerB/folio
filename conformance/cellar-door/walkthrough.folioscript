@@ -1,9 +1,10 @@
 # Cellar Door — the proof of completability, cold start, no state injection.
+# Every command here is reachable by clicking: the eight grid verbs and the compass.
 north
 take key
 take lantern
 south
-unlock cellar-door
-light lantern
+use cellar-door
+use lantern
 down
 take locket

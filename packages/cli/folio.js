@@ -86,9 +86,17 @@ try {
       console.log(col + x.level.toUpperCase() + C.off + ' ' + C.dim + x.code + C.off + '  ' + x.msg);
       if (x.hint) console.log('        ' + C.dim + x.hint + C.off);
     }
-    const badge = !r.ok ? C.red + 'INVALID' + C.off
-      : r.tier === 'playable' ? C.green + 'PLAYABLE' + C.off
-      : C.green + 'VALID' + C.off;
+    // Four tiers, and this ternary only ever handled three. A game that reached
+    // the top tier was shown the weakest passing badge, and the first person to
+    // earn it concluded from the output that PLAYABLE did not exist. A badge is
+    // supposed to claim exactly what was verified; claiming dramatically less is
+    // the same defect as claiming more.
+    const BADGE = {
+      certified: C.green + 'CERTIFIED' + C.off,
+      playable:  C.green + 'PLAYABLE' + C.off,
+      valid:     C.green + 'VALID' + C.off
+    };
+    const badge = !r.ok ? C.red + 'INVALID' + C.off : (BADGE[r.tier] || BADGE.valid);
     console.log('\n' + badge + '  ' + path.basename(file) + '  ' + C.dim + r.summary + C.off);
     if (r.stats && r.stats.won !== undefined) {
       console.log(C.dim + '  completed in ' + r.stats.moves + ' moves for ' + r.stats.score +
@@ -103,6 +111,11 @@ try {
       (missing.length ? '. Not checked: ' + missing.join(', ') : '') + C.off);
     if (r.tier === 'playable') {
       console.log(C.dim + '  "playable" means a path exists, not that a human can find it.' + C.off);
+    }
+    if (r.tier === 'certified') {
+      console.log(C.dim + '  certified is the top tier: every check ran and the design ' +
+        'audit raised nothing.' + C.off);
+      console.log(C.dim + '  It still does not claim a human can find the solution.' + C.off);
     }
     process.exit(r.ok ? 0 : 1);
 

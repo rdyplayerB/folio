@@ -140,5 +140,37 @@ const machinery = {
 check('a rule with no verb, and a timer, are not flagged as silent',
   !audit(machinery).findings.some(f => f.code === 'W508'));
 
+
+// A death scene is not silence. Counting print effects alone reported five
+// working death rules as saying nothing, and the author added redundant prose in
+// front of each purely to quiet it, which made the writing worse.
+const deadly = {
+  meta: { start: 'A' }, rooms: [{ id: 'A', exits: [] }],
+  items: [{ id: 'OGRE', location: 'A', attributes: {} }],
+  rules: [{ on: { verb: 'HIT', noun: 'OGRE' },
+            do: [{ type: 'lose', text: 'He eats you, boots and all.' }] },
+          { on: { verb: 'USE', noun: 'OGRE' },
+            do: [{ type: 'print', text: 'ok' }, { type: 'win', text: 'd' }] }]
+};
+check('a rule whose only output is lose text is not called silent',
+  !audit(deadly).findings.some(f => f.code === 'W508'),
+  (audit(deadly).findings.find(f => f.code === 'W508') || {}).msg || 'not flagged');
+
+// Verbs the player cannot click. This project's own worked example failed it.
+const offgrid = {
+  meta: { start: 'A' }, rooms: [{ id: 'A', exits: [] }],
+  items: [{ id: 'DOOR', location: 'A', attributes: {} }],
+  rules: [{ on: { verb: 'UNLOCK', noun: 'DOOR' },
+            do: [{ type: 'print', text: 'click' }, { type: 'win', text: 'd' }] }]
+};
+check('a verb that is not on the grid is flagged',
+  audit(offgrid).findings.some(f => f.code === 'W509'),
+  (audit(offgrid).findings.find(f => f.code === 'W509') || {}).msg || 'not flagged');
+
+const ongrid = JSON.parse(JSON.stringify(offgrid));
+ongrid.rules[0].on.verb = 'USE';
+check('the same rule on USE is not flagged',
+  !audit(ongrid).findings.some(f => f.code === 'W509'));
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

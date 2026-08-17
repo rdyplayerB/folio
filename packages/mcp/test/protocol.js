@@ -104,8 +104,8 @@ const body = (res) => JSON.parse(res.result.content[0].text);
     name: 'folio_validate',
     arguments: {
       world: WORLD,
-      walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
-        'light lantern\ndown\ntake locket'
+      walkthrough: 'north\ntake key\ntake lantern\nsouth\nuse cellar-door\n' +
+        'use lantern\ndown\ntake locket'
     }
   });
   const g = body(good);
@@ -157,8 +157,8 @@ const body = (res) => JSON.parse(res.result.content[0].text);
 
   await say('take lantern');
   await say('south');
-  await say('unlock cellar-door');
-  await say('light lantern');
+  await say('use cellar-door');
+  await say('use lantern');
   await say('down');
   const won = await say('take locket');
   ok('a game can be played to a win through the protocol',
@@ -212,8 +212,8 @@ const body = (res) => JSON.parse(res.result.content[0].text);
 
   const nFull = await next({
     world: WORLD,
-    walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
-      'light lantern\ndown\ntake locket',
+    walkthrough: 'north\ntake key\ntake lantern\nsouth\nuse cellar-door\n' +
+      'use lantern\ndown\ntake locket',
     manifest: { id: 'cd', title: 'Cellar Door', author: 'me', license: 'MIT',
       contentRating: 'all-ages' }
   });
@@ -232,8 +232,8 @@ const body = (res) => JSON.parse(res.result.content[0].text);
     name: 'folio_pack',
     arguments: {
       world: WORLD,
-      walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
-        'light lantern\ndown\ntake locket',
+      walkthrough: 'north\ntake key\ntake lantern\nsouth\nuse cellar-door\n' +
+        'use lantern\ndown\ntake locket',
       manifest: { id: 'cellar-door', title: 'Cellar Door', author: 'test',
         license: 'MIT', contentRating: 'all-ages' },
       presentation: { 'scenes.js': "GUE.scenes={};GUE.scenes['PORCH']={draw:function(){}};" }
@@ -270,8 +270,8 @@ const body = (res) => JSON.parse(res.result.content[0].text);
 
   const nDone = await next({
     world: WORLD,
-    walkthrough: 'north\ntake key\ntake lantern\nsouth\nunlock cellar-door\n' +
-      'light lantern\ndown\ntake locket',
+    walkthrough: 'north\ntake key\ntake lantern\nsouth\nuse cellar-door\n' +
+      'use lantern\ndown\ntake locket',
     manifest: { id: 'cd', title: 'Cellar Door', author: 'me', license: 'MIT',
       contentRating: 'all-ages' },
     brief: { length: 'short', difficulty: 'gentle' },

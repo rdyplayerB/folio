@@ -114,5 +114,39 @@ check('a fallback whose noun a later rule removes is not called dead code',
   !g.findings.some(f => f.code === 'W313' && /GUARD/.test(f.msg)),
   (g.findings.find(f => f.code === 'W313') || {}).msg || 'no W313');
 
+
+// Timers advance the world, and reachability used to be blind to them.
+//
+// The design this broke was the faithful one: hide in the oven while timers
+// bring the ogre home, feed him and put him to sleep, setting the flag that
+// opens the great hall. It came back with an unreachable win, an unreachable
+// room and twelve dead rules, none of which named the cause. Nothing in the
+// vocabulary can cancel a timer, so one whose startFlag is satisfiable will fire
+// given enough turns, and this analysis is already optimistic about ordering.
+const timed = {
+  meta: { start: 'OVEN' }, flags: { asleep: false },
+  rooms: [{ id: 'OVEN', exits: [{ dir: 'OUT', to: 'HALL',
+              condition: { type: 'flag', flag: 'asleep' } }] },
+          { id: 'HALL', exits: [{ dir: 'IN', to: 'OVEN' }] }],
+  items: [{ id: 'GOLD', location: 'HALL', attributes: { TAKEBIT: true } }],
+  rules: [{ on: { verb: 'TAKE', noun: 'GOLD' }, if: [{ type: 'in-room', item: 'GOLD' }],
+            do: [{ type: 'take', item: 'GOLD' }, { type: 'print', text: 'Got it.' },
+                 { type: 'win', text: 'done' }] }],
+  timers: [{ turns: 6, do: [{ type: 'set-flag', flag: 'asleep', value: true }] }]
+};
+check('a room gated on a timer-set flag is reachable',
+  analyse(timed).findings.filter(f => f.level === 'error').length === 0,
+  analyse(timed).findings.filter(f => f.level === 'error').map(f => f.code).join(',') || 'clean');
+
+// And the diagnosis has to name the blocker, not guess at it. The old text said
+// "usually a missing exit or an unsatisfiable condition", which was exactly
+// wrong for the case above and cost most of a build to see past.
+const stuck = JSON.parse(JSON.stringify(timed));
+stuck.timers = [];
+const why = analyse(stuck).findings.find(f => f.code === 'E311');
+check('an unreachable room names the flag that gates it',
+  !!why && /asleep/.test(why.hint) && /nothing ever sets/.test(why.hint),
+  why ? why.hint : 'no E311');
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);
