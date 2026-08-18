@@ -195,5 +195,44 @@ const chainWhy = analyse(chain).findings.find(f => f.code === 'E311');
 check('an unreachable room says why the rule that would open it cannot fire',
   !!chainWhy && /CRANK/.test(chainWhy.hint), chainWhy ? chainWhy.hint : 'no E311');
 
+
+// A walk that is really a cut.
+//
+// A film cuts and a map cannot. An adaptation wired its scene changes as compass
+// exits, because that was the only way anything could move between rooms, and
+// twenty-nine of its exits crossed continents: leaving a Humvee on an Afghan road
+// and heading OUT put you on the floor of Caesars Palace.
+const continents = {
+  meta: { start: 'ROAD' },
+  rooms: [
+    { id: 'ROAD', region: 'afghanistan',
+      exits: [{ dir: 'NORTH', to: 'DUNES' }, { dir: 'OUT', to: 'CASINO' }] },
+    { id: 'DUNES', region: 'afghanistan', exits: [{ dir: 'SOUTH', to: 'ROAD' }] },
+    { id: 'CASINO', region: 'vegas', exits: [] }
+  ],
+  items: [], rules: [{ on: { verb: 'LOOK' }, do: [{ type: 'win', text: 'd' }] }]
+};
+const cross = analyse(continents).findings.find(f => f.code === 'W512');
+check('an exit that walks between regions is reported',
+  !!cross && /CASINO/.test(cross.hint), cross ? cross.hint.slice(0, 70) : 'not flagged');
+check('and an exit inside one region is not',
+  !!cross && !/DUNES/.test(cross.hint));
+
+// A world that declares no regions has made no claim, so there is nothing to
+// check and nothing to complain about.
+const noRegions = JSON.parse(JSON.stringify(continents));
+noRegions.rooms.forEach(r => { delete r.region; });
+check('a world with no regions is left alone',
+  !analyse(noRegions).findings.some(f => f.code === 'W512'));
+
+// The sanctioned way to cross: the player does something and the story moves.
+const withCut = JSON.parse(JSON.stringify(continents));
+withCut.rooms[0].exits = [{ dir: 'NORTH', to: 'DUNES' }];
+withCut.rules.unshift({ on: { verb: 'USE', noun: 'PLANE' },
+  do: [{ type: 'print', text: 'Hours later.' }, { type: 'goto', room: 'CASINO' }] });
+withCut.items.push({ id: 'PLANE', location: 'ROAD', attributes: {} });
+check('a scene change written as a rule is not a teleport',
+  !analyse(withCut).findings.some(f => f.code === 'W512'));
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mall passed\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);

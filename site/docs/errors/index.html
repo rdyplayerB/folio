@@ -210,6 +210,16 @@
         <b>A room is unreachable.</b> Nothing the player can do leads there. Usually a
         missing return exit or a condition nothing satisfies.
       </dd>
+      <dt><span class="code w">W512</span></dt>
+      <dd>
+        <b>An exit walks between regions.</b> A compass exit says two places are next
+        to each other. When the rooms at each end declare different
+        <code>region</code> values, that claim is false and the player crosses the
+        world in a step. A film cuts and a map cannot: write the jump as a rule with a
+        <code>goto</code>, where the player does something and the story moves. Silent
+        in a world that declares no regions, since that world has made no claim to
+        check.
+      </dd>
       <dt><span class="code w">W511</span></dt>
       <dd>
         <b>A rule can never fire because an earlier one always answers first.</b>

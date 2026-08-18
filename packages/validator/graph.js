@@ -397,6 +397,49 @@ function analyse(world) {
     }
   }
 
+  // Walks that are really cuts.
+  //
+  // A film cuts and a map cannot. An adaptation wired its scene changes as
+  // compass exits, because that was the only way the format let anything move
+  // between rooms, and the result was a game where leaving a Humvee on a road in
+  // Afghanistan and heading OUT put you on the floor of Caesars Palace. Six more
+  // like it: a Malibu roof to an Afghan village by walking south-east, a desert
+  // to an airbase in California by walking west.
+  //
+  // A compass exit is a claim that two places are next to each other. When rooms
+  // declare which region they are in, that claim is checkable, and the honest way
+  // to express a jump is a rule with a goto: the player does something and the
+  // story moves, which is what a cut actually is.
+  //
+  // Silent unless a world uses regions at all, because a game with none has made
+  // no claim to check.
+  const regionOf = {};
+  let anyRegion = false;
+  for (const room of world.rooms) {
+    if (room.region) { regionOf[room.id] = room.region; anyRegion = true; }
+  }
+  if (anyRegion) {
+    const crossings = [];
+    for (const room of world.rooms) {
+      const from = regionOf[room.id];
+      for (const ex of (room.exits || [])) {
+        const to = regionOf[ex.to];
+        if (!from || !to || from === to) continue;
+        crossings.push(room.id + ' ' + ex.dir + ' to ' + ex.to +
+          ' (' + from + ' to ' + to + ')');
+      }
+    }
+    if (crossings.length) {
+      warn('W512', crossings.length + ' exit' + (crossings.length > 1 ? 's walk' : ' walks') +
+        ' between regions',
+        'A compass exit says two places are next to each other. These cross a region ' +
+        'boundary, so a player walks from one part of the world to another in a step: ' +
+        crossings.slice(0, 5).join('; ') +
+        '. A scene change belongs in a rule with a goto, where the player does ' +
+        'something and the story moves, rather than on the compass.');
+    }
+  }
+
   // Rules standing in front of rules.
   //
   // Two written, working scenes shipped certified and never played, because a

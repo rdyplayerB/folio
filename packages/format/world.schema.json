@@ -258,6 +258,10 @@
               }
             }
           }
+        },
+        "region": {
+          "type": "string",
+          "description": "Which part of the world this room belongs to, for example \"afghanistan\" or \"malibu\". Rooms in different regions are not next to each other, so a compass exit between them is a scene change wearing a walk's clothes and is reported as W512. Express a jump as a rule with a goto instead."
         }
       },
       "description": "A place. `variants` change its description as the world changes; an `enter` rule makes something happen because the player arrived."

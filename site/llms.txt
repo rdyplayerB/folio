@@ -127,7 +127,11 @@ Failure line numbers count **commands**, not file lines.
 
 ### rooms
 
-`id` (required), `name`, `prose`, `dark`, `exits[]`, `variants[]`
+`id` (required), `name`, `prose`, `dark`, `region`, `exits[]`, `variants[]`
+
+`region` is which part of the world a room is in: `"afghanistan"`, `"malibu"`,
+`"the ship"`. Rooms in different regions are not next to each other, so a compass
+exit between them is reported as `W512`.
 
 `variants` is how a room changes once something has happened in it. Each is
 `{ "if": [conditions], "prose": "..." }`, tried in order; the first whose
@@ -213,6 +217,23 @@ asks the player for one whenever a rule pairs objects under that verb.
 **A rule without `second` will never match a two-object command**, so write the
 pairing above the single-object fallback and the fallback still answers a bare
 `USE CELLAR-DOOR`.
+
+**A scene change is a rule, not an exit.** An exit on the compass claims two
+places are next to each other. When the story jumps — a flight, a flashback, a cut
+to somewhere else entirely — write it as an action with a `goto`:
+
+```json
+{ "on": { "verb": "USE", "noun": "JET" },
+  "do": [ { "type": "print", "text": "Fourteen hours, and the light is wrong." },
+          { "type": "goto", "room": "BAGRAM" } ] }
+```
+
+This matters more than it looks. An adaptation of a film wired every one of its
+cuts as a compass exit, because that was the only way anything could move, and
+twenty-nine of its thirty rooms ended up connected to somewhere on another
+continent. Walking OUT of a Humvee on an Afghan road put the player on the floor of
+a Las Vegas casino. Declare `region` on your rooms and the validator finds these
+for you.
 
 **Rules are tried in array order and the first match wins.** Put the specific case
 above the general one. A rule whose conditions fail does not block later rules, so
@@ -510,6 +531,8 @@ erroring, so a typo costs you the dial without telling you.
 - Failure branches are where the prose lives. A guarded rule with no fallback
   means the player who tries the right idea at the wrong time hears nothing.
 - Distance makes a puzzle. A key in the same room as its lock is a formality.
+- A map is a place, not a running order. If two rooms are only adjacent because
+  one scene follows the other, that is a cut: write it as a rule with a `goto`.
 - Counting is a counter, not a chain of near-identical rules. `add-counter` on
   each visit and `counter-equals` to branch is how you write "the third time".
 - Foreshadow deaths. An unannounced instant death is an ambush, not a hazard.

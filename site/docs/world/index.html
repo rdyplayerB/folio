@@ -171,6 +171,14 @@
       <dd><span class="t">string</span> The room description, printed on entry and on <code>LOOK</code>.</dd>
       <dt>dark</dt>
       <dd><span class="t">boolean</span> The room is unreadable unless a lit <code>LIGHTSOURCE</code> is carried or present.</dd>
+      <dt>region</dt>
+      <dd>
+        <span class="t">string</span>
+        Which part of the world this room is in, such as <code>"afghanistan"</code> or
+        <code>"malibu"</code>. Rooms in different regions are not next to each other, so
+        a compass exit between them is reported as <span class="code w">W512</span>.
+        Optional, and worth setting on anything that spans more than one place.
+      </dd>
       <dt>exits</dt>
       <dd><span class="t">object[]</span> Ways out. See below.</dd>
       <dt>variants</dt>
@@ -497,6 +505,24 @@
       A repeating timer that prints a warning, and a second timer or a rule that applies
       <code>lose</code>. Foreshadowing a death is what separates a hazard from an ambush,
       and T4 measures whether you did it.
+    </p>
+
+    <h3>A scene change</h3>
+    <p>
+      An exit on the compass claims two places are next to each other. When the story
+      jumps instead — a flight, a flashback, a cut to somewhere else — write it as an
+      action with a <code>goto</code>, so the player does something and the story moves.
+      That is what a cut is.
+    </p>
+<pre>{ <span class="k">"on"</span>: { <span class="k">"verb"</span>: <span class="s">"USE"</span>, <span class="k">"noun"</span>: <span class="s">"JET"</span> },
+  <span class="k">"do"</span>: [ { <span class="k">"type"</span>: <span class="s">"print"</span>, <span class="k">"text"</span>: <span class="s">"Fourteen hours, and the light is wrong."</span> },
+          { <span class="k">"type"</span>: <span class="s">"goto"</span>, <span class="k">"room"</span>: <span class="s">"BAGRAM"</span> } ] }</pre>
+    <p>
+      An adaptation of a film wired every one of its cuts as a compass exit, because
+      that was the only way anything could move between rooms, and twenty-nine of its
+      thirty rooms ended up joined to somewhere on another continent. Walking out of a
+      Humvee on an Afghan road put the player on the floor of a Las Vegas casino.
+      Declaring <code>region</code> is what lets the validator find those for you.
     </p>
 
     <h3>Counting</h3>

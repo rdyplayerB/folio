@@ -470,6 +470,7 @@ const CREATE_START = [
   { do: 'folio_spec', why: 'Read the format once. It is short and it is the whole thing.' },
   { do: 'folio_brief', why: 'Set intent first. The dials become the targets everything else is graded against, and shipping the brief means the design audit judges you against what you asked for rather than against Zork.' },
   { do: 'Draft structure with no prose', why: 'Rooms, exits, items and rules as bare ids. Write the walkthrough at the same time, because the solution path is known once the graph is. Leave every description empty for now.' },
+  { do: 'Set a region on every room, if the story visits more than one place', why: 'A compass exit claims two rooms are next to each other. An adaptation that spans continents needs its jumps written as rules with a goto instead, or the player walks out of a Humvee in Afghanistan and into a casino in Las Vegas. Declaring regions is what lets the validator find those.' },
   { do: 'folio_validate', why: 'Prove the shape holds and nothing is a dead end while it is still cheap to rearrange.' },
   { do: 'Write the prose', why: 'Descriptions, names, and the failure branches. The unguarded fallback rules are where a world stops feeling like a form.' },
   { do: 'folio_scenes', why: 'Scaffold the art. It returns a picture per room and, more to the point, hotspots taken from the world itself, so everything in a room is clickable and every exit sits on the edge it points at. The backdrops are a guess from your own prose; replace them.' },
@@ -552,6 +553,13 @@ function nextSteps(args) {
   if (unnamed.length) {
     push('Name the items', 'The id is what the rules match on; the name is what a player is shown.',
       unnamed.slice(0, 8).join(', '));
+  }
+
+  // --- a map that is a place rather than a running order -------------------
+  const regions = new Set(rooms.map(r => r.region).filter(Boolean));
+  if (rooms.length > 8 && !regions.size) {
+    push('Consider a region per room', 'A story that visits more than one place needs the engine to know which rooms are actually near each other. Without regions a scene change and a walk look identical, and the commonest failure in an adaptation is wiring every cut as a compass exit.',
+      rooms.length + ' rooms, no regions declared');
   }
 
   // --- the four dead buttons ----------------------------------------------
