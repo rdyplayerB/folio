@@ -359,6 +359,33 @@ const TOOLS = [
     handler: (args) => nextSteps(args)
   },
   {
+    name: 'folio_scenes',
+    description:
+      'Scaffold the scene art. Returns a presentation/scenes.js with a picture ' +
+      'for every room and, more importantly, working hotspots derived from the ' +
+      'world itself, so what is in a room is clickable and every exit is drawn ' +
+      'on the edge it points at. The backdrops are a starting guess from each ' +
+      "room's own prose; replace them. Pass the result to folio_pack under " +
+      'presentation. A room with no scene is playable but has no picture.',
+    inputSchema: {
+      type: 'object', required: ['world'], additionalProperties: false,
+      properties: { world: { type: 'object' } }
+    },
+    handler: (args) => {
+      const r = require('../format/scenes.js').scaffold(args.world);
+      return json({
+        rooms: r.rooms,
+        file: 'presentation/scenes.js',
+        source: r.source,
+        note: 'The canvas is 144x104 and never scales. GUE.kit holds the ' +
+          'primitives (sky, grass, rockWall, houseWall, cavefloor, tree, water, ' +
+          'door, stairsDown, torch, dither, noise) and K.PAL the colours, upper ' +
+          'case. Keep the ids in the hotspots and move the rectangles to match ' +
+          'whatever you draw.'
+      });
+    }
+  },
+  {
     name: 'folio_brief',
     description:
       'Resolve authoring dials into concrete targets and thresholds. The same ' +
@@ -445,6 +472,7 @@ const CREATE_START = [
   { do: 'Draft structure with no prose', why: 'Rooms, exits, items and rules as bare ids. Write the walkthrough at the same time, because the solution path is known once the graph is. Leave every description empty for now.' },
   { do: 'folio_validate', why: 'Prove the shape holds and nothing is a dead end while it is still cheap to rearrange.' },
   { do: 'Write the prose', why: 'Descriptions, names, and the failure branches. The unguarded fallback rules are where a world stops feeling like a form.' },
+  { do: 'folio_scenes', why: 'Scaffold the art. It returns a picture per room and, more to the point, hotspots taken from the world itself, so everything in a room is clickable and every exit sits on the edge it points at. The backdrops are a guess from your own prose; replace them.' },
   { do: 'folio_pack', why: 'Assemble the file.' }
 ];
 
@@ -542,8 +570,14 @@ function nextSteps(args) {
   const drawn = new Set([...sceneSrc.matchAll(/scenes\s*\[\s*['"]([^'"]+)['"]\s*\]/g)].map(m => m[1]));
   const undrawn = rooms.filter(r => !drawn.has(r.id)).map(r => r.id);
   if (undrawn.length) {
-    push('Scene art', 'Rooms with no scene render as a placeholder. The rest of the board is drawn for you; only the picture is yours.',
-      undrawn.length + ' of ' + rooms.length + ' rooms undrawn');
+    push('folio_scenes', undrawn.length === rooms.length
+      ? 'No room has a picture. Scaffold them: it returns a scene per room with ' +
+        'hotspots already derived from the world, so everything is clickable ' +
+        'before you have drawn anything. Then replace the backdrops.'
+      : 'Some rooms have no picture. A room without one still plays, but the ' +
+        'game is only half drawn.',
+      undrawn.length + ' of ' + rooms.length + ' rooms undrawn: ' +
+      undrawn.slice(0, 6).join(', '));
   }
 
   // --- packaging -----------------------------------------------------------

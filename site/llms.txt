@@ -33,6 +33,7 @@ folio profile my-game.folio           # measure its design shape
 folio brief brief.json                # resolve the dials into targets
 folio calibrate story.z3              # Path A only: derive a room map
 folio solve my-game.folio             # play it blind: is the ending findable?
+folio scenes my-game.folio -o presentation/scenes.js   # scaffold the art
 ```
 
 `folio solve` plays your game with the walkthrough withheld, using only what a
@@ -427,9 +428,27 @@ GUE.scenes['PORCH'] = {
 };
 ```
 
-A room with no scene renders a placeholder and the game is still playable, so art
-is the last thing to do, not the first. Overlapping hotspots resolve smallest-first,
-so a mailbox in front of a house wins. Full reference: https://folio.games/docs/scenes/
+**Do not write this file from scratch.** `folio scenes` generates it: a scene for
+every room, a backdrop guessed from that room's own prose, and — the part that
+matters — hotspots taken straight from the world, so everything in a room is
+clickable and every exit is drawn on the edge it points at. Then you replace the
+backdrops with the actual picture and move the rectangles to match, keeping the ids.
+
+Hotspots are the reason to scaffold rather than hand-write. They have to agree with
+three things at once: the picture, the item ids in your world, and the exits. A
+mismatch is invisible until a player clicks the wrong thing.
+
+`GUE.kit` carries the drawing primitives the engine already uses — `sky`, `grass`,
+`rockWall`, `houseWall`, `cavefloor`, `caveCeiling`, `tree`, `water`, `door`,
+`stairsDown`, `stairsUp`, `passage`, `torch`, `chasm`, `riverbank`, `dither`,
+`noise`, `crack` — and `K.PAL` the colours, upper case. `tree(x, y, size)` takes a
+height in pixels, and `sky()` paints down to y=37, so ground has to start there or
+the picture has a black stripe across it.
+
+A room with no scene is still playable: the engine lists what is in it and makes
+each thing clickable. It is a placeholder, not a picture, and a game shipped that
+way is half finished. Overlapping hotspots resolve smallest-first, so a mailbox in
+front of a house wins. Full reference: https://folio.games/docs/scenes/
 
 ## What validation will tell you
 

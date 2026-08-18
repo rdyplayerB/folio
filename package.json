@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node packages/zmachine/test/smoke.js && node packages/world/test/grammar.js && node packages/format/test/roundtrip.js && node packages/format/test/brief.js && node packages/format/test/schema.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node packages/validator/test/design.js && node packages/validator/test/coverage.js && node packages/validator/test/profile.js && node packages/validator/test/solve.js && node conformance/fixtures.js && node conformance/parity.js && node conformance/calibrate.js && node packages/mcp/test/protocol.js && node tools/check-docs.js",
+    "test": "node packages/zmachine/test/smoke.js && node packages/world/test/grammar.js && node packages/format/test/roundtrip.js && node packages/format/test/brief.js && node packages/format/test/schema.js && node packages/format/test/scenes.js && node packages/validator/test/catches.js && node packages/validator/test/graph.js && node packages/validator/test/design.js && node packages/validator/test/coverage.js && node packages/validator/test/profile.js && node packages/validator/test/solve.js && node conformance/fixtures.js && node conformance/parity.js && node conformance/calibrate.js && node packages/mcp/test/protocol.js && node tools/check-docs.js",
     "build": "node tools/build-full-player.js",
     "test:browser": "node tools/build-player.js && node tools/test-player.js",
     "build:lite": "node tools/build-player.js"

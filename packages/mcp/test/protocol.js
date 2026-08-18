@@ -89,7 +89,7 @@ const body = (res) => JSON.parse(res.result.content[0].text);
 
   const list = await c.rpc('tools/list', {});
   const names = list.result.tools.map(t => t.name);
-  ok('tools/list returns every tool', names.length === 10, names.join(', '));
+  ok('tools/list returns every tool', names.length === 11, names.join(', '));
   ok('every tool declares an input schema',
     list.result.tools.every(t => t.inputSchema && t.inputSchema.type === 'object'));
 

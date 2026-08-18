@@ -273,6 +273,49 @@ try {
     console.log('');
     process.exit(0);
 
+  } else if (cmd === 'scenes') {
+    // Scaffold the art. Every room gets a picture and every picture is
+    // clickable; what it looks like is still yours to decide.
+    const [file] = args;
+    if (!file) throw new Error('usage: folio scenes <file.folio> [-o presentation/scenes.js]');
+    const oi = args.indexOf('-o');
+    const out = oi > 0 ? args[oi + 1] : null;
+
+    const game = load(fs.readFileSync(file));
+    if (game.manifest.logicType !== 'world') {
+      throw new Error('folio scenes reads a declarative world. A Z-machine game does ' +
+        'not publish its rooms, so its scenes have to be bound by hand.');
+    }
+    const def = JSON.parse(game.files['logic/world.json'].toString('utf8'));
+    const r = require('../format/scenes.js').scaffold(def);
+
+    const already = Object.keys(game.files).filter(n => /^presentation\/.*\.js$/.test(n));
+    console.log(C.bold + game.manifest.title + C.off + C.dim + ' — scene scaffold' + C.off);
+    console.log('  ' + r.rooms + ' rooms, each with a backdrop and working hotspots');
+    if (already.length) {
+      console.log('  ' + C.yellow + 'this game already ships ' + already.join(', ') +
+        C.off + C.dim + ' — do not overwrite it blindly' + C.off);
+    }
+
+    if (out) {
+      fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
+      if (fs.existsSync(out)) {
+        throw new Error(out + ' already exists. Move it aside first: this writes a ' +
+          'starting point, not a merge.');
+      }
+      fs.writeFileSync(out, r.source);
+      console.log('  wrote ' + out + '  ' + C.dim +
+        Math.round(r.source.length / 1024) + 'KB' + C.off);
+      console.log('');
+      console.log('  ' + C.dim + 'Now open it and draw. The canvas is 144x104 and never' + C.off);
+      console.log('  ' + C.dim + 'scales; GUE.kit has the primitives. Keep the ids in the' + C.off);
+      console.log('  ' + C.dim + 'hotspots and move the rectangles to match your picture.' + C.off);
+    } else {
+      console.log('');
+      process.stdout.write(r.source);
+    }
+    process.exit(0);
+
   } else if (cmd === 'info') {
     const [file] = args;
     if (!file) throw new Error('usage: folio info <file.folio>');
@@ -315,6 +358,7 @@ try {
     console.log('  folio brief [brief.json]       resolve authoring dials into targets');
     console.log('  folio calibrate <story.z3>     derive a room map from a Z-machine story');
     console.log('  folio solve <file.folio>       play it blind: is the ending findable?');
+    console.log('  folio scenes <file.folio>      scaffold the scene art for every room');
     process.exit(cmd ? 1 : 0);
   }
 } catch (e) {

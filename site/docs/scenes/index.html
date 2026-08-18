@@ -84,13 +84,24 @@
       either. What you write is the contents of the scene pane, the sixteen-pixel icons in
       the inventory strip, and the verb map that turns a click into a command.
     </p>
-    <div class="gap">
-      <span class="tag">Nothing generates scene art</span>
+    <div class="note">
+      <span class="tag">Start with the scaffold, not a blank file</span>
       <p>
-        There is no art pipeline. A Path B world with no presentation code renders every
-        room as the placeholder above, and it stays that way until somebody writes a
-        <code>draw</code> function for each room. That is the largest piece of manual work
-        in making a Folio game look finished, and automating it is open work.
+        <code>folio scenes my-game.folio -o presentation/scenes.js</code> writes a scene
+        for every room: a backdrop guessed from that room's own prose, and hotspots taken
+        straight from the world, so everything in a room is clickable and every exit is
+        drawn on the edge it points at before you have drawn anything at all.
+      </p>
+      <p>
+        Then you replace the backdrops with the real picture and move the rectangles to
+        match, keeping the ids. Zork's art was written the other way, by hand, one room at
+        a time, and it came to 397KB across six files. The hotspots are the reason to
+        scaffold: they have to agree with the picture, the item ids and the exits all at
+        once, and a mismatch is invisible until somebody clicks the wrong thing.
+      </p>
+      <p>
+        What it cannot do is decide what a place looks like. That part is yours, and after
+        the scaffold it is the only part left.
       </p>
     </div>
 
