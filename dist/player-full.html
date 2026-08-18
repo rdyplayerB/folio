@@ -5780,14 +5780,10 @@ window.GUE = window.GUE || {};
     ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, SCENE_ART.w, SCENE_ART.h);
     if (S.dark) drawDark();
     else {
-      var sc = GUE.scenes && GUE.scenes[S.roomId];
-      if (sc && typeof sc.draw === 'function') {
-        try { sc.draw(ctx, S, t); }
-        catch (e) { warnOnce('scene-err-' + S.roomId, 'scene draw threw for ' + S.roomId, e); drawFallbackScene(); }
-      } else {
-        warnOnce('scene-' + S.roomId, 'no scene for room ' + (S.roomId || '(unknown)'));
-        drawFallbackScene();
-      }
+      var sc = sceneFor(S.roomId);
+      if (sc === AUTO_SCENE) warnOnce('scene-' + S.roomId, 'no scene for room ' + (S.roomId || '(unknown)'));
+      try { sc.draw(ctx, S, t); }
+      catch (e) { warnOnce('scene-err-' + S.roomId, 'scene draw threw for ' + S.roomId, e); drawFallbackScene(); }
       if (hover) drawHoverBox(hover);
     }
     ctx.restore();
@@ -5813,16 +5809,65 @@ window.GUE = window.GUE || {};
     console.warn('[shell] ' + msg, err || '');
   }
 
+  //  A room nobody has drawn is still a room you have to be able to play.
+  //
+  //  Scene art supplies the hotspots, so a game with no art had nothing to click:
+  //  the verb grid worked and had no target, the objects in the room were in the
+  //  state and invisible, and the first room of a thirty-room game was a dead end.
+  //  Not "no pictures yet" — unplayable, which is the one thing the board exists
+  //  to prevent.
+  //
+  //  So an undrawn room now draws what is in it as a list of labelled strips and
+  //  hands back a hotspot for each. It is plainly a placeholder rather than a
+  //  picture, which is right: it should look like something waiting to be drawn,
+  //  and it should be playable while it waits.
+  var AUTO_ROWS = 6, AUTO_TOP = 30, AUTO_H = 11, AUTO_STEP = 12;
+
+  function autoList(state) {
+    var inv = {}, i;
+    for (i = 0; i < (state.inventory || []).length; i++) inv[state.inventory[i]] = 1;
+    var out = [];
+    for (i = 0; i < (state.objects || []).length; i++) {
+      var id = state.objects[i];
+      if (inv[id]) continue;                       // already in the inventory strip
+      if (String(id).charAt(0) === '_') continue;  // shell pseudo-objects
+      out.push(id);
+    }
+    return out;
+  }
+
+  function autoHotspots(state) {
+    var list = autoList(state), out = [];
+    for (var i = 0; i < list.length && i < AUTO_ROWS; i++) {
+      out.push({ x: 6, y: AUTO_TOP + i * AUTO_STEP, w: 132, h: AUTO_H, obj: list[i] });
+    }
+    return out;
+  }
+
+  var AUTO_SCENE = { draw: function () { drawFallbackScene(); }, hotspots: autoHotspots };
+
+  /** The authored scene for a room, or a playable placeholder. */
+  function sceneFor(id) {
+    var sc = GUE.scenes && GUE.scenes[id];
+    if (sc && typeof sc.draw === 'function') return sc;
+    return AUTO_SCENE;
+  }
+
   function drawFallbackScene() {
     var w = SCENE_ART.w, h = SCENE_ART.h;
     ctx.fillStyle = '#101010'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = COL.dark;
     ctx.fillRect(4, 4, w - 8, 1); ctx.fillRect(4, h - 5, w - 8, 1);
     ctx.fillRect(4, 4, 1, h - 8); ctx.fillRect(w - 5, 4, 1, h - 8);
-    // question block
-    ctx.fillStyle = COL.dark; ctx.fillRect(w / 2 - 16, 28, 32, 32);
-    ctx.fillStyle = '#000'; ctx.fillRect(w / 2 - 15, 29, 30, 30);
-    textC('?', w / 2, 38, COL.gold);
+    // The question block belongs to an EMPTY undrawn room. Once there is
+    // something to point at, the list is the content and the block just sits on
+    // top of it.
+    var anything = autoList(S).length;
+    if (!anything) {
+      ctx.fillStyle = COL.dark; ctx.fillRect(w / 2 - 16, 40, 32, 32);
+      ctx.fillStyle = '#000'; ctx.fillRect(w / 2 - 15, 41, 30, 30);
+      textC('?', w / 2, 50, COL.gold);
+    }
     // Wrapped to the SCENE's width, not the text pane's. wrap() measures against
     // the pane, which is far wider, so a long room name came back as one line and
     // was then hard-cut at 17 characters: "Inside the Fun-Vee" lost its tail and
@@ -5836,10 +5881,39 @@ window.GUE = window.GUE || {};
       if (!line) { line = word.slice(0, per); continue; }
       if (line.length + 1 + word.length <= per) { line += ' ' + word; continue; }
       lines.push(line); line = word.slice(0, per);
-      if (lines.length === 3) break;
+      if (lines.length === 2) break;
     }
-    if (line && lines.length < 3) lines.push(line);
-    for (var i = 0; i < lines.length; i++) textC(lines[i], w / 2, 72 + i * LH, COL.dim);
+    if (line && lines.length < 2) lines.push(line);
+    for (var i = 0; i < lines.length; i++) textC(lines[i], w / 2, 10 + i * LH, COL.dim);
+
+    // Everything here, as something you can point at.
+    var list = autoList(S);
+    if (!list.length) {
+      textC('NOTHING TO POINT AT', w / 2, 80, COL.dark);
+      return;
+    }
+    for (var j = 0; j < list.length && j < AUTO_ROWS; j++) {
+      var y = AUTO_TOP + j * AUTO_STEP;
+      frame(6, y, 132, AUTO_H, COL.dark);
+      var drawn = false;
+      if (GUE.sprites && typeof GUE.sprites.draw === 'function') {
+        try { GUE.sprites.draw(ctx, list[j], 8, y - 2, t); drawn = true; } catch (e) { drawn = false; }
+      }
+      if (!drawn) { ctx.fillStyle = COL.dark; ctx.fillRect(9, y + 3, 5, 5); }
+      text(labelOf(list[j]).slice(0, 14), 20, y + 2, COL.dim);
+    }
+    if (list.length > AUTO_ROWS) {
+      text('+' + (list.length - AUTO_ROWS) + ' MORE', 20, AUTO_TOP + AUTO_ROWS * AUTO_STEP + 2, COL.dark);
+    }
+  }
+
+  /** What to call a thing on screen. The verb map owns display names. */
+  function labelOf(id) {
+    if (GUE.verbmap && typeof GUE.verbmap.noun === 'function') {
+      var n = safe(function () { return GUE.verbmap.noun(id); });
+      if (n) return String(n).toUpperCase();
+    }
+    return String(id).replace(/-/g, ' ').toUpperCase();
   }
 
   function drawDark() {
@@ -6188,7 +6262,7 @@ window.GUE = window.GUE || {};
   }
   // The same pick rule the click uses, so what lights up is what you get.
   function hotspotAt(lx, ly) {
-    var sc = GUE.scenes && GUE.scenes[S.roomId];
+    var sc = sceneFor(S.roomId);
     if (!sc || typeof sc.hotspots !== 'function') return null;
     var list = safe(function () { return sc.hotspots(S); }) || [];
     var objs = [], exits = [], i, h;
@@ -6254,7 +6328,7 @@ window.GUE = window.GUE || {};
 
   function sceneClick(lx, ly) {
     if (S.dark) return;
-    var sc = GUE.scenes && GUE.scenes[S.roomId];
+    var sc = sceneFor(S.roomId);
     if (!sc || typeof sc.hotspots !== 'function') return;
     var list = safe(function () { return sc.hotspots(S); }) || [];
     var pad = touching ? TOUCH_SLOP / SCENE_SCALE : 0;
