@@ -198,7 +198,9 @@ body:has(.ed) footer { display: none; }
     <label class="efile">Open a .folio<input type="file" id="openFile" accept=".folio"></label>
     <button id="sample" class="ebtn ghost">Load an example</button>
     <span class="sep"></span>
-    <button id="exportWorld" class="ebtn ghost">Export world.json</button>
+    <button id="findWalk" class="ebtn ghost">Find the walkthrough</button>
+    <button id="exportFolio" class="ebtn">Export .folio</button>
+    <button id="exportWorld" class="ebtn ghost">world.json</button>
     <span class="grow"></span>
     <span id="badge" class="badge">empty</span>
   </div>
@@ -1079,6 +1081,7 @@ class World {
     for (const it of world.items) this.loc[it.id] = it.location;
     this.actorLoc = {};
     for (const a of (world.actors || [])) this.actorLoc[a.id] = a.location;
+    this.actorClock = {};
 
     this.log = [];
   }
@@ -1245,6 +1248,8 @@ class World {
     this.moves++;
     const timed = this.tickTimers();
     if (timed) prose += '\n\n' + timed;
+    const moved = this.tickActors();
+    if (moved) prose += '\n\n' + moved;
     if (this.ended) prose += '\n\n' + this.endText();
 
     this.log.push({ verb, noun, prose });
@@ -1253,10 +1258,10 @@ class World {
 
   matches(rule, verb, noun, indirect) {
     const on = rule.on || {};
-    // An arrival rule is dispatched by fireEnter and nowhere else. Every other
-    // field here is optional, so without this an enter rule matched the first
-    // command of any kind and answered everything in the game.
-    if (on.enter) return false;
+    // Arrival and encounter rules are dispatched by fireEnter and tickActors and
+    // nowhere else. Every other field here is optional, so without this they
+    // would match the first command of any kind and answer the whole game.
+    if (on.enter || on.meets) return false;
     if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
     if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
     if (on.room && on.room !== this.here) return false;
@@ -1335,6 +1340,89 @@ class World {
         case 'lose':
           this.ended = { win: false, reason: endingText(e), pages: endingPages(e) }; break;
         default: break;   // unknown effects are inert; T1 rejects them at validation
+      }
+    }
+    return said.join('\n');
+  }
+
+  /**
+   * Characters that go about their business.
+   *
+   * The largest single thing the format could not express was Zork's thief: a
+   * person who wanders the map, takes what you are carrying, and keeps it
+   * somewhere. Measured against the ZIL source, characters and combat are 39 of
+   * the 72 routines that need real code — more than half of everything the closed
+   * vocabulary could not reach.
+   *
+   * This is that shape without the code. An actor with a `patrol` moves; one with
+   * `takes` helps itself; a rule with `on.meets` answers when it turns up. None of
+   * it is scripting, so the dependency analysis can still see everything the world
+   * is able to do, which is the whole reason the vocabulary is closed.
+   */
+  tickActors() {
+    const said = [];
+    for (const actor of (this.def.actors || [])) {
+      const at = this.actorLoc[actor.id];
+      if (at === 'NOWHERE' || at === 'PLAYER') continue;
+
+      // ---- moving --------------------------------------------------------
+      const p = actor.patrol;
+      if (p) {
+        const clock = this.actorClock[actor.id] = (this.actorClock[actor.id] || 0) + 1;
+        const every = p.every || 1;
+        const willing = p.chance === undefined ? true : this.rng() * 100 < p.chance;
+        if (clock % every === 0 && willing) {
+          const route = (p.rooms && p.rooms.length)
+            ? p.rooms
+            : (this.def.rooms || []).map(r => r.id);
+          if (route.length) {
+            // Round the route in order when one is given, because a patrol is a
+            // beat a player can learn. A named route that shuffled would be
+            // indistinguishable from teleporting.
+            const i = route.indexOf(at);
+            const next = (p.rooms && p.rooms.length)
+              ? route[(i + 1) % route.length]
+              : route[(this.rng() * route.length) | 0];
+            if (next && next !== at) {
+              const wasHere = at === this.here, nowHere = next === this.here;
+              this.actorLoc[actor.id] = next;
+              if (wasHere && !nowHere && p.leaves) said.push(p.leaves);
+              if (!wasHere && nowHere && p.arrives) said.push(p.arrives);
+            }
+          }
+        }
+      }
+
+      // ---- helping itself -------------------------------------------------
+      const t = actor.takes;
+      if (t && this.actorLoc[actor.id] === this.here) {
+        const willing = t.chance === undefined ? true : this.rng() * 100 < t.chance;
+        if (willing) {
+          const wanted = Object.keys(this.loc).filter(id => {
+            if (this.loc[id] !== 'PLAYER') return false;
+            if (Array.isArray(t.what)) return t.what.indexOf(id) >= 0;
+            const it = this.items[id];
+            return !!(it && it.attributes && it.attributes.TAKEBIT);
+          });
+          if (wanted.length) {
+            const got = wanted[(this.rng() * wanted.length) | 0];
+            this.loc[got] = t.to || 'NOWHERE';
+            said.push(t.says ||
+              ('The ' + (actor.name || actor.id).toLowerCase() + ' takes the ' +
+                ((this.items[got] || {}).name || got.toLowerCase()) + '.'));
+          }
+        }
+      }
+
+      // ---- and what happens when it is here -------------------------------
+      if (this.actorLoc[actor.id] === this.here) {
+        for (const rule of this.rules) {
+          if ((rule.on || {}).meets !== actor.id) continue;
+          if (rule.if && !rule.if.every(c => this.test(c))) continue;
+          const text = this.apply(rule.do || []);
+          if (text) said.push(text);
+          break;
+        }
       }
     }
     return said.join('\n');
@@ -1732,10 +1820,19 @@ function analyse(world) {
   // was rejected. Found by writing a game against the published spec rather than
   // against the engine, which is exactly what that exercise is for.
   function actorReachable(id) {
-    if (!actors[id]) return false;
+    const a = actors[id];
+    if (!a) return false;
     const where = actorLoc[id];
-    if (where === 'NOWHERE') return false;
     if (where === 'PLAYER') return true;      // travelling with you, so always here
+    // A character on a patrol is met wherever the patrol goes, so the question is
+    // whether the player can reach any room on its route. Without this, a thief
+    // parked in its lair reads as unreachable and every rule about it as dead.
+    if (a.patrol) {
+      const route = (a.patrol.rooms && a.patrol.rooms.length)
+        ? a.patrol.rooms : Object.keys(rooms);
+      if (route.some(r => reachRooms.has(r))) return true;
+    }
+    if (where === 'NOWHERE') return false;
     return rooms[where] ? reachRooms.has(where) : false;
   }
 
@@ -1803,6 +1900,7 @@ function analyse(world) {
       const r = rules[i];
       const on = r.on || {};
       if (on.room && !reachRooms.has(on.room)) continue;
+      if (on.meets && !actorReachable(on.meets)) continue;
       // The noun must be present for the player to act on it at all.
       if (on.noun && !nounReachable(on.noun)) continue;
       // A pairing needs both halves. Without this a rule gated on an unobtainable
@@ -1935,10 +2033,14 @@ function analyse(world) {
     if (firedRules.has(i)) continue;
     const on = rules[i].on || {};
     const roomDead = on.room && !reachRooms.has(on.room);
-    const nounDead = (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) ||
+    const meetDead = on.meets && !actorReachable(on.meets);
+    const nounDead = meetDead ||
+      (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) ||
       (on.second && !nounReachable(on.second) && !everPresent.has(on.second));
     if (roomDead || nounDead) {
-      warn('W313', 'rule ' + i + ' (' + (on.verb || '?') + ' ' + (on.noun || '') +
+      warn('W313', 'rule ' + i + ' (' +
+        (on.meets ? 'meeting ' + on.meets : on.enter ? 'entering ' + on.enter
+          : (on.verb || '?') + ' ' + (on.noun || '')).trim() +
         ') can never fire',
         roomDead ? 'Its room "' + on.room + '" is unreachable.'
                  : 'Its noun "' + on.noun + '" can never be present.');
@@ -1985,6 +2087,49 @@ function analyse(world) {
         crossings.slice(0, 5).join('; ') +
         '. A scene change belongs in a rule with a goto, where the player does ' +
         'something and the story moves, rather than on the compass.');
+    }
+  }
+
+  // A character that helps itself to something a puzzle needs.
+  //
+  // Theft only ever removes capability, so it is left out of the fixpoint the way
+  // destroy is: modelling it would turn an ordinary thief into a hard error. But
+  // it is exactly the softlock W314 reports for destruction, arriving on legs, and
+  // a player robbed of the one key has no way to know the game is over.
+  const thieves = (world.actors || []).filter(a => a.takes);
+  if (thieves.length) {
+    const needed = new Set();
+    const wantItem = (c) => {
+      if (!c) return;
+      if ((c.type === 'carrying' || c.type === 'present') && c.item) needed.add(c.item);
+      if (c.condition) wantItem(c.condition);
+      for (const sub of (c.conditions || [])) wantItem(sub);
+    };
+    for (const r of rules) {
+      for (const c of (r.if || [])) wantItem(c);
+      if ((r.on || {}).second) needed.add(r.on.second);
+    }
+    const atRisk = [];
+    for (const a of thieves) {
+      const lair = a.takes.to;
+      // Loot put somewhere the player can still get to is a setback, not a
+      // dead end. Only what leaves the world for good is a trap.
+      const recoverable = lair && rooms[lair];
+      if (recoverable) continue;
+      for (const id of needed) {
+        const it = items[id];
+        if (!it) continue;
+        if (Array.isArray(a.takes.what) && a.takes.what.indexOf(id) < 0) continue;
+        if (!Array.isArray(a.takes.what) && !(it.attributes && it.attributes.TAKEBIT)) continue;
+        atRisk.push(id + ' (taken by ' + a.id + ')');
+      }
+    }
+    if (atRisk.length) {
+      warn('W513', atRisk.length + ' item' + (atRisk.length > 1 ? 's a character can take are' : ' a character can take is') +
+        ' needed later',
+        'The thing leaves the world and the player is stuck with no way to tell: ' +
+        [...new Set(atRisk)].slice(0, 4).join('; ') +
+        '. Give the character a lair the player can reach, or name what it may take.');
     }
   }
 
@@ -3153,6 +3298,320 @@ function scaffold(def) {
 module.exports = { scaffold, backdropFor, objectRects, BACKDROPS, FALLBACK, EXIT_RECTS };
 
   };
+  REG["solve.js"] = function (module, exports, require) {
+//  The blind solver — playing a game without being told the answer.
+//
+//  Every check before this one asks whether a game is coherent and finishable.
+//  None of them asks whether a player could have done anything else, and three
+//  separate cold builds independently reported the same verdict about their own
+//  certified games: a corridor with good prose on it. One put it exactly right —
+//  the audit "measured seven design properties and cleared all seven while being
+//  structurally unable to see whether any choice could have gone another way."
+//
+//  This is that missing half. It searches the game from a cold start with the
+//  walkthrough withheld, using only what a player can see: the objects in the
+//  room, the things in hand, the exits on the compass, and the eight verbs on the
+//  board. It answers two questions the tiers cannot.
+//
+//    FINDABLE     Can the ending be reached without being told how? A game whose
+//                 solution needs a word nobody could guess is completable and not
+//                 fair, and the badge has never been able to tell those apart.
+//
+//    CHOICE       On the way there, how often does more than one thing work? If
+//                 exactly one action advances the world at every step, the map is
+//                 decoration. This is the corridor measure, and it is the number
+//                 the design audit could never see.
+//
+//  It also finds softlocks properly, by search rather than by heuristic: a state
+//  a player can reach and cannot win from. W314 and W510 guess at that shape;
+//  this proves it.
+//
+//  Bounded on purpose. An exhaustive search of a thirty-room game is not
+//  finite in any useful sense, so it explores until it runs out of budget and
+//  says so rather than pretending the answer is complete.
+
+'use strict';
+
+const world = require('../world/index.js');
+
+// What the board can send. A blind player has these and nothing else.
+const VERBS = ['LOOK', 'TAKE', 'DROP', 'OPEN', 'CLOSE', 'USE', 'HIT', 'SPEAK'];
+const DIRS = ['NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW',
+  'UP', 'DOWN', 'IN', 'OUT'];
+
+/**
+ * Everything that distinguishes one world state from another.
+ *
+ * Built against a vocabulary worked out once, because this is called for every
+ * candidate action of every state and an earlier version re-derived and re-sorted
+ * the whole world each time. On a game with seventy-five items that was most of
+ * the running cost.
+ */
+function keyer(def) {
+  const names = new Set();
+  const walk = (c) => {
+    if (!c || typeof c !== 'object') return;
+    if (c.flag) names.add(c.flag);
+    if (c.condition) walk(c.condition);
+    for (const sub of (c.conditions || [])) walk(sub);
+  };
+  for (const k of Object.keys(def.flags || {})) names.add(k);
+  for (const r of (def.rules || []).concat(def.timers || [])) {
+    for (const c of (r.if || [])) walk(c);
+    for (const e of (r.do || [])) {
+      if (e.flag) names.add(e.flag);
+      if (e.item) { names.add('_open_' + e.item); names.add('_lit_' + e.item); }
+    }
+  }
+  for (const it of (def.items || [])) {
+    names.add('_open_' + it.id); names.add('_lit_' + it.id);
+  }
+  const flagNames = [...names].sort();
+  const counterNames = Object.keys(def.counters || {}).sort();
+  const itemIds = (def.items || []).map(i => i.id).sort();
+  const actorIds = (def.actors || []).map(a => a.id).sort();
+  const roomIds = (def.rooms || []).map(r => r.id).sort();
+
+  return function key(w) {
+    let s = w.here + '|' + w.score + '|';
+    for (const f of flagNames) s += w.flags[f] ? '1' : '0';
+    s += '|';
+    for (const c of counterNames) s += (w.counters[c] || 0) + ',';
+    s += '|';
+    for (const id of itemIds) s += (w.loc[id] || '-') + ',';
+    s += '|';
+    for (const id of actorIds) s += (w.actorLoc[id] || '-') + ',';
+    s += '|';
+    for (const id of roomIds) s += w.visited.has(id) ? '1' : '0';
+    s += '|';
+    // Whether a timer has FIRED, never how far along it is. A running clock makes
+    // every action produce a technically-new state, and the search happily burned
+    // four hundred turns opening the same door because each attempt ticked the
+    // lamp. Two states that differ only by a tick are the same state to a player.
+    //
+    // The consequence is deliberate: a game that can only be advanced by idling
+    // comes back unsolvable, which is the right answer. WAIT has no button, so
+    // nothing reachable by clicking should ever require it.
+    for (const t of w.timers) s += (t.done ? 'd' : '-');
+    return s + '|' + (w.ended ? (w.ended.win ? 'W' : 'L') : '');
+  };
+}
+
+function snapshot(w) {
+  return {
+    here: w.here, score: w.score, moves: w.moves,
+    flags: Object.assign({}, w.flags),
+    counters: Object.assign({}, w.counters || {}),
+    loc: Object.assign({}, w.loc),
+    actorLoc: Object.assign({}, w.actorLoc),
+    visited: [...w.visited],
+    timers: w.timers.map(t => ({ elapsed: t.elapsed, done: !!t.done })),
+    ended: w.ended
+  };
+}
+
+function restore(w, s) {
+  w.here = s.here; w.score = s.score; w.moves = s.moves;
+  w.flags = Object.assign({}, s.flags);
+  w.counters = Object.assign({}, s.counters);
+  w.loc = Object.assign({}, s.loc);
+  w.actorLoc = Object.assign({}, s.actorLoc);
+  w.visited = new Set(s.visited);
+  s.timers.forEach((t, i) => {
+    if (w.timers[i]) { w.timers[i].elapsed = t.elapsed; w.timers[i].done = t.done; }
+  });
+  w.ended = s.ended;
+}
+
+/**
+ * The commands a player could try from here, given only what they can see.
+ *
+ * Deliberately not read off the rules. A solver that consults the rule list to
+ * decide what to try is not blind, and would report every game as perfectly
+ * findable. The one concession is which verbs take a second object, because the
+ * board itself knows that: it is what decides whether the interface asks for a
+ * second click.
+ */
+function moves(def, state, pairVerbs) {
+  const out = [];
+  for (const dir of DIRS) if (state.exits[dir]) out.push([dir, null, null]);
+
+  const here = state.objects || [];
+  const held = state.inventory || [];
+  const seen = [...new Set(here.concat(held))];
+
+  for (const verb of VERBS) {
+    if (verb === 'DROP') continue;
+    // Dropping is never required to finish a Folio game: there is no carry limit,
+    // so anything you can hold you can keep holding. Leaving it in multiplied the
+    // reachable states by every arrangement of every item across every room, and
+    // a thirty-room game did not finish inside forty thousand states.
+    if (verb === 'LOOK') out.push(['LOOK', null, null]);
+    for (const obj of seen) {
+      out.push([verb, obj, null]);
+      if (!pairVerbs.has(verb)) continue;
+      // Pairing is the expensive one, so only carried things are offered as the
+      // second object. That is also what a player does: you use the thing in your
+      // hand on the thing in the room.
+      for (const other of held) if (other !== obj) out.push([verb, obj, other]);
+    }
+  }
+  return out;
+}
+
+/**
+ * How far along does this state look?
+ *
+ * Breadth-first is the wrong shape for this. It treats "walk one room west" and
+ * "solve the puzzle" as equally interesting and drowns in a game of any size. A
+ * player does not do that: they chase whatever looks like progress and back up
+ * when it stops paying. So the frontier is ordered by the things a player would
+ * notice happening — points, doors opening, new ground, new possessions — and the
+ * search behaves like somebody trying to get somewhere.
+ *
+ * This makes the search good rather than exhaustive, which is the honest trade.
+ * A solution found proves findability; no solution found proves nothing, and the
+ * report says truncated so nobody reads it as proof.
+ */
+function progress(w) {
+  let flags = 0;
+  for (const k in w.flags) if (w.flags[k]) flags++;
+  let held = 0;
+  for (const id in w.loc) if (w.loc[id] === 'PLAYER') held++;
+  return w.score * 10 + flags * 4 + w.visited.size * 2 + held;
+}
+
+/**
+ * Search a world for its ending, blind.
+ *
+ * Iterative deepening, because the two obvious searches are both wrong here.
+ * Breadth-first drowns: a thirty-room game did not finish inside forty thousand
+ * states. Greedy best-first finds a path and not a short one, and came back with
+ * a four-hundred-move route through an eight-move game, which is useless as a
+ * measure of whether a person could find it. Deepening the cap until something
+ * solves gives a path close to the shortest one, and the shallow rounds cost
+ * almost nothing.
+ *
+ * @param {object} def            a world.json
+ * @param {object} [opts]
+ * @param {number} [opts.maxStates]  states to explore before giving up
+ * @param {number} [opts.maxMs]      wall-clock budget
+ * @param {number} [opts.maxDepth]   deepest solution worth looking for
+ */
+function solve(def, opts) {
+  opts = opts || {};
+  const budget = {
+    states: opts.maxStates || 60000,
+    until: Date.now() + (opts.maxMs || 30000),
+    depth: opts.maxDepth || 256
+  };
+
+  const pairVerbs = new Set();
+  for (const r of (def.rules || [])) {
+    if (r.on && r.on.second && r.on.verb) pairVerbs.add(String(r.on.verb).toUpperCase());
+  }
+
+  const key = keyer(def);
+  const be = world.createBackend(def, { seed: opts.seed === undefined ? 1234 : opts.seed });
+  const start = snapshot(be.world);
+
+  let totalStates = 0;
+  let truncated = false;
+  let result = null;
+
+  for (let cap = 8; cap <= budget.depth && !result; cap *= 2) {
+    const round = search(cap);
+    totalStates += round.explored;
+    if (round.win) result = round;
+    if (round.outOfBudget) { truncated = true; break; }
+  }
+  if (!result) truncated = true;
+
+  // ------------------------------------------------------------- the path back
+  const path = [];
+  if (result) {
+    let at = result.winKey;
+    while (at && result.seen.get(at) && result.seen.get(at).via) {
+      const node = result.seen.get(at);
+      path.unshift({ command: node.via, choices: (result.seen.get(node.from) || {}).branch || 0 });
+      at = node.from;
+    }
+  }
+
+  // How often did more than one thing work? This is the corridor number: a game
+  // where exactly one action ever advances the world is a sequence wearing a map.
+  const branches = path.map(p => p.choices).filter(n => n > 0);
+  const forced = branches.filter(n => n === 1).length;
+  const meanChoices = branches.length
+    ? Math.round((branches.reduce((a, b) => a + b, 0) / branches.length) * 10) / 10 : 0;
+
+  return {
+    solvedBlind: !!result,
+    truncated,
+    statesExplored: totalStates,
+    solutionMoves: path.length,
+    path,
+    meanChoices,
+    forcedSteps: forced,
+    forcedFraction: branches.length ? Math.round((forced / branches.length) * 100) : 0,
+    deaths: result ? result.losses : 0,
+    deadEnds: result ? result.leaves : 0
+  };
+
+  // ---------------------------------------------------------------- one round
+  function search(cap) {
+    const seen = new Map();
+    restore(be.world, start);
+    seen.set(key(be.world), { depth: 0, from: null, via: null, branch: 0 });
+
+    let queue = [start];
+    let explored = 0, losses = 0, leaves = 0;
+    let win = null, winKey = null, outOfBudget = false;
+
+    while (queue.length && !win) {
+      const next = [];
+      for (const state of queue) {
+        if (Date.now() > budget.until || explored >= budget.states) {
+          outOfBudget = true; break;
+        }
+        restore(be.world, state);
+        if (be.world.ended) continue;
+        const from = key(be.world);
+        const node = seen.get(from);
+        if (!node || node.depth >= cap) continue;
+
+        const options = moves(def, be.world.state(), pairVerbs);
+        let advanced = 0, anyChild = false;
+
+        for (const [verb, noun, second] of options) {
+          restore(be.world, state);
+          try { be.world.submit(verb, noun, second); } catch (e) { continue; }
+          const k = key(be.world);
+          if (k === from) continue;               // nothing happened
+          advanced++; anyChild = true;
+          if (seen.has(k)) continue;
+          seen.set(k, { depth: node.depth + 1, from,
+            via: verb + (noun ? ' ' + noun : '') + (second ? ' ' + second : '') });
+          explored++;
+          if (be.world.ended && be.world.ended.win) { win = true; winKey = k; break; }
+          if (be.world.ended) { losses++; continue; }   // a death is not worth expanding
+          next.push(snapshot(be.world));
+        }
+
+        node.branch = advanced;
+        if (!anyChild) leaves++;
+        if (win) break;
+      }
+      if (win || outOfBudget) break;
+      queue = next;
+    }
+    return { win, winKey, seen, explored, losses, leaves, outOfBudget };
+  }
+}
+
+module.exports = { solve, VERBS, DIRS };
+
+  };
   REG["schema.js"] = function (module, exports, require) {
 //  A small JSON Schema checker, and the world schema it exists to run.
 //
@@ -3543,6 +4002,66 @@ const WORLD_SCHEMA = {
         "description": {
           "type": "string",
           "description": "What LOOK at them says."
+        },
+        "patrol": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Makes this character move. Give it a route and it walks the route in order, which is a beat a player can learn; leave the rooms out and it wanders anywhere.",
+          "properties": {
+            "rooms": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "description": "The route, walked in order. Omit to wander the whole map."
+            },
+            "every": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Moves once every this many turns. Defaults to 1."
+            },
+            "chance": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Percent chance of moving on a turn it is due to. Defaults to always."
+            },
+            "arrives": {
+              "type": "string",
+              "description": "Said when it walks into the player's room."
+            },
+            "leaves": {
+              "type": "string",
+              "description": "Said when it walks out."
+            }
+          }
+        },
+        "takes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Makes this character help itself to what the player is carrying, which is the shape of Zork's thief. Give it a lair the player can reach or the loot is gone for good, which W513 reports.",
+          "properties": {
+            "what": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "description": "Only these. Omit and it takes anything takeable."
+            },
+            "to": {
+              "$ref": "#/$defs/id",
+              "description": "Where the loot goes. A room the player can reach makes theft a setback rather than a dead end."
+            },
+            "chance": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Percent chance per turn while sharing your room."
+            },
+            "says": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -3577,6 +4096,10 @@ const WORLD_SCHEMA = {
             "enter": {
               "$ref": "#/$defs/id",
               "description": "Fires when the player arrives in this room, instead of on a command. Use it for a floor that gives way, an ambush, a door closing behind you. A rule with `enter` is never matched by a typed or clicked command."
+            },
+            "meets": {
+              "$ref": "#/$defs/id",
+              "description": "Fires on the turn this character is in the player's room, rather than on a command. A rule with `meets` is never matched by anything typed or clicked."
             }
           }
         },
@@ -4415,7 +4938,8 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     design: require('design.js'),
     schema: require('schema.js'),
     brief: require('brief.js'),
-    scenes: require('scenes.js')
+    scenes: require('scenes.js'),
+    solve: require('solve.js')
   };
 })();</script>
 <script>//  The map editor.
@@ -4460,7 +4984,9 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
   //  map reopens the way it was left.
   var world = blank();
   var layout = {};
-  var selected = null;
+  var selected = null;      // a room id
+  var pickedItem = null;    // an item id, for editing its description
+  var walkthrough = '';     // found by the solver, not written by hand
 
   function blank() {
     return { meta: { title: 'Untitled', start: null }, flags: {},
@@ -4680,7 +5206,7 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
 
   function stripLayout(w) {
     var c = JSON.parse(JSON.stringify(w));
-    if (c.meta) delete c.meta.editorLayout;
+    if (c.meta) { delete c.meta.editorLayout; delete c.meta.editorWalkthrough; }
     return c;
   }
   function esc(s) {
@@ -4819,6 +5345,39 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     }
     html += '<div class="minirow"><button class="mini" data-add="item">+ Something here</button>' +
       '<button class="mini" data-add="fixture">+ Scenery</button></div>';
+    // What LOOK says about the thing the author last touched. Kept to one at a
+    // time because a textarea per object turns a short list into a wall.
+    var pi = pickedItem && itemById(pickedItem);
+    if (pi && pi.location === r.id) {
+      html += '<div class="field" style="margin-top:12px"><label>Looking at ' +
+        esc(pi.name || pi.id) + '</label><textarea data-desc="' + esc(pi.id) + '">' +
+        esc(pi.description || '') + '</textarea></div>';
+    }
+    html += '</div>';
+
+    // ---- who is in it ---------------------------------------------------
+    var who = (world.actors || []).filter(function (a) { return a.location === r.id; });
+    html += '<div class="pane"><p class="ptitle">Who is here</p>';
+    if (!who.length) html += '<p class="pdim">Nobody.</p>';
+    for (var q = 0; q < who.length; q++) {
+      var a = who[q];
+      html += '<div class="row">' +
+        '<input class="rename" data-actor="' + esc(a.id) + '" value="' + esc(a.name || a.id) + '">' +
+        '<span class="tag' + (a.patrol ? ' on' : '') + '" data-walk="' + esc(a.id) +
+        '" title="Does it move about?">walks</span>' +
+        '<span class="tag' + (a.takes ? ' on' : '') + '" data-rob="' + esc(a.id) +
+        '" title="Does it take your things?">robs</span>' +
+        '<span class="x" data-delactor="' + esc(a.id) + '">×</span></div>';
+      if (a.patrol && a.patrol.rooms) {
+        html += '<div class="row" style="border:0;padding-top:2px"><span class="pdim" ' +
+          'style="font-size:11px">route: ' +
+          esc(a.patrol.rooms.map(function (id) {
+            var rr = byId(id); return rr ? (rr.name || id) : id;
+          }).join(' → ')) + '</span></div>';
+      }
+    }
+    html += '<div class="minirow"><button class="mini" data-add="actor">+ Somebody</button>' +
+      '<button class="mini" data-pz="haunt">Kills you unless…</button></div>';
     html += '</div>';
 
     // ---- puzzles --------------------------------------------------------
@@ -4897,13 +5456,44 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     });
     inspector.querySelectorAll('[data-add]').forEach(function (el) {
       el.addEventListener('click', function () {
-        addItem(selected, el.getAttribute('data-add') === 'item');
+        var kind = el.getAttribute('data-add');
+        if (kind === 'actor') addActor(selected);
+        else addItem(selected, kind === 'item');
       });
     });
     inspector.querySelectorAll('.rename').forEach(function (el) {
+      var isActor = el.hasAttribute('data-actor');
       el.addEventListener('change', function () {
-        var it = itemById(el.getAttribute('data-item'));
-        if (it) { it.name = el.value; redraw(); }
+        var thing = isActor ? actorById(el.getAttribute('data-actor'))
+          : itemById(el.getAttribute('data-item'));
+        if (thing) { thing.name = el.value; redraw(); }
+      });
+      if (!isActor) {
+        el.addEventListener('focus', function () {
+          pickedItem = el.getAttribute('data-item'); showInspector();
+        });
+      }
+    });
+    inspector.querySelectorAll('[data-desc]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var it = itemById(el.getAttribute('data-desc'));
+        if (!it) return;
+        if (el.value) it.description = el.value; else delete it.description;
+        check();
+      });
+    });
+    inspector.querySelectorAll('[data-walk]').forEach(function (el) {
+      el.addEventListener('click', function () { toggleWalk(el.getAttribute('data-walk')); });
+    });
+    inspector.querySelectorAll('[data-rob]').forEach(function (el) {
+      el.addEventListener('click', function () { toggleRob(el.getAttribute('data-rob')); });
+    });
+    inspector.querySelectorAll('[data-delactor]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var id = el.getAttribute('data-delactor');
+        world.actors = (world.actors || []).filter(function (a) { return a.id !== id; });
+        world.rules = world.rules.filter(function (ru) { return (ru.on || {}).meets !== id; });
+        redraw();
       });
     });
     inspector.querySelectorAll('[data-take]').forEach(function (el) {
@@ -4938,6 +5528,50 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
 
   function redraw() { draw(); check(); showInspector(); }
 
+  function actorById(id) {
+    for (var i = 0; i < (world.actors || []).length; i++) {
+      if (world.actors[i].id === id) return world.actors[i];
+    }
+    return null;
+  }
+
+  function addActor(roomId) {
+    world.actors = world.actors || [];
+    var id = freshId('SOMEBODY');
+    world.actors.push({ id: id, name: 'somebody', location: roomId, attributes: {} });
+    redraw();
+  }
+
+  //  A patrol is a route walked in order, so the default is this room and its
+  //  neighbours: a character who paces the ground around where you found them
+  //  reads as a person, and one who teleports across the map reads as a bug.
+  function toggleWalk(id) {
+    var a = actorById(id);
+    if (!a) return;
+    if (a.patrol) { delete a.patrol; return redraw(); }
+    var home = byId(a.location);
+    var route = [a.location];
+    for (var i = 0; i < ((home && home.exits) || []).length && route.length < 4; i++) {
+      if (route.indexOf(home.exits[i].to) < 0) route.push(home.exits[i].to);
+    }
+    a.patrol = { rooms: route, every: 2, chance: 70,
+      arrives: 'The ' + (a.name || 'figure') + ' comes in.',
+      leaves: 'The ' + (a.name || 'figure') + ' goes.' };
+    redraw();
+  }
+
+  //  Loot goes to the room the character started in, which is the difference
+  //  between a thief and a dead end: somewhere the player can follow. Sending it
+  //  nowhere is what W513 reports, so the editor does not do it by default.
+  function toggleRob(id) {
+    var a = actorById(id);
+    if (!a) return;
+    if (a.takes) { delete a.takes; return redraw(); }
+    a.takes = { to: a.location, chance: 40,
+      says: 'The ' + (a.name || 'figure') + ' takes something of yours and is gone with it.' };
+    redraw();
+  }
+
   function addItem(roomId, takeable) {
     var n = itemsIn(roomId).length + 1;
     var id = freshId(slug('thing ' + n, 'THING'));
@@ -4965,6 +5599,42 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     if (kind === 'reward') return reward(room);
     if (kind === 'win') return ending(room);
     if (kind === 'hazard') return hazard(room);
+    if (kind === 'haunt') return haunting(room);
+  }
+
+  //  The Uninvited shape: something that kills you unless you are carrying the
+  //  thing that wards it off. One rule, but it needs the character to exist and
+  //  to be somewhere the player will meet it, which is the part that is easy to
+  //  get half-right by hand.
+  function haunting(room) {
+    var here = (world.actors || []).filter(function (a) { return a.location === room.id; })
+      .map(function (a) { return { label: a.name || a.id, value: a.id }; });
+    here.push({ label: '— make something new to haunt this room —', value: '__new' });
+    var who = pick('What haunts this room?', here);
+    if (!who) return;
+    if (who === '__new') {
+      who = freshId('WRAITH');
+      world.actors = world.actors || [];
+      world.actors.push({ id: who, name: 'a cold shape', location: room.id, hostile: true,
+        patrol: { rooms: [room.id], every: 1,
+          arrives: 'Something is here that was not here before.' } });
+    }
+    var wards = world.items.filter(function (i) { return i.attributes && i.attributes.TAKEBIT; })
+      .map(function (i) {
+        var w = byId(i.location);
+        return { label: (i.name || i.id) + (w ? '  (in ' + (w.name || w.id) + ')' : ''), value: i.id };
+      });
+    wards.unshift({ label: 'nothing — it always kills', value: '__always' });
+    var ward = pick('What keeps it off?', wards);
+    if (!ward) return;
+
+    var rule = { on: { meets: who },
+      do: [{ type: 'lose', pages: ['It reaches you.', 'And that is all.'] }] };
+    if (ward !== '__always') {
+      rule.if = [{ type: 'not', condition: { type: 'carrying', item: ward } }];
+    }
+    world.rules.unshift(rule);
+    redraw();
   }
 
   function pick(label, options) {
@@ -4985,12 +5655,19 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     var ex = pick('Which way is locked?', exits);
     if (!ex) return;
 
-    var keys = world.items.filter(function (i) { return i.attributes && i.attributes.TAKEBIT; })
-      .map(function (i) {
-        var where = byId(i.location);
-        return { label: (i.name || i.id) + (where ? '  (in ' + (where.name || where.id) + ')' : ''),
-          value: i.id };
-      });
+    //  Never offer a key that sits behind the door it opens. The editor did, once,
+    //  and the world it produced was circular: the way to the crypt needed the
+    //  thing in the crypt. The validator caught it immediately, which is the
+    //  system working, but a tool that offers you the wrong answer and then tells
+    //  you off for taking it is not much of a tool.
+    var keys = world.items.filter(function (i) {
+      if (!(i.attributes && i.attributes.TAKEBIT)) return false;
+      return i.location !== ex.to;
+    }).map(function (i) {
+      var where = byId(i.location);
+      return { label: (i.name || i.id) + (where ? '  (in ' + (where.name || where.id) + ')' : ''),
+        value: i.id };
+    });
     keys.push({ label: '— make a new key, here —', value: '__new' });
     var keyId = pick('What opens it?', keys);
     if (!keyId) return;
@@ -5173,9 +5850,95 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     selected = null;
     redraw();
   });
+  //  The walkthrough is found, not written.
+  //
+  //  A game cannot reach "playable" without one, and writing it by hand in a
+  //  visual editor would be typing commands into a box, which is the thing this
+  //  is meant to replace. The blind solver already plays a game with the
+  //  walkthrough withheld, so if it can win, the route it took IS a walkthrough —
+  //  and one that provably starts cold, which is what T3 requires.
+  document.getElementById('findWalk').addEventListener('click', function () {
+    var btn = this;
+    btn.textContent = 'Looking...';
+    btn.disabled = true;
+    setTimeout(function () {
+      var out;
+      try { out = F.solve.solve(stripLayout(world), { maxMs: 8000 }); }
+      catch (e) { out = { solvedBlind: false, error: e.message }; }
+      btn.disabled = false;
+      btn.textContent = 'Find the walkthrough';
+      if (out.solvedBlind) {
+        walkthrough = out.path.map(function (p) { return p.command.toLowerCase(); }).join('\n');
+        findingsEl.innerHTML =
+          '<div class="f"><code>FOUND</code>A route in ' + out.solutionMoves +
+          ' moves, without being told how. ' + out.forcedFraction +
+          '% of the steps had exactly one thing that worked' +
+          (out.forcedFraction >= 60 ? ', which is a corridor.' : '.') + '</div>' +
+          '<div class="f"><code>ROUTE</code>' + esc(walkthrough.replace(/\n/g, ' → ')) + '</div>';
+      } else {
+        findingsEl.innerHTML = '<div class="f warn"><code>NOT FOUND</code>' +
+          'No route to an ending inside eight seconds. Either the game cannot be ' +
+          'finished, or it is big enough to need the command line: ' +
+          '<b>folio solve</b> takes a bigger budget.</div>';
+      }
+    }, 30);
+  });
+
+  //  A real game out, not a fragment. Everything a .folio needs, packed here so
+  //  the thing you made is a thing you can play and give away.
+  document.getElementById('exportFolio').addEventListener('click', function () {
+    var w = stripLayout(world);
+    if (!walkthrough) {
+      findingsEl.innerHTML = '<div class="f warn"><code>NO WALKTHROUGH</code>' +
+        'A .folio carries the proof it can be finished. Press <b>Find the ' +
+        'walkthrough</b> first.</div>';
+      return;
+    }
+    var id = slug(w.meta.title || 'my-game', 'my-game').toLowerCase();
+    var files = {
+      'manifest.json': JSON.stringify({
+        id: id,
+        title: w.meta.title || 'Untitled',
+        author: w.meta.author || 'Unknown',
+        folioVersion: '0.1.0',
+        logicType: 'world',
+        license: 'unknown',
+        contentRating: 'all-ages',
+        aiDisclosure: { prose: 'unknown', art: 'none', note: 'Made in the Folio map editor.' }
+      }, null, 2),
+      'walkthrough.folioscript': '# Found by the blind solver, so it starts cold.\n' + walkthrough + '\n',
+      'logic/world.json': JSON.stringify(w, null, 2),
+      'presentation/scenes.js': F.scenes.scaffold(w).source
+    };
+    // checksums.json is what makes a .folio refuse to load if it has been
+    // tampered with, so it is written here rather than left to the CLI.
+    var enc = new TextEncoder();
+    var sums = {};
+    var names = Object.keys(files).sort();
+    Promise.all(names.map(function (n) {
+      return crypto.subtle.digest('SHA-256', enc.encode(files[n]))
+        .then(function (buf) {
+          sums[n] = [...new Uint8Array(buf)]
+            .map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+        });
+    })).then(function () {
+      files['checksums.json'] = JSON.stringify(sums, null, 2);
+      var bytes = zipWrite(files);
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+      a.download = id + '.folio';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      findingsEl.innerHTML = '<div class="f"><code>PACKED</code>' + esc(id) +
+        '.folio, ' + Math.round(bytes.length / 1024) + 'KB. Drop it on the player, ' +
+        'or run <b>folio validate</b> on it.</div>';
+    });
+  });
+
   document.getElementById('exportWorld').addEventListener('click', function () {
     var out = stripLayout(world);
     out.meta.editorLayout = layout;
+    if (walkthrough) out.meta.editorWalkthrough = walkthrough;
     download(JSON.stringify(out, null, 2), 'world.json', 'application/json');
   });
   document.getElementById('openFile').addEventListener('change', function (e) {
@@ -5201,7 +5964,8 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     world.rules = world.rules || [];
     world.flags = world.flags || {};
     layout = (w.meta && w.meta.editorLayout) || autoLayout(w);
-    if (w.meta) delete w.meta.editorLayout;
+    walkthrough = (w.meta && w.meta.editorWalkthrough) || '';
+    if (w.meta) { delete w.meta.editorLayout; delete w.meta.editorWalkthrough; }
     selected = null;
     redraw();
   }
@@ -5271,6 +6035,73 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
         { id: 'HALL', name: 'The Hall', region: 'house',
           prose: 'A narrow hall.', exits: [{ dir: 'SOUTH', to: 'PORCH' }] }
       ], items: [], rules: [] };
+  }
+
+  //  A .folio is a zip, and the node writer deflates with zlib, which a page does
+  //  not have. Everything here is stored instead of deflated: a stored zip is a
+  //  perfectly ordinary zip, the reader already handles it, and a world file is a
+  //  few kilobytes of JSON that nobody needs compressed.
+  var CRC = (function () {
+    var t = new Int32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c;
+    }
+    return function (bytes) {
+      var c = -1;
+      for (var i = 0; i < bytes.length; i++) c = (c >>> 8) ^ t[(c ^ bytes[i]) & 0xFF];
+      return (c ^ -1) >>> 0;
+    };
+  })();
+
+  function zipWrite(files) {
+    var enc = new TextEncoder();
+    var names = Object.keys(files).sort();     // sorted, so rebuilds are identical
+    var chunks = [], central = [], offset = 0;
+    for (var i = 0; i < names.length; i++) {
+      var nameBytes = enc.encode(names[i]);
+      var body = enc.encode(files[names[i]]);
+      var crc = CRC(body);
+
+      var local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(8, 0, true);             // stored
+      local.setUint16(12, 0x21, true);         // fixed date, for reproducibility
+      local.setUint32(14, crc, true);
+      local.setUint32(18, body.length, true);
+      local.setUint32(22, body.length, true);
+      local.setUint16(26, nameBytes.length, true);
+      chunks.push(new Uint8Array(local.buffer), nameBytes, body);
+
+      var cen = new DataView(new ArrayBuffer(46));
+      cen.setUint32(0, 0x02014b50, true);
+      cen.setUint16(4, 20, true);
+      cen.setUint16(6, 20, true);
+      cen.setUint16(10, 0, true);
+      cen.setUint16(14, 0x21, true);
+      cen.setUint32(16, crc, true);
+      cen.setUint32(20, body.length, true);
+      cen.setUint32(24, body.length, true);
+      cen.setUint16(28, nameBytes.length, true);
+      cen.setUint32(42, offset, true);
+      central.push(new Uint8Array(cen.buffer), nameBytes);
+      offset += 30 + nameBytes.length + body.length;
+    }
+    var centralSize = central.reduce(function (n, c) { return n + c.length; }, 0);
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, names.length, true);
+    end.setUint16(10, names.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+
+    var all = chunks.concat(central, [new Uint8Array(end.buffer)]);
+    var total = all.reduce(function (n, c) { return n + c.length; }, 0);
+    var out = new Uint8Array(total), at = 0;
+    for (var j = 0; j < all.length; j++) { out.set(all[j], at); at += all[j].length; }
+    return out;
   }
 
   function download(text, name, type) {

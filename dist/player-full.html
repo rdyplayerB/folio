@@ -4169,6 +4169,7 @@ class World {
     for (const it of world.items) this.loc[it.id] = it.location;
     this.actorLoc = {};
     for (const a of (world.actors || [])) this.actorLoc[a.id] = a.location;
+    this.actorClock = {};
 
     this.log = [];
   }
@@ -4335,6 +4336,8 @@ class World {
     this.moves++;
     const timed = this.tickTimers();
     if (timed) prose += '\n\n' + timed;
+    const moved = this.tickActors();
+    if (moved) prose += '\n\n' + moved;
     if (this.ended) prose += '\n\n' + this.endText();
 
     this.log.push({ verb, noun, prose });
@@ -4343,10 +4346,10 @@ class World {
 
   matches(rule, verb, noun, indirect) {
     const on = rule.on || {};
-    // An arrival rule is dispatched by fireEnter and nowhere else. Every other
-    // field here is optional, so without this an enter rule matched the first
-    // command of any kind and answered everything in the game.
-    if (on.enter) return false;
+    // Arrival and encounter rules are dispatched by fireEnter and tickActors and
+    // nowhere else. Every other field here is optional, so without this they
+    // would match the first command of any kind and answer the whole game.
+    if (on.enter || on.meets) return false;
     if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
     if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
     if (on.room && on.room !== this.here) return false;
@@ -4425,6 +4428,89 @@ class World {
         case 'lose':
           this.ended = { win: false, reason: endingText(e), pages: endingPages(e) }; break;
         default: break;   // unknown effects are inert; T1 rejects them at validation
+      }
+    }
+    return said.join('\n');
+  }
+
+  /**
+   * Characters that go about their business.
+   *
+   * The largest single thing the format could not express was Zork's thief: a
+   * person who wanders the map, takes what you are carrying, and keeps it
+   * somewhere. Measured against the ZIL source, characters and combat are 39 of
+   * the 72 routines that need real code — more than half of everything the closed
+   * vocabulary could not reach.
+   *
+   * This is that shape without the code. An actor with a `patrol` moves; one with
+   * `takes` helps itself; a rule with `on.meets` answers when it turns up. None of
+   * it is scripting, so the dependency analysis can still see everything the world
+   * is able to do, which is the whole reason the vocabulary is closed.
+   */
+  tickActors() {
+    const said = [];
+    for (const actor of (this.def.actors || [])) {
+      const at = this.actorLoc[actor.id];
+      if (at === 'NOWHERE' || at === 'PLAYER') continue;
+
+      // ---- moving --------------------------------------------------------
+      const p = actor.patrol;
+      if (p) {
+        const clock = this.actorClock[actor.id] = (this.actorClock[actor.id] || 0) + 1;
+        const every = p.every || 1;
+        const willing = p.chance === undefined ? true : this.rng() * 100 < p.chance;
+        if (clock % every === 0 && willing) {
+          const route = (p.rooms && p.rooms.length)
+            ? p.rooms
+            : (this.def.rooms || []).map(r => r.id);
+          if (route.length) {
+            // Round the route in order when one is given, because a patrol is a
+            // beat a player can learn. A named route that shuffled would be
+            // indistinguishable from teleporting.
+            const i = route.indexOf(at);
+            const next = (p.rooms && p.rooms.length)
+              ? route[(i + 1) % route.length]
+              : route[(this.rng() * route.length) | 0];
+            if (next && next !== at) {
+              const wasHere = at === this.here, nowHere = next === this.here;
+              this.actorLoc[actor.id] = next;
+              if (wasHere && !nowHere && p.leaves) said.push(p.leaves);
+              if (!wasHere && nowHere && p.arrives) said.push(p.arrives);
+            }
+          }
+        }
+      }
+
+      // ---- helping itself -------------------------------------------------
+      const t = actor.takes;
+      if (t && this.actorLoc[actor.id] === this.here) {
+        const willing = t.chance === undefined ? true : this.rng() * 100 < t.chance;
+        if (willing) {
+          const wanted = Object.keys(this.loc).filter(id => {
+            if (this.loc[id] !== 'PLAYER') return false;
+            if (Array.isArray(t.what)) return t.what.indexOf(id) >= 0;
+            const it = this.items[id];
+            return !!(it && it.attributes && it.attributes.TAKEBIT);
+          });
+          if (wanted.length) {
+            const got = wanted[(this.rng() * wanted.length) | 0];
+            this.loc[got] = t.to || 'NOWHERE';
+            said.push(t.says ||
+              ('The ' + (actor.name || actor.id).toLowerCase() + ' takes the ' +
+                ((this.items[got] || {}).name || got.toLowerCase()) + '.'));
+          }
+        }
+      }
+
+      // ---- and what happens when it is here -------------------------------
+      if (this.actorLoc[actor.id] === this.here) {
+        for (const rule of this.rules) {
+          if ((rule.on || {}).meets !== actor.id) continue;
+          if (rule.if && !rule.if.every(c => this.test(c))) continue;
+          const text = this.apply(rule.do || []);
+          if (text) said.push(text);
+          break;
+        }
       }
     }
     return said.join('\n');
@@ -4702,6 +4788,7 @@ if (typeof window !== 'undefined') { window.FolioWorld = { createBackend, World 
         here: world.here, moves: world.moves, score: world.score,
         flags: JSON.parse(JSON.stringify(world.flags)),
         counters: JSON.parse(JSON.stringify(world.counters || {})),
+        actorClock: JSON.parse(JSON.stringify(world.actorClock || {})),
         loc: JSON.parse(JSON.stringify(world.loc)),
         actorLoc: JSON.parse(JSON.stringify(world.actorLoc)),
         visited: Array.from(world.visited),
@@ -4717,6 +4804,7 @@ if (typeof window !== 'undefined') { window.FolioWorld = { createBackend, World 
       world.score = snap.score;
       world.flags = JSON.parse(JSON.stringify(snap.flags));
       world.counters = JSON.parse(JSON.stringify(snap.counters || {}));
+      world.actorClock = JSON.parse(JSON.stringify(snap.actorClock || {}));
       world.loc = JSON.parse(JSON.stringify(snap.loc));
       world.actorLoc = JSON.parse(JSON.stringify(snap.actorLoc));
       world.visited = new Set(snap.visited || []);

@@ -66,6 +66,7 @@
         here: world.here, moves: world.moves, score: world.score,
         flags: JSON.parse(JSON.stringify(world.flags)),
         counters: JSON.parse(JSON.stringify(world.counters || {})),
+        actorClock: JSON.parse(JSON.stringify(world.actorClock || {})),
         loc: JSON.parse(JSON.stringify(world.loc)),
         actorLoc: JSON.parse(JSON.stringify(world.actorLoc)),
         visited: Array.from(world.visited),
@@ -81,6 +82,7 @@
       world.score = snap.score;
       world.flags = JSON.parse(JSON.stringify(snap.flags));
       world.counters = JSON.parse(JSON.stringify(snap.counters || {}));
+      world.actorClock = JSON.parse(JSON.stringify(snap.actorClock || {}));
       world.loc = JSON.parse(JSON.stringify(snap.loc));
       world.actorLoc = JSON.parse(JSON.stringify(snap.actorLoc));
       world.visited = new Set(snap.visited || []);

@@ -184,10 +184,19 @@ function analyse(world) {
   // was rejected. Found by writing a game against the published spec rather than
   // against the engine, which is exactly what that exercise is for.
   function actorReachable(id) {
-    if (!actors[id]) return false;
+    const a = actors[id];
+    if (!a) return false;
     const where = actorLoc[id];
-    if (where === 'NOWHERE') return false;
     if (where === 'PLAYER') return true;      // travelling with you, so always here
+    // A character on a patrol is met wherever the patrol goes, so the question is
+    // whether the player can reach any room on its route. Without this, a thief
+    // parked in its lair reads as unreachable and every rule about it as dead.
+    if (a.patrol) {
+      const route = (a.patrol.rooms && a.patrol.rooms.length)
+        ? a.patrol.rooms : Object.keys(rooms);
+      if (route.some(r => reachRooms.has(r))) return true;
+    }
+    if (where === 'NOWHERE') return false;
     return rooms[where] ? reachRooms.has(where) : false;
   }
 
@@ -255,6 +264,7 @@ function analyse(world) {
       const r = rules[i];
       const on = r.on || {};
       if (on.room && !reachRooms.has(on.room)) continue;
+      if (on.meets && !actorReachable(on.meets)) continue;
       // The noun must be present for the player to act on it at all.
       if (on.noun && !nounReachable(on.noun)) continue;
       // A pairing needs both halves. Without this a rule gated on an unobtainable
@@ -387,10 +397,14 @@ function analyse(world) {
     if (firedRules.has(i)) continue;
     const on = rules[i].on || {};
     const roomDead = on.room && !reachRooms.has(on.room);
-    const nounDead = (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) ||
+    const meetDead = on.meets && !actorReachable(on.meets);
+    const nounDead = meetDead ||
+      (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) ||
       (on.second && !nounReachable(on.second) && !everPresent.has(on.second));
     if (roomDead || nounDead) {
-      warn('W313', 'rule ' + i + ' (' + (on.verb || '?') + ' ' + (on.noun || '') +
+      warn('W313', 'rule ' + i + ' (' +
+        (on.meets ? 'meeting ' + on.meets : on.enter ? 'entering ' + on.enter
+          : (on.verb || '?') + ' ' + (on.noun || '')).trim() +
         ') can never fire',
         roomDead ? 'Its room "' + on.room + '" is unreachable.'
                  : 'Its noun "' + on.noun + '" can never be present.');
@@ -437,6 +451,49 @@ function analyse(world) {
         crossings.slice(0, 5).join('; ') +
         '. A scene change belongs in a rule with a goto, where the player does ' +
         'something and the story moves, rather than on the compass.');
+    }
+  }
+
+  // A character that helps itself to something a puzzle needs.
+  //
+  // Theft only ever removes capability, so it is left out of the fixpoint the way
+  // destroy is: modelling it would turn an ordinary thief into a hard error. But
+  // it is exactly the softlock W314 reports for destruction, arriving on legs, and
+  // a player robbed of the one key has no way to know the game is over.
+  const thieves = (world.actors || []).filter(a => a.takes);
+  if (thieves.length) {
+    const needed = new Set();
+    const wantItem = (c) => {
+      if (!c) return;
+      if ((c.type === 'carrying' || c.type === 'present') && c.item) needed.add(c.item);
+      if (c.condition) wantItem(c.condition);
+      for (const sub of (c.conditions || [])) wantItem(sub);
+    };
+    for (const r of rules) {
+      for (const c of (r.if || [])) wantItem(c);
+      if ((r.on || {}).second) needed.add(r.on.second);
+    }
+    const atRisk = [];
+    for (const a of thieves) {
+      const lair = a.takes.to;
+      // Loot put somewhere the player can still get to is a setback, not a
+      // dead end. Only what leaves the world for good is a trap.
+      const recoverable = lair && rooms[lair];
+      if (recoverable) continue;
+      for (const id of needed) {
+        const it = items[id];
+        if (!it) continue;
+        if (Array.isArray(a.takes.what) && a.takes.what.indexOf(id) < 0) continue;
+        if (!Array.isArray(a.takes.what) && !(it.attributes && it.attributes.TAKEBIT)) continue;
+        atRisk.push(id + ' (taken by ' + a.id + ')');
+      }
+    }
+    if (atRisk.length) {
+      warn('W513', atRisk.length + ' item' + (atRisk.length > 1 ? 's a character can take are' : ' a character can take is') +
+        ' needed later',
+        'The thing leaves the world and the player is stuck with no way to tell: ' +
+        [...new Set(atRisk)].slice(0, 4).join('; ') +
+        '. Give the character a lair the player can reach, or name what it may take.');
     }
   }
 

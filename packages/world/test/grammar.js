@@ -280,6 +280,73 @@ const base = (extra) => Object.assign({
   ok('while a different seed gives a different fight', roll(99) !== a, roll(99));
 }
 
+
+// ---- characters who go about their business -------------------------------
+//
+// The largest single thing the format could not express was Zork's thief.
+// Measured against the ZIL source, characters and combat are 39 of the 72
+// routines that need real code — more than half of everything out of reach.
+{
+  const w = {
+    meta: { start: 'A' },
+    rooms: [{ id: 'A', exits: [{ dir: 'NORTH', to: 'B' }] },
+            { id: 'B', exits: [{ dir: 'SOUTH', to: 'A' }] },
+            { id: 'LAIR', exits: [] }],
+    items: [{ id: 'COIN', name: 'coin', location: 'PLAYER', attributes: { TAKEBIT: true } }],
+    actors: [{ id: 'THIEF', name: 'thief', location: 'B',
+      patrol: { rooms: ['B', 'A'], every: 1, arrives: 'He slips in.', leaves: 'He melts away.' },
+      takes: { to: 'LAIR', chance: 100, says: 'He lifts the coin.' } }],
+    rules: [{ on: { meets: 'THIEF' }, do: [{ type: 'print', text: 'He looks you over.' }] }]
+  };
+  const be = boot(w);
+  const first = be.submit('LOOK').prose;
+  ok('a patrolling character walks into your room',
+    /slips in/.test(first), first.replace(/\n+/g, ' | ').slice(0, 60));
+  ok('and helps itself to what you are carrying',
+    be.world.loc.COIN === 'LAIR', 'coin is at ' + be.world.loc.COIN);
+  ok('and a meets rule answers while it is here', /looks you over/.test(first));
+  ok('it leaves again on its route',
+    /melts away/.test(be.submit('LOOK').prose));
+  // An encounter is a thing that happens during the turn, not the turn's answer.
+  // It fires whenever the character is present, which is what makes a haunting
+  // lethal, but the command still gets its own reply first.
+  const both = be.submit('TAKE', 'NOTHING').prose;
+  ok('an encounter does not replace the answer to the command',
+    /do not see|not something/i.test(both.split('\n')[0]), both.split('\n')[0]);
+}
+{
+  // A route is walked in order, because a patrol a player can learn is a beat
+  // and a patrol that shuffles is indistinguishable from teleporting.
+  const be = boot({
+    meta: { start: 'A' }, items: [],
+    rooms: [{ id: 'A', exits: [] }, { id: 'B', exits: [] }, { id: 'C', exits: [] }],
+    actors: [{ id: 'GUARD', location: 'A', patrol: { rooms: ['A', 'B', 'C'], every: 1 } }],
+    rules: []
+  });
+  const seen = [];
+  for (var i = 0; i < 4; i++) { be.submit('LOOK'); seen.push(be.world.actorLoc.GUARD); }
+  ok('a named route is walked in order', seen.join('') === 'BCAB', seen.join(' '));
+}
+{
+  // Uninvited's shape rather than Zork's: something that kills you unless you
+  // are carrying the thing that wards it off.
+  const w = {
+    meta: { start: 'A' }, rooms: [{ id: 'A', exits: [] }],
+    items: [{ id: 'AMULET', location: 'A', attributes: { TAKEBIT: true } }],
+    actors: [{ id: 'WRAITH', location: 'A', hostile: true, patrol: { rooms: ['A'], every: 1 } }],
+    rules: [{ on: { meets: 'WRAITH' },
+      if: [{ type: 'not', condition: { type: 'carrying', item: 'AMULET' } }],
+      do: [{ type: 'lose', text: 'The cold gets into you.' }] }]
+  };
+  let be = boot(w);
+  be.submit('LOOK');
+  ok('a haunting kills you when you are unprotected', !!be.world.ended);
+  be = boot(w);
+  be.submit('TAKE', 'AMULET');
+  be.submit('LOOK');
+  ok('and does not when you are not', !be.world.ended);
+}
+
 console.log('\n' + (fail ? '\x1b[31m' + fail + ' failed\x1b[0m, ' : '') +
   '\x1b[32m' + pass + ' passed\x1b[0m\n');
 process.exit(fail ? 1 : 0);

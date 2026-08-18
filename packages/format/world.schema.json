@@ -365,6 +365,66 @@
         "description": {
           "type": "string",
           "description": "What LOOK at them says."
+        },
+        "patrol": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Makes this character move. Give it a route and it walks the route in order, which is a beat a player can learn; leave the rooms out and it wanders anywhere.",
+          "properties": {
+            "rooms": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "description": "The route, walked in order. Omit to wander the whole map."
+            },
+            "every": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Moves once every this many turns. Defaults to 1."
+            },
+            "chance": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Percent chance of moving on a turn it is due to. Defaults to always."
+            },
+            "arrives": {
+              "type": "string",
+              "description": "Said when it walks into the player's room."
+            },
+            "leaves": {
+              "type": "string",
+              "description": "Said when it walks out."
+            }
+          }
+        },
+        "takes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Makes this character help itself to what the player is carrying, which is the shape of Zork's thief. Give it a lair the player can reach or the loot is gone for good, which W513 reports.",
+          "properties": {
+            "what": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "description": "Only these. Omit and it takes anything takeable."
+            },
+            "to": {
+              "$ref": "#/$defs/id",
+              "description": "Where the loot goes. A room the player can reach makes theft a setback rather than a dead end."
+            },
+            "chance": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Percent chance per turn while sharing your room."
+            },
+            "says": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -399,6 +459,10 @@
             "enter": {
               "$ref": "#/$defs/id",
               "description": "Fires when the player arrives in this room, instead of on a command. Use it for a floor that gives way, an ambush, a door closing behind you. A rule with `enter` is never matched by a typed or clicked command."
+            },
+            "meets": {
+              "$ref": "#/$defs/id",
+              "description": "Fires on the turn this character is in the player's room, rather than on a command. A rule with `meets` is never matched by anything typed or clicked."
             }
           }
         },

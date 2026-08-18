@@ -40,7 +40,9 @@
   //  map reopens the way it was left.
   var world = blank();
   var layout = {};
-  var selected = null;
+  var selected = null;      // a room id
+  var pickedItem = null;    // an item id, for editing its description
+  var walkthrough = '';     // found by the solver, not written by hand
 
   function blank() {
     return { meta: { title: 'Untitled', start: null }, flags: {},
@@ -260,7 +262,7 @@
 
   function stripLayout(w) {
     var c = JSON.parse(JSON.stringify(w));
-    if (c.meta) delete c.meta.editorLayout;
+    if (c.meta) { delete c.meta.editorLayout; delete c.meta.editorWalkthrough; }
     return c;
   }
   function esc(s) {
@@ -399,6 +401,39 @@
     }
     html += '<div class="minirow"><button class="mini" data-add="item">+ Something here</button>' +
       '<button class="mini" data-add="fixture">+ Scenery</button></div>';
+    // What LOOK says about the thing the author last touched. Kept to one at a
+    // time because a textarea per object turns a short list into a wall.
+    var pi = pickedItem && itemById(pickedItem);
+    if (pi && pi.location === r.id) {
+      html += '<div class="field" style="margin-top:12px"><label>Looking at ' +
+        esc(pi.name || pi.id) + '</label><textarea data-desc="' + esc(pi.id) + '">' +
+        esc(pi.description || '') + '</textarea></div>';
+    }
+    html += '</div>';
+
+    // ---- who is in it ---------------------------------------------------
+    var who = (world.actors || []).filter(function (a) { return a.location === r.id; });
+    html += '<div class="pane"><p class="ptitle">Who is here</p>';
+    if (!who.length) html += '<p class="pdim">Nobody.</p>';
+    for (var q = 0; q < who.length; q++) {
+      var a = who[q];
+      html += '<div class="row">' +
+        '<input class="rename" data-actor="' + esc(a.id) + '" value="' + esc(a.name || a.id) + '">' +
+        '<span class="tag' + (a.patrol ? ' on' : '') + '" data-walk="' + esc(a.id) +
+        '" title="Does it move about?">walks</span>' +
+        '<span class="tag' + (a.takes ? ' on' : '') + '" data-rob="' + esc(a.id) +
+        '" title="Does it take your things?">robs</span>' +
+        '<span class="x" data-delactor="' + esc(a.id) + '">×</span></div>';
+      if (a.patrol && a.patrol.rooms) {
+        html += '<div class="row" style="border:0;padding-top:2px"><span class="pdim" ' +
+          'style="font-size:11px">route: ' +
+          esc(a.patrol.rooms.map(function (id) {
+            var rr = byId(id); return rr ? (rr.name || id) : id;
+          }).join(' → ')) + '</span></div>';
+      }
+    }
+    html += '<div class="minirow"><button class="mini" data-add="actor">+ Somebody</button>' +
+      '<button class="mini" data-pz="haunt">Kills you unless…</button></div>';
     html += '</div>';
 
     // ---- puzzles --------------------------------------------------------
@@ -477,13 +512,44 @@
     });
     inspector.querySelectorAll('[data-add]').forEach(function (el) {
       el.addEventListener('click', function () {
-        addItem(selected, el.getAttribute('data-add') === 'item');
+        var kind = el.getAttribute('data-add');
+        if (kind === 'actor') addActor(selected);
+        else addItem(selected, kind === 'item');
       });
     });
     inspector.querySelectorAll('.rename').forEach(function (el) {
+      var isActor = el.hasAttribute('data-actor');
       el.addEventListener('change', function () {
-        var it = itemById(el.getAttribute('data-item'));
-        if (it) { it.name = el.value; redraw(); }
+        var thing = isActor ? actorById(el.getAttribute('data-actor'))
+          : itemById(el.getAttribute('data-item'));
+        if (thing) { thing.name = el.value; redraw(); }
+      });
+      if (!isActor) {
+        el.addEventListener('focus', function () {
+          pickedItem = el.getAttribute('data-item'); showInspector();
+        });
+      }
+    });
+    inspector.querySelectorAll('[data-desc]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var it = itemById(el.getAttribute('data-desc'));
+        if (!it) return;
+        if (el.value) it.description = el.value; else delete it.description;
+        check();
+      });
+    });
+    inspector.querySelectorAll('[data-walk]').forEach(function (el) {
+      el.addEventListener('click', function () { toggleWalk(el.getAttribute('data-walk')); });
+    });
+    inspector.querySelectorAll('[data-rob]').forEach(function (el) {
+      el.addEventListener('click', function () { toggleRob(el.getAttribute('data-rob')); });
+    });
+    inspector.querySelectorAll('[data-delactor]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var id = el.getAttribute('data-delactor');
+        world.actors = (world.actors || []).filter(function (a) { return a.id !== id; });
+        world.rules = world.rules.filter(function (ru) { return (ru.on || {}).meets !== id; });
+        redraw();
       });
     });
     inspector.querySelectorAll('[data-take]').forEach(function (el) {
@@ -518,6 +584,50 @@
 
   function redraw() { draw(); check(); showInspector(); }
 
+  function actorById(id) {
+    for (var i = 0; i < (world.actors || []).length; i++) {
+      if (world.actors[i].id === id) return world.actors[i];
+    }
+    return null;
+  }
+
+  function addActor(roomId) {
+    world.actors = world.actors || [];
+    var id = freshId('SOMEBODY');
+    world.actors.push({ id: id, name: 'somebody', location: roomId, attributes: {} });
+    redraw();
+  }
+
+  //  A patrol is a route walked in order, so the default is this room and its
+  //  neighbours: a character who paces the ground around where you found them
+  //  reads as a person, and one who teleports across the map reads as a bug.
+  function toggleWalk(id) {
+    var a = actorById(id);
+    if (!a) return;
+    if (a.patrol) { delete a.patrol; return redraw(); }
+    var home = byId(a.location);
+    var route = [a.location];
+    for (var i = 0; i < ((home && home.exits) || []).length && route.length < 4; i++) {
+      if (route.indexOf(home.exits[i].to) < 0) route.push(home.exits[i].to);
+    }
+    a.patrol = { rooms: route, every: 2, chance: 70,
+      arrives: 'The ' + (a.name || 'figure') + ' comes in.',
+      leaves: 'The ' + (a.name || 'figure') + ' goes.' };
+    redraw();
+  }
+
+  //  Loot goes to the room the character started in, which is the difference
+  //  between a thief and a dead end: somewhere the player can follow. Sending it
+  //  nowhere is what W513 reports, so the editor does not do it by default.
+  function toggleRob(id) {
+    var a = actorById(id);
+    if (!a) return;
+    if (a.takes) { delete a.takes; return redraw(); }
+    a.takes = { to: a.location, chance: 40,
+      says: 'The ' + (a.name || 'figure') + ' takes something of yours and is gone with it.' };
+    redraw();
+  }
+
   function addItem(roomId, takeable) {
     var n = itemsIn(roomId).length + 1;
     var id = freshId(slug('thing ' + n, 'THING'));
@@ -545,6 +655,42 @@
     if (kind === 'reward') return reward(room);
     if (kind === 'win') return ending(room);
     if (kind === 'hazard') return hazard(room);
+    if (kind === 'haunt') return haunting(room);
+  }
+
+  //  The Uninvited shape: something that kills you unless you are carrying the
+  //  thing that wards it off. One rule, but it needs the character to exist and
+  //  to be somewhere the player will meet it, which is the part that is easy to
+  //  get half-right by hand.
+  function haunting(room) {
+    var here = (world.actors || []).filter(function (a) { return a.location === room.id; })
+      .map(function (a) { return { label: a.name || a.id, value: a.id }; });
+    here.push({ label: '— make something new to haunt this room —', value: '__new' });
+    var who = pick('What haunts this room?', here);
+    if (!who) return;
+    if (who === '__new') {
+      who = freshId('WRAITH');
+      world.actors = world.actors || [];
+      world.actors.push({ id: who, name: 'a cold shape', location: room.id, hostile: true,
+        patrol: { rooms: [room.id], every: 1,
+          arrives: 'Something is here that was not here before.' } });
+    }
+    var wards = world.items.filter(function (i) { return i.attributes && i.attributes.TAKEBIT; })
+      .map(function (i) {
+        var w = byId(i.location);
+        return { label: (i.name || i.id) + (w ? '  (in ' + (w.name || w.id) + ')' : ''), value: i.id };
+      });
+    wards.unshift({ label: 'nothing — it always kills', value: '__always' });
+    var ward = pick('What keeps it off?', wards);
+    if (!ward) return;
+
+    var rule = { on: { meets: who },
+      do: [{ type: 'lose', pages: ['It reaches you.', 'And that is all.'] }] };
+    if (ward !== '__always') {
+      rule.if = [{ type: 'not', condition: { type: 'carrying', item: ward } }];
+    }
+    world.rules.unshift(rule);
+    redraw();
   }
 
   function pick(label, options) {
@@ -565,12 +711,19 @@
     var ex = pick('Which way is locked?', exits);
     if (!ex) return;
 
-    var keys = world.items.filter(function (i) { return i.attributes && i.attributes.TAKEBIT; })
-      .map(function (i) {
-        var where = byId(i.location);
-        return { label: (i.name || i.id) + (where ? '  (in ' + (where.name || where.id) + ')' : ''),
-          value: i.id };
-      });
+    //  Never offer a key that sits behind the door it opens. The editor did, once,
+    //  and the world it produced was circular: the way to the crypt needed the
+    //  thing in the crypt. The validator caught it immediately, which is the
+    //  system working, but a tool that offers you the wrong answer and then tells
+    //  you off for taking it is not much of a tool.
+    var keys = world.items.filter(function (i) {
+      if (!(i.attributes && i.attributes.TAKEBIT)) return false;
+      return i.location !== ex.to;
+    }).map(function (i) {
+      var where = byId(i.location);
+      return { label: (i.name || i.id) + (where ? '  (in ' + (where.name || where.id) + ')' : ''),
+        value: i.id };
+    });
     keys.push({ label: '— make a new key, here —', value: '__new' });
     var keyId = pick('What opens it?', keys);
     if (!keyId) return;
@@ -753,9 +906,95 @@
     selected = null;
     redraw();
   });
+  //  The walkthrough is found, not written.
+  //
+  //  A game cannot reach "playable" without one, and writing it by hand in a
+  //  visual editor would be typing commands into a box, which is the thing this
+  //  is meant to replace. The blind solver already plays a game with the
+  //  walkthrough withheld, so if it can win, the route it took IS a walkthrough —
+  //  and one that provably starts cold, which is what T3 requires.
+  document.getElementById('findWalk').addEventListener('click', function () {
+    var btn = this;
+    btn.textContent = 'Looking...';
+    btn.disabled = true;
+    setTimeout(function () {
+      var out;
+      try { out = F.solve.solve(stripLayout(world), { maxMs: 8000 }); }
+      catch (e) { out = { solvedBlind: false, error: e.message }; }
+      btn.disabled = false;
+      btn.textContent = 'Find the walkthrough';
+      if (out.solvedBlind) {
+        walkthrough = out.path.map(function (p) { return p.command.toLowerCase(); }).join('\n');
+        findingsEl.innerHTML =
+          '<div class="f"><code>FOUND</code>A route in ' + out.solutionMoves +
+          ' moves, without being told how. ' + out.forcedFraction +
+          '% of the steps had exactly one thing that worked' +
+          (out.forcedFraction >= 60 ? ', which is a corridor.' : '.') + '</div>' +
+          '<div class="f"><code>ROUTE</code>' + esc(walkthrough.replace(/\n/g, ' → ')) + '</div>';
+      } else {
+        findingsEl.innerHTML = '<div class="f warn"><code>NOT FOUND</code>' +
+          'No route to an ending inside eight seconds. Either the game cannot be ' +
+          'finished, or it is big enough to need the command line: ' +
+          '<b>folio solve</b> takes a bigger budget.</div>';
+      }
+    }, 30);
+  });
+
+  //  A real game out, not a fragment. Everything a .folio needs, packed here so
+  //  the thing you made is a thing you can play and give away.
+  document.getElementById('exportFolio').addEventListener('click', function () {
+    var w = stripLayout(world);
+    if (!walkthrough) {
+      findingsEl.innerHTML = '<div class="f warn"><code>NO WALKTHROUGH</code>' +
+        'A .folio carries the proof it can be finished. Press <b>Find the ' +
+        'walkthrough</b> first.</div>';
+      return;
+    }
+    var id = slug(w.meta.title || 'my-game', 'my-game').toLowerCase();
+    var files = {
+      'manifest.json': JSON.stringify({
+        id: id,
+        title: w.meta.title || 'Untitled',
+        author: w.meta.author || 'Unknown',
+        folioVersion: '0.1.0',
+        logicType: 'world',
+        license: 'unknown',
+        contentRating: 'all-ages',
+        aiDisclosure: { prose: 'unknown', art: 'none', note: 'Made in the Folio map editor.' }
+      }, null, 2),
+      'walkthrough.folioscript': '# Found by the blind solver, so it starts cold.\n' + walkthrough + '\n',
+      'logic/world.json': JSON.stringify(w, null, 2),
+      'presentation/scenes.js': F.scenes.scaffold(w).source
+    };
+    // checksums.json is what makes a .folio refuse to load if it has been
+    // tampered with, so it is written here rather than left to the CLI.
+    var enc = new TextEncoder();
+    var sums = {};
+    var names = Object.keys(files).sort();
+    Promise.all(names.map(function (n) {
+      return crypto.subtle.digest('SHA-256', enc.encode(files[n]))
+        .then(function (buf) {
+          sums[n] = [...new Uint8Array(buf)]
+            .map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+        });
+    })).then(function () {
+      files['checksums.json'] = JSON.stringify(sums, null, 2);
+      var bytes = zipWrite(files);
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
+      a.download = id + '.folio';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      findingsEl.innerHTML = '<div class="f"><code>PACKED</code>' + esc(id) +
+        '.folio, ' + Math.round(bytes.length / 1024) + 'KB. Drop it on the player, ' +
+        'or run <b>folio validate</b> on it.</div>';
+    });
+  });
+
   document.getElementById('exportWorld').addEventListener('click', function () {
     var out = stripLayout(world);
     out.meta.editorLayout = layout;
+    if (walkthrough) out.meta.editorWalkthrough = walkthrough;
     download(JSON.stringify(out, null, 2), 'world.json', 'application/json');
   });
   document.getElementById('openFile').addEventListener('change', function (e) {
@@ -781,7 +1020,8 @@
     world.rules = world.rules || [];
     world.flags = world.flags || {};
     layout = (w.meta && w.meta.editorLayout) || autoLayout(w);
-    if (w.meta) delete w.meta.editorLayout;
+    walkthrough = (w.meta && w.meta.editorWalkthrough) || '';
+    if (w.meta) { delete w.meta.editorLayout; delete w.meta.editorWalkthrough; }
     selected = null;
     redraw();
   }
@@ -851,6 +1091,73 @@
         { id: 'HALL', name: 'The Hall', region: 'house',
           prose: 'A narrow hall.', exits: [{ dir: 'SOUTH', to: 'PORCH' }] }
       ], items: [], rules: [] };
+  }
+
+  //  A .folio is a zip, and the node writer deflates with zlib, which a page does
+  //  not have. Everything here is stored instead of deflated: a stored zip is a
+  //  perfectly ordinary zip, the reader already handles it, and a world file is a
+  //  few kilobytes of JSON that nobody needs compressed.
+  var CRC = (function () {
+    var t = new Int32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c;
+    }
+    return function (bytes) {
+      var c = -1;
+      for (var i = 0; i < bytes.length; i++) c = (c >>> 8) ^ t[(c ^ bytes[i]) & 0xFF];
+      return (c ^ -1) >>> 0;
+    };
+  })();
+
+  function zipWrite(files) {
+    var enc = new TextEncoder();
+    var names = Object.keys(files).sort();     // sorted, so rebuilds are identical
+    var chunks = [], central = [], offset = 0;
+    for (var i = 0; i < names.length; i++) {
+      var nameBytes = enc.encode(names[i]);
+      var body = enc.encode(files[names[i]]);
+      var crc = CRC(body);
+
+      var local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(8, 0, true);             // stored
+      local.setUint16(12, 0x21, true);         // fixed date, for reproducibility
+      local.setUint32(14, crc, true);
+      local.setUint32(18, body.length, true);
+      local.setUint32(22, body.length, true);
+      local.setUint16(26, nameBytes.length, true);
+      chunks.push(new Uint8Array(local.buffer), nameBytes, body);
+
+      var cen = new DataView(new ArrayBuffer(46));
+      cen.setUint32(0, 0x02014b50, true);
+      cen.setUint16(4, 20, true);
+      cen.setUint16(6, 20, true);
+      cen.setUint16(10, 0, true);
+      cen.setUint16(14, 0x21, true);
+      cen.setUint32(16, crc, true);
+      cen.setUint32(20, body.length, true);
+      cen.setUint32(24, body.length, true);
+      cen.setUint16(28, nameBytes.length, true);
+      cen.setUint32(42, offset, true);
+      central.push(new Uint8Array(cen.buffer), nameBytes);
+      offset += 30 + nameBytes.length + body.length;
+    }
+    var centralSize = central.reduce(function (n, c) { return n + c.length; }, 0);
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, names.length, true);
+    end.setUint16(10, names.length, true);
+    end.setUint32(12, centralSize, true);
+    end.setUint32(16, offset, true);
+
+    var all = chunks.concat(central, [new Uint8Array(end.buffer)]);
+    var total = all.reduce(function (n, c) { return n + c.length; }, 0);
+    var out = new Uint8Array(total), at = 0;
+    for (var j = 0; j < all.length; j++) { out.set(all[j], at); at += all[j].length; }
+    return out;
   }
 
   function download(text, name, type) {

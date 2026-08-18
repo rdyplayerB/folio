@@ -181,6 +181,19 @@ opening).
 A hostile actor in the room sets `fighting`, which you can read as a condition. It
 does no harm by itself; the harm is a rule or a timer.
 
+`patrol` makes a character move: `{ "rooms": [...], "every": 3, "chance": 60,
+"arrives": "...", "leaves": "..." }`. A named route is walked in order, because a
+patrol a player can learn is a beat. Omit `rooms` and it wanders anywhere.
+
+`takes` makes it help itself to what you carry, which is the shape of Zork's thief:
+`{ "what": [...], "to": "LAIR", "chance": 30, "says": "..." }`. **Give it a `to` the
+player can reach** or the loot is gone for good and the game can become unwinnable
+with no warning, which `W513` reports.
+
+A rule with `on.meets: "THIEF"` fires on any turn that character is in your room. It
+happens during the turn rather than answering the command, and it fires every turn
+they are there, which is what makes a haunting lethal.
+
 `location` is a room id, `"NOWHERE"` until they arrive, or **`"PLAYER"` to travel
 with the player**. A companion at `"PLAYER"` is present in every room you enter, so
 speaking to them works everywhere rather than hitting the absent default. Move

@@ -297,8 +297,45 @@
         the music or the scene. It does not itself do any harm; the harm is a rule or a timer.
       </dd>
       <dt>attributes</dt><dd><span class="t">object</span> As for items.</dd>
+      <dt>patrol</dt>
+      <dd>
+        <span class="t">object</span>
+        Makes the character move. <code>rooms</code> is a route, walked in order, because
+        a patrol a player can learn is a beat and one that shuffles is indistinguishable
+        from teleporting; omit it and the character wanders anywhere. <code>every</code>
+        is how many turns between moves, <code>chance</code> a percentage per eligible
+        turn, and <code>arrives</code> and <code>leaves</code> are what is said as it
+        comes and goes.
+      </dd>
+      <dt>takes</dt>
+      <dd>
+        <span class="t">object</span>
+        Makes the character help itself to what you are carrying, which is the shape of
+        Zork's thief. <code>to</code> is where the loot goes and matters more than it
+        looks: a lair the player can reach makes theft a setback, and anywhere else makes
+        it a dead end, which <span class="code w">W513</span> reports. <code>what</code>
+        limits it to named things, <code>chance</code> throttles it, <code>says</code> is
+        the line.
+      </dd>
     </dl>
     <p>Move them with the <code>move-actor</code> effect.</p>
+    <p>
+      A rule with <code>on.meets</code> fires on any turn the character shares the
+      player's room. It happens during the turn rather than being the turn's answer, so
+      the command still gets its own reply first, and it fires every turn the character
+      is there, which is what makes a haunting lethal. Gate it with a flag or a
+      <code>chance</code> condition if it should not speak every time.
+    </p>
+<pre><span class="c">// Zork's thief, without any code</span>
+{ <span class="k">"id"</span>: <span class="s">"THIEF"</span>, <span class="k">"name"</span>: <span class="s">"a seedy-looking individual"</span>, <span class="k">"location"</span>: <span class="s">"TREASURE-ROOM"</span>,
+  <span class="k">"patrol"</span>: { <span class="k">"rooms"</span>: [<span class="s">"CELLAR"</span>, <span class="s">"MAZE-1"</span>, <span class="s">"TREASURE-ROOM"</span>], <span class="k">"every"</span>: 3, <span class="k">"chance"</span>: 60,
+              <span class="k">"arrives"</span>: <span class="s">"Someone is here, and was not a moment ago."</span> },
+  <span class="k">"takes"</span>: { <span class="k">"to"</span>: <span class="s">"TREASURE-ROOM"</span>, <span class="k">"chance"</span>: 30, <span class="k">"says"</span>: <span class="s">"His hands are quicker than yours."</span> } }
+
+<span class="c">// Uninvited's shape: something that kills you unless you are warded</span>
+{ <span class="k">"on"</span>: { <span class="k">"meets"</span>: <span class="s">"WRAITH"</span> },
+  <span class="k">"if"</span>: [ { <span class="k">"type"</span>: <span class="s">"not"</span>, <span class="k">"condition"</span>: { <span class="k">"type"</span>: <span class="s">"carrying"</span>, <span class="k">"item"</span>: <span class="s">"AMULET"</span> } } ],
+  <span class="k">"do"</span>: [ { <span class="k">"type"</span>: <span class="s">"lose"</span>, <span class="k">"text"</span>: <span class="s">"The cold gets into you."</span> } ] }</pre>
 
     <h2 id="rules">rules</h2>
     <p>

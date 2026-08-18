@@ -30,6 +30,7 @@ const MODULES = [
   ['packages/validator/design.js', './design.js'],
   ['packages/format/brief.js', '../format/brief.js'],
   ['packages/format/scenes.js', '../format/scenes.js'],
+  ['packages/validator/solve.js', './solve.js'],
   ['packages/format/schema.js', '../format/schema.js']
 ];
 
@@ -79,7 +80,8 @@ parts.push('    replay: require(\'replay.js\'),');
 parts.push('    design: require(\'design.js\'),');
 parts.push('    schema: require(\'schema.js\'),');
 parts.push('    brief: require(\'brief.js\'),');
-parts.push('    scenes: require(\'scenes.js\')');
+parts.push('    scenes: require(\'scenes.js\'),');
+parts.push('    solve: require(\'solve.js\')');
 parts.push('  };');
 parts.push('})();');
 

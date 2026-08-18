@@ -210,6 +210,15 @@
         <b>A room is unreachable.</b> Nothing the player can do leads there. Usually a
         missing return exit or a condition nothing satisfies.
       </dd>
+      <dt><span class="code w">W513</span></dt>
+      <dd>
+        <b>A character can take something that is needed later.</b> Theft only ever
+        removes capability, so it is left out of the dependency fixpoint the way
+        <code>destroy</code> is. But a player robbed of the one key is stuck with no way
+        to tell. Give the character a <code>takes.to</code> lair the player can reach,
+        which makes theft a setback rather than a dead end, or name exactly what it may
+        take with <code>takes.what</code>.
+      </dd>
       <dt><span class="code w">W512</span></dt>
       <dd>
         <b>An exit walks between regions.</b> A compass exit says two places are next
