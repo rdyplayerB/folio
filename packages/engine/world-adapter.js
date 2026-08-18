@@ -141,13 +141,25 @@
         // display name is only ever for the player's eyes.
         return v + ' ' + objId + (obj2Id ? ' ' + obj2Id : '');
       },
-      // Which verbs ask for a second target. Derived from the world rather than
-      // guessed: a rule that names `second` is the only reason to ask for one, so
-      // a game that never pairs objects never makes the player pick twice.
-      needsSecond: function (verb) {
+      // Whether to ask for a second target, decided per verb AND NOUN.
+      //
+      // Asking per verb alone was a real bug and a bad one. One rule anywhere in
+      // the game pairing something with USE made every USE wait for a second
+      // object, so a player who selected USE and clicked the thing that opens the
+      // first room got silence and stayed there. Any game mixing paired and
+      // unpaired uses of the same verb was unfinishable by clicking.
+      //
+      // A second object is wanted only when a rule actually pairs THIS thing.
+      needsSecond: function (verb, objId) {
         var v = String(verb || '').toUpperCase();
+        var n = objId ? String(objId).toUpperCase() : null;
         return (def.rules || []).some(function (r) {
-          return r.on && r.on.second && String(r.on.verb || '').toUpperCase() === v;
+          if (!r.on || !r.on.second) return false;
+          if (String(r.on.verb || '').toUpperCase() !== v) return false;
+          // With no noun yet the answer is about the verb in general, which is
+          // what the interface wants before anything has been picked.
+          if (!n) return true;
+          return String(r.on.noun || '').toUpperCase() === n;
         });
       },
       magicWords: (def.meta && def.meta.magicWords) || []

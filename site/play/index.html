@@ -4777,13 +4777,25 @@ if (typeof window !== 'undefined') { window.FolioWorld = { createBackend, World 
         // display name is only ever for the player's eyes.
         return v + ' ' + objId + (obj2Id ? ' ' + obj2Id : '');
       },
-      // Which verbs ask for a second target. Derived from the world rather than
-      // guessed: a rule that names `second` is the only reason to ask for one, so
-      // a game that never pairs objects never makes the player pick twice.
-      needsSecond: function (verb) {
+      // Whether to ask for a second target, decided per verb AND NOUN.
+      //
+      // Asking per verb alone was a real bug and a bad one. One rule anywhere in
+      // the game pairing something with USE made every USE wait for a second
+      // object, so a player who selected USE and clicked the thing that opens the
+      // first room got silence and stayed there. Any game mixing paired and
+      // unpaired uses of the same verb was unfinishable by clicking.
+      //
+      // A second object is wanted only when a rule actually pairs THIS thing.
+      needsSecond: function (verb, objId) {
         var v = String(verb || '').toUpperCase();
+        var n = objId ? String(objId).toUpperCase() : null;
         return (def.rules || []).some(function (r) {
-          return r.on && r.on.second && String(r.on.verb || '').toUpperCase() === v;
+          if (!r.on || !r.on.second) return false;
+          if (String(r.on.verb || '').toUpperCase() !== v) return false;
+          // With no noun yet the answer is about the verb in general, which is
+          // what the interface wants before anything has been picked.
+          if (!n) return true;
+          return String(r.on.noun || '').toUpperCase() === n;
         });
       },
       magicWords: (def.meta && def.meta.magicWords) || []
@@ -5822,6 +5834,7 @@ window.GUE = window.GUE || {};
   //  picture, which is right: it should look like something waiting to be drawn,
   //  and it should be playable while it waits.
   var AUTO_ROWS = 6, AUTO_TOP = 30, AUTO_H = 11, AUTO_STEP = 12;
+  var AUTO_X = 2, AUTO_W = 140, AUTO_CHARS = 17;
 
   function autoList(state) {
     var inv = {}, i;
@@ -5839,7 +5852,7 @@ window.GUE = window.GUE || {};
   function autoHotspots(state) {
     var list = autoList(state), out = [];
     for (var i = 0; i < list.length && i < AUTO_ROWS; i++) {
-      out.push({ x: 6, y: AUTO_TOP + i * AUTO_STEP, w: 132, h: AUTO_H, obj: list[i] });
+      out.push({ x: AUTO_X, y: AUTO_TOP + i * AUTO_STEP, w: AUTO_W, h: AUTO_H, obj: list[i] });
     }
     return out;
   }
@@ -5894,17 +5907,33 @@ window.GUE = window.GUE || {};
     }
     for (var j = 0; j < list.length && j < AUTO_ROWS; j++) {
       var y = AUTO_TOP + j * AUTO_STEP;
-      frame(6, y, 132, AUTO_H, COL.dark);
-      var drawn = false;
-      if (GUE.sprites && typeof GUE.sprites.draw === 'function') {
-        try { GUE.sprites.draw(ctx, list[j], 8, y - 2, t); drawn = true; } catch (e) { drawn = false; }
-      }
-      if (!drawn) { ctx.fillStyle = COL.dark; ctx.fillRect(9, y + 3, 5, 5); }
-      text(labelOf(list[j]).slice(0, 14), 20, y + 2, COL.dim);
+      frame(AUTO_X, y, AUTO_W, AUTO_H, COL.dark);
+      // No icon. It cost eleven characters of the name, and a name you cannot
+      // read is the whole reason this box exists. A cut name ends in a dot so it
+      // is plainly cut rather than plainly wrong; pointing at it gives the rest.
+      text(fitLabel(list[j], AUTO_CHARS), AUTO_X + 3, y + 2, COL.dim);
     }
     if (list.length > AUTO_ROWS) {
-      text('+' + (list.length - AUTO_ROWS) + ' MORE', 20, AUTO_TOP + AUTO_ROWS * AUTO_STEP + 2, COL.dark);
+      text('+' + (list.length - AUTO_ROWS) + ' MORE', AUTO_X + 3,
+        AUTO_TOP + AUTO_ROWS * AUTO_STEP + 2, COL.dark);
     }
+  }
+
+  /**
+   * A label that fits, keeping the part that identifies the thing.
+   *
+   * Cutting from the front leaves the least useful half: "Jimmy's camera" and
+   * "your phone" became "JIMMY" and "YOUR", and Jimmy is also a person standing
+   * in the room. English puts the head noun last, so when the whole name will not
+   * fit, the last word on its own is nearly always the right answer.
+   */
+  function fitLabel(id, chars) {
+    var full = labelOf(id);
+    if (full.length <= chars) return full;
+    var parts = full.split(/\s+/);
+    var head = parts[parts.length - 1];
+    if (head.length <= chars) return head;
+    return full.slice(0, Math.max(1, chars - 1)) + '.';
   }
 
   /** What to call a thing on screen. The verb map owns display names. */
@@ -6035,24 +6064,59 @@ window.GUE = window.GUE || {};
     frame(INV.x, INV.y, INV.w, INV.h, COL.dim);
     invRects = []; invArrow = null;
     var items = S.inventory || [];
-    var perPage = 11;
+    if (!items.length) { text('(EMPTY HANDED)', INV.x + TPAD_X + 2, INV.y + (INV.h - 8) / 2, COL.dark); return; }
+
+    // A game with sprites gets icons. A game without them used to get a row of
+    // 16-pixel boxes each holding one dim letter, which is not an inventory, it
+    // is a row of identical squares. A player who had just picked up the object
+    // that opens the first room could not tell which square it was.
+    // Whether THIS GAME's things have pictures, not whether a sprite module was
+    // loaded. The player bundles the engine's sprite set with every game, so
+    // asking whether GUE.sprites exists answered yes for a game that has no art
+    // of its own, and the strip stayed a row of one-letter boxes.
+    var art = GUE.sprites && typeof GUE.sprites.draw === 'function' &&
+      (typeof GUE.sprites.has !== 'function' ||
+        items.some(function (id) { return GUE.sprites.has(id); }));
+    // Icons are all one size; words are not. Sizing each slot to its own label
+    // shows the whole word wherever it fits, instead of cutting CAMERA to five
+    // characters because something else in the strip was long.
+    var labels = {}, widths = {};
+    for (var n = 0; n < items.length; n++) {
+      labels[items[n]] = art ? '' : fitLabel(items[n], 9);
+      widths[items[n]] = art ? 20 : Math.max(28, labels[items[n]].length * 8 + 10);
+    }
+    var room = INV.w - 16;
+    var perPage = 0, used = 0;
+    for (var m = invPage * 1; m < items.length; m++) {
+      var wd = widths[items[m]];
+      if (used + wd > room) break;
+      used += wd; perPage++;
+      if (art && perPage >= 11) break;
+    }
+    perPage = Math.max(1, perPage);
     if (items.length > perPage) invPage = Math.min(invPage, Math.ceil(items.length / perPage) - 1);
     else invPage = 0;
     var slice = items.slice(invPage * perPage, invPage * perPage + perPage);
-    if (!items.length) { text('(EMPTY HANDED)', INV.x + TPAD_X + 2, INV.y + (INV.h - 8) / 2, COL.dark); return; }
+
+    var cursor = INV.x + 5;
     for (var i = 0; i < slice.length; i++) {
       var id = slice[i];
-      var x = INV.x + 5 + i * 20, y = (INV.y + (INV.h - 16) / 2) | 0;
+      var slotW = widths[id];
+      var x = cursor, y = (INV.y + (INV.h - 16) / 2) | 0;
+      cursor += slotW;
+      var rect = { x: x - 1, y: y - 1, w: slotW - 2, h: 18, obj: id };
       var drawn = false;
-      if (GUE.sprites && typeof GUE.sprites.draw === 'function') {
+      if (art) {
         try { GUE.sprites.draw(ctx, id, x, y, t); drawn = true; } catch (e) { drawn = false; }
       }
-      if (!drawn) {                                        // sprite missing: initial in a box
-        frame(x, y, 16, 16, COL.dark);
-        textC(String(id).charAt(0), x + 8, y + 4, COL.dim);
+      if (!drawn) {
+        // Named, not initialled. Five characters is enough to tell a camera from
+        // a phone, and pointing at it gives the whole name in the status bar.
+        frame(rect.x, rect.y, rect.w, rect.h, COL.dim);
+        text(labels[id], rect.x + 3, y + 4, COL.ink);
       }
-      if (id === selectedItem) frame(x - 1, y - 1, 18, 18, COL.gold);
-      invRects.push({ x: x - 1, y: y - 1, w: 18, h: 18, obj: id });
+      if (id === selectedItem) frame(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2, COL.gold);
+      invRects.push(rect);
     }
     if (items.length > perPage) {
       invArrow = { x: INV.x + INV.w - 12, y: INV.y + 12, w: 10, h: 10 };
@@ -6230,7 +6294,16 @@ window.GUE = window.GUE || {};
     if (hints && hit(SCENE, p.x, p.y) && !S.dark) {
       var h = hotspotAt((p.x - SCENE.x) / SCENE_SCALE, (p.y - SCENE.y) / SCENE_SCALE);
       if (h) { hover = h; cur = 'pointer'; }
-    } else if (overClickable(p.x, p.y)) cur = 'pointer';
+    } else if (overClickable(p.x, p.y)) {
+      cur = 'pointer';
+      // Naming what is in your hands, which matters most when the strip is a row
+      // of lettered boxes because the game ships no sprites.
+      if (hints) {
+        for (var q = 0; q < invRects.length; q++) {
+          if (hit(invRects[q], p.x, p.y)) { hover = invRects[q]; break; }
+        }
+      }
+    }
     canvas.style.cursor = cur;   // the 30fps loop paints the change
   }
   // v2 of the key: hints briefly defaulted ON for touch devices, so a choice
@@ -6245,12 +6318,29 @@ window.GUE = window.GUE || {};
   function loadHints() {
     // Off by default on every device. Finding what is clickable is the game, as
     // it was in Uninvited; a player who wants the modern affordance turns it on.
+    //
+    // Unless the game has no art. Then there is nothing to find: the scene is a
+    // list of labels, the inventory is a row of lettered boxes, and withholding
+    // names is not difficulty, it is just an unreadable screen. A player got stuck
+    // in the first room of a thirty-room game holding the object that opens it,
+    // unable to tell which box it was.
     var stored = null;
     try {
       stored = localStorage.getItem(HINTS_KEY);
       localStorage.removeItem('gue.hints');           // drop the stale key
     } catch (e) {}
+    if (stored === null && !hasArt()) { hints = true; return; }
     hints = stored === '1';
+  }
+
+  /** Does this game draw anything of its own? */
+  function hasArt() {
+    // Scenes only. The sprite module ships with the player rather than with the
+    // game, so its presence says nothing about whether this game was drawn.
+    var sc = GUE.scenes;
+    if (!sc) return false;
+    for (var k in sc) if (Object.prototype.hasOwnProperty.call(sc, k)) return true;
+    return false;
   }
   function overClickable(x, y) {
     var i;

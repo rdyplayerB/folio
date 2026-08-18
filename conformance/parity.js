@@ -134,5 +134,41 @@ for (const m of ADAPTER_SURFACE.bridge) {
   check('the bridge exposes ' + m + '() for the shell', typeof A.bridge[m] === 'function');
 }
 
+// --- the interface asks for a second object only when one is wanted ----------
+//
+// Found by a player stuck in the first room of a thirty-room game. needsSecond
+// was answered per VERB, so one rule anywhere pairing something with USE made
+// every USE wait for a second object that never came. The command that opens
+// that room is a plain USE, and it could not be sent by clicking at all. Any
+// game mixing paired and unpaired uses of one verb was unfinishable.
+{
+  const paired = {
+    meta: { start: 'A' }, rooms: [{ id: 'A', exits: [] }],
+    items: [{ id: 'CAMERA', location: 'A', attributes: { TAKEBIT: true } },
+            { id: 'DOOR', location: 'A', attributes: {} },
+            { id: 'KEY', location: 'A', attributes: { TAKEBIT: true } }],
+    rules: [
+      { on: { verb: 'USE', noun: 'DOOR', second: 'KEY' }, do: [{ type: 'print', text: 'unlocked' }] },
+      { on: { verb: 'USE', noun: 'CAMERA' }, do: [{ type: 'print', text: 'click' }] }
+    ]
+  };
+  // Both files attach to the global the way they do in a page rather than
+  // exporting, so loading them is what installs them.
+  const ROOT = typeof window !== 'undefined' ? window : globalThis;
+  // In a page @folio/world attaches itself to window; under node it only
+  // exports, so the global it expects has to be set by hand before the adapter
+  // is loaded, because the adapter captures it at load time.
+  ROOT.FolioWorld = require('../packages/world/index.js');
+  require('../packages/engine/world-adapter.js');
+  ROOT.FolioWorldAdapter.install(paired);
+  const vm = ROOT.GUE.verbmap;
+  check('a paired thing asks for a second object', vm.needsSecond('USE', 'DOOR') === true);
+  check('an unpaired thing does not', vm.needsSecond('USE', 'CAMERA') === false,
+    'answering per verb alone stranded a player in room one');
+  check('a verb with nothing picked yet still reports it can pair',
+    vm.needsSecond('USE', null) === true);
+  check('a verb nothing pairs never asks', vm.needsSecond('TAKE', 'CAMERA') === false);
+}
+
 console.log('\n=== ' + (failed ? '\x1b[31m' + failed + ' FAILED\x1b[0m' : '\x1b[32mboth paths speak the same contract\x1b[0m') + ' ===');
 process.exit(failed ? 1 : 0);
