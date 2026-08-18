@@ -91,8 +91,12 @@ const CLOSE = '</' + 'script>';
 // thing most people will want to do first.
 const zip = read('packages/engine/browser-zip.js');
 
+// The drawing kit, so the editor can show a real backdrop rather than a swatch.
+// It reads window.GUE at load time, which has to exist first.
+const kit = 'window.GUE = window.GUE || {};\n' + read('packages/engine/vendor/kit.js');
+
 const html = read('packages/editor/editor.html')
-  .replace('/*ENGINE*/', (zip + '\n' + bundle).split(CLOSE).join('<\\/script>'))
+  .replace('/*ENGINE*/', (zip + '\n' + kit + '\n' + bundle).split(CLOSE).join('<\\/script>'))
   .replace('/*APP*/', read('packages/editor/editor.js').split(CLOSE).join('<\\/script>'))
   .replace('/*STYLE*/', read('packages/editor/editor.css'));
 

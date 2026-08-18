@@ -4,7 +4,11 @@
  *  looks like a different product from the thing it makes is a tell.
  */
 
-.ed { padding: 22px 0 40px; }
+/*  Full bleed. The map is the work, so it gets the screen: an earlier version sat
+ *  inside the site's 1440px measure with a footer under it, and two thirds of a
+ *  large display was empty navy. */
+.ed { max-width: none; padding: 12px 16px 16px; }
+body:has(.ed) footer { display: none; }
 
 /* ------------------------------------------------------------------ toolbar */
 .edbar {
@@ -43,23 +47,30 @@
 .badge.bad      { border-color: #d8555a; color: #e8848a; }
 
 /* --------------------------------------------------------------- the layout */
-.edmain { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 14px; align-items: start; }
-@media (max-width: 900px) { .edmain { grid-template-columns: minmax(0,1fr); } }
+.edmain {
+  display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 12px;
+  align-items: stretch;
+  /* Everything above the map: banner, toolbar, and the hint under it. */
+  height: calc(100vh - 150px); min-height: 480px;
+}
+@media (max-width: 900px) {
+  .edmain { grid-template-columns: minmax(0,1fr); height: auto; }
+  .canvaswrap { height: 60vh; }
+}
 
 .canvaswrap {
   background: var(--panel); border: 1px solid rgba(232,228,218,.18);
-  padding: 10px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
+  padding: 8px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
+  display: flex; flex-direction: column; min-height: 0;
 }
 #map {
-  display: block; width: 100%; height: auto; background: #06091a;
+  display: block; flex: 1; min-height: 0; width: 100%; background: #06091a;
   border: 1px solid rgba(155,155,164,.22); cursor: crosshair;
-  /* The map is drawn at 8-bit scale and blown up, so it keeps its edges. */
-  image-rendering: pixelated;
 }
-.hint { font: 12.5px/1.7 var(--mono); color: var(--dimgray); margin: 10px 2px 0; }
+.hint { font: 11.5px/1.5 var(--mono); color: var(--dimgray); margin: 7px 2px 0; }
 
 /* ---------------------------------------------------------------- the panel */
-.panel { display: grid; gap: 14px; }
+.panel { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; padding-right: 2px; }
 .pane {
   background: var(--panel); border: 1px solid rgba(232,228,218,.18);
   padding: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
@@ -103,7 +114,7 @@
 .exitrow.cross b { color: #e8848a; }
 
 /* ------------------------------------------------------------- the findings */
-.findings { display: grid; gap: 8px; max-height: 300px; overflow-y: auto; }
+.findings { display: grid; gap: 7px; }
 .f {
   font: 12px/1.5 var(--sans); padding: 8px 10px;
   border-left: 3px solid var(--dimgray); background: rgba(0,0,0,.25);
@@ -113,4 +124,41 @@
 .f code {
   font: 600 10px/1 var(--mono); letter-spacing: .08em; color: var(--dimgray);
   display: block; margin-bottom: 3px;
+}
+
+
+/* --------------------------------------------------------------- the pieces */
+/*  A room's contents and its puzzles, listed rather than buried in a form. */
+.row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  border-top: 1px solid rgba(155,155,164,.14);
+  font: 12px/1.4 var(--mono); color: rgba(232,228,218,.85);
+}
+.row:first-of-type { border-top: 0; }
+.row .tag {
+  font: 600 9px/1 var(--mono); letter-spacing: .1em; padding: 3px 5px;
+  border: 1px solid rgba(155,155,164,.3); color: var(--dimgray);
+}
+.row .tag.on { border-color: var(--gold); color: var(--gold); }
+.row .x { margin-left: auto; color: var(--dimgray); cursor: pointer; }
+.row .x:hover { color: #e8848a; }
+.row input.rename {
+  flex: 1; min-width: 0; background: transparent; border: 0; color: var(--paper);
+  font: 12px/1.4 var(--mono); padding: 2px 0;
+}
+.row input.rename:focus { outline: 1px solid var(--gold); }
+
+.mini {
+  font: 600 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  padding: 7px 9px; border: 1px solid rgba(232,228,218,.28); background: transparent;
+  color: var(--palegold); cursor: pointer;
+}
+.mini:hover { border-color: var(--gold); background: rgba(242,167,27,.12); }
+.minirow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+/* A real 144x104 scene, drawn by the engine's own kit. */
+.preview {
+  display: block; width: 100%; image-rendering: pixelated;
+  border: 2px solid var(--bezel); border-radius: 8px; background: #000;
+  margin-bottom: 9px;
 }

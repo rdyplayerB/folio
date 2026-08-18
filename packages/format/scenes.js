@@ -202,4 +202,4 @@ function scaffold(def) {
   return { source: out.join('\n') + '\n', rooms: drawn };
 }
 
-module.exports = { scaffold, backdropFor, objectRects, BACKDROPS, EXIT_RECTS };
+module.exports = { scaffold, backdropFor, objectRects, BACKDROPS, FALLBACK, EXIT_RECTS };
