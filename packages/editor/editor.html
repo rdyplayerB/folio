@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Map editor · Folio Game Engine</title>
+<meta name="description" content="Draw a world and the engine checks it as you go. The map is the map: where you put a room is where it is.">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<style>/*STYLE*/</style>
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap ed">
+
+  <div class="edbar">
+    <button id="addRoom" class="ebtn">+ Room</button>
+    <button id="delRoom" class="ebtn ghost">Delete</button>
+    <span class="sep"></span>
+    <label class="efile">Open a .folio<input type="file" id="openFile" accept=".folio"></label>
+    <button id="sample" class="ebtn ghost">Load an example</button>
+    <span class="sep"></span>
+    <button id="exportWorld" class="ebtn ghost">Export world.json</button>
+    <span class="grow"></span>
+    <span id="badge" class="badge">empty</span>
+  </div>
+
+  <div class="edmain">
+    <div class="canvaswrap">
+      <canvas id="map" width="1200" height="760"></canvas>
+      <p class="hint" id="hint">
+        Click the canvas to put a room down. Drag a room to move it. Drag from one
+        room to another to join them: the direction comes from where you put them,
+        so the map is the map.
+      </p>
+    </div>
+
+    <aside class="panel">
+      <div id="inspector" class="pane">
+        <p class="ptitle">Nothing selected</p>
+        <p class="pdim">Click a room to edit it.</p>
+      </div>
+
+      <div class="pane">
+        <p class="ptitle">What the engine says</p>
+        <div id="findings" class="findings"><p class="pdim">Put a room down to begin.</p></div>
+      </div>
+    </aside>
+  </div>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/docs/world/">The format</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script>/*ENGINE*/</script>
+<script>/*APP*/</script>
+</body>
+</html>

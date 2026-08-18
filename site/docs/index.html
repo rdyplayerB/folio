@@ -181,17 +181,18 @@
     </ul>
 
     <h3>Designed, not built</h3>
-    <div class="gap">
-      <span class="tag">There is no editor</span>
+    <div class="note">
+      <span class="tag">The map editor is real, and it is a first slice</span>
       <p>
-        You author a Folio game by writing JSON in your own text editor and running
-        <code>folio validate</code>. There is no visual editor, no dependency-chart view,
-        and no web studio. Those are designed and intended, and the dependency chart is
-        meant to become the primary editing surface, but none of it is written yet.
+        <a href="/editor/">folio.games/editor</a> draws a world: rooms on a canvas, exits
+        you draw between them, regions in colour, and the real validator running on every
+        edit. The direction of an exit comes from where the rooms sit, so the map cannot
+        claim two places are adjacent while showing them apart.
       </p>
       <p>
-        This manual documents the workflow that exists. Where a section would otherwise
-        describe an unbuilt tool, it says so in a box like this one instead.
+        It edits rooms, exits and regions. Items, rules and the dependency chart are not
+        in it yet, so a finished game still needs the format itself, which is what the
+        rest of this manual is for.
       </p>
     </div>
     <ul>

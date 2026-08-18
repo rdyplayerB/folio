@@ -1,0 +1,116 @@
+/*  The map editor's own furniture.
+ *
+ *  Sits on the site's palette rather than inventing one, because a tool that
+ *  looks like a different product from the thing it makes is a tell.
+ */
+
+.ed { padding: 22px 0 40px; }
+
+/* ------------------------------------------------------------------ toolbar */
+.edbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid rgba(232,228,218,.18);
+  padding: 12px 14px; margin-bottom: 14px;
+  box-shadow: 0 3px 0 rgba(0,0,0,.55);
+}
+.edbar .grow { flex: 1; }
+.edbar .sep { width: 1px; height: 20px; background: rgba(155,155,164,.3); }
+
+.ebtn {
+  font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 10px 14px; border: 2px solid var(--gold); background: var(--gold);
+  color: #20140a; cursor: pointer; white-space: nowrap;
+}
+.ebtn:hover { background: var(--palegold); border-color: var(--palegold); }
+.ebtn.ghost { background: transparent; color: var(--palegold); }
+.ebtn.ghost:hover { background: rgba(242,167,27,.14); }
+
+.efile {
+  font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 10px 14px; border: 2px solid rgba(232,228,218,.3);
+  color: var(--gray); cursor: pointer; white-space: nowrap;
+}
+.efile:hover { border-color: var(--gold); color: var(--palegold); }
+.efile input { display: none; }
+
+.badge {
+  font: 700 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase;
+  padding: 9px 13px; border: 2px solid var(--dimgray); color: var(--dimgray);
+  white-space: nowrap;
+}
+.badge.ok       { border-color: var(--green); color: var(--green); }
+.badge.warn     { border-color: var(--gold); color: var(--gold); }
+.badge.bad      { border-color: #d8555a; color: #e8848a; }
+
+/* --------------------------------------------------------------- the layout */
+.edmain { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 14px; align-items: start; }
+@media (max-width: 900px) { .edmain { grid-template-columns: minmax(0,1fr); } }
+
+.canvaswrap {
+  background: var(--panel); border: 1px solid rgba(232,228,218,.18);
+  padding: 10px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
+}
+#map {
+  display: block; width: 100%; height: auto; background: #06091a;
+  border: 1px solid rgba(155,155,164,.22); cursor: crosshair;
+  /* The map is drawn at 8-bit scale and blown up, so it keeps its edges. */
+  image-rendering: pixelated;
+}
+.hint { font: 12.5px/1.7 var(--mono); color: var(--dimgray); margin: 10px 2px 0; }
+
+/* ---------------------------------------------------------------- the panel */
+.panel { display: grid; gap: 14px; }
+.pane {
+  background: var(--panel); border: 1px solid rgba(232,228,218,.18);
+  padding: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
+}
+.ptitle {
+  font: 600 10px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 12px;
+}
+.pdim { font: 13px/1.6 var(--sans); color: var(--dimgray); margin: 0; }
+
+.field { margin: 0 0 10px; }
+.field label {
+  display: block; font: 600 9.5px/1 var(--mono); letter-spacing: .15em;
+  text-transform: uppercase; color: var(--dimgray); margin-bottom: 5px;
+}
+.field input, .field textarea, .field select {
+  width: 100%; box-sizing: border-box; background: #06091a; color: var(--paper);
+  border: 1px solid rgba(155,155,164,.3); padding: 7px 8px;
+  font: 13px/1.5 var(--mono);
+}
+.field textarea { resize: vertical; min-height: 66px; font-family: var(--sans); }
+.field input:focus, .field textarea:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+/* A checkbox sits beside its words. `.field label` is display:block for the text
+   inputs, which stacked the box above the label and floated it to the far edge. */
+.field label.check {
+  display: flex; align-items: center; gap: 9px; margin: 0;
+  font: 13px/1.3 var(--sans); letter-spacing: 0; text-transform: none;
+  color: var(--paper); cursor: pointer;
+}
+.field label.check input { width: auto; margin: 0; accent-color: var(--gold); }
+
+.exits { margin-top: 12px; }
+.exitrow {
+  display: flex; align-items: center; gap: 8px; padding: 5px 0;
+  font: 12px/1.4 var(--mono); color: rgba(232,228,218,.8);
+  border-top: 1px solid rgba(155,155,164,.14);
+}
+.exitrow b { color: var(--gold); min-width: 40px; }
+.exitrow .x { margin-left: auto; color: var(--dimgray); cursor: pointer; padding: 0 4px; }
+.exitrow .x:hover { color: #e8848a; }
+.exitrow.cross b { color: #e8848a; }
+
+/* ------------------------------------------------------------- the findings */
+.findings { display: grid; gap: 8px; max-height: 300px; overflow-y: auto; }
+.f {
+  font: 12px/1.5 var(--sans); padding: 8px 10px;
+  border-left: 3px solid var(--dimgray); background: rgba(0,0,0,.25);
+}
+.f.err  { border-left-color: #d8555a; }
+.f.warn { border-left-color: var(--gold); }
+.f code {
+  font: 600 10px/1 var(--mono); letter-spacing: .08em; color: var(--dimgray);
+  display: block; margin-bottom: 3px;
+}

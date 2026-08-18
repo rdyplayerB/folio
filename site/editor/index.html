@@ -1,0 +1,4345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Map editor · Folio Game Engine</title>
+<meta name="description" content="Draw a world and the engine checks it as you go. The map is the map: where you put a room is where it is.">
+<meta name="theme-color" content="#050409">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/site.css">
+<style>/*  The map editor's own furniture.
+ *
+ *  Sits on the site's palette rather than inventing one, because a tool that
+ *  looks like a different product from the thing it makes is a tell.
+ */
+
+.ed { padding: 22px 0 40px; }
+
+/* ------------------------------------------------------------------ toolbar */
+.edbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid rgba(232,228,218,.18);
+  padding: 12px 14px; margin-bottom: 14px;
+  box-shadow: 0 3px 0 rgba(0,0,0,.55);
+}
+.edbar .grow { flex: 1; }
+.edbar .sep { width: 1px; height: 20px; background: rgba(155,155,164,.3); }
+
+.ebtn {
+  font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 10px 14px; border: 2px solid var(--gold); background: var(--gold);
+  color: #20140a; cursor: pointer; white-space: nowrap;
+}
+.ebtn:hover { background: var(--palegold); border-color: var(--palegold); }
+.ebtn.ghost { background: transparent; color: var(--palegold); }
+.ebtn.ghost:hover { background: rgba(242,167,27,.14); }
+
+.efile {
+  font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 10px 14px; border: 2px solid rgba(232,228,218,.3);
+  color: var(--gray); cursor: pointer; white-space: nowrap;
+}
+.efile:hover { border-color: var(--gold); color: var(--palegold); }
+.efile input { display: none; }
+
+.badge {
+  font: 700 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase;
+  padding: 9px 13px; border: 2px solid var(--dimgray); color: var(--dimgray);
+  white-space: nowrap;
+}
+.badge.ok       { border-color: var(--green); color: var(--green); }
+.badge.warn     { border-color: var(--gold); color: var(--gold); }
+.badge.bad      { border-color: #d8555a; color: #e8848a; }
+
+/* --------------------------------------------------------------- the layout */
+.edmain { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 14px; align-items: start; }
+@media (max-width: 900px) { .edmain { grid-template-columns: minmax(0,1fr); } }
+
+.canvaswrap {
+  background: var(--panel); border: 1px solid rgba(232,228,218,.18);
+  padding: 10px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
+}
+#map {
+  display: block; width: 100%; height: auto; background: #06091a;
+  border: 1px solid rgba(155,155,164,.22); cursor: crosshair;
+  /* The map is drawn at 8-bit scale and blown up, so it keeps its edges. */
+  image-rendering: pixelated;
+}
+.hint { font: 12.5px/1.7 var(--mono); color: var(--dimgray); margin: 10px 2px 0; }
+
+/* ---------------------------------------------------------------- the panel */
+.panel { display: grid; gap: 14px; }
+.pane {
+  background: var(--panel); border: 1px solid rgba(232,228,218,.18);
+  padding: 14px; box-shadow: 0 3px 0 rgba(0,0,0,.55);
+}
+.ptitle {
+  font: 600 10px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 12px;
+}
+.pdim { font: 13px/1.6 var(--sans); color: var(--dimgray); margin: 0; }
+
+.field { margin: 0 0 10px; }
+.field label {
+  display: block; font: 600 9.5px/1 var(--mono); letter-spacing: .15em;
+  text-transform: uppercase; color: var(--dimgray); margin-bottom: 5px;
+}
+.field input, .field textarea, .field select {
+  width: 100%; box-sizing: border-box; background: #06091a; color: var(--paper);
+  border: 1px solid rgba(155,155,164,.3); padding: 7px 8px;
+  font: 13px/1.5 var(--mono);
+}
+.field textarea { resize: vertical; min-height: 66px; font-family: var(--sans); }
+.field input:focus, .field textarea:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+/* A checkbox sits beside its words. `.field label` is display:block for the text
+   inputs, which stacked the box above the label and floated it to the far edge. */
+.field label.check {
+  display: flex; align-items: center; gap: 9px; margin: 0;
+  font: 13px/1.3 var(--sans); letter-spacing: 0; text-transform: none;
+  color: var(--paper); cursor: pointer;
+}
+.field label.check input { width: auto; margin: 0; accent-color: var(--gold); }
+
+.exits { margin-top: 12px; }
+.exitrow {
+  display: flex; align-items: center; gap: 8px; padding: 5px 0;
+  font: 12px/1.4 var(--mono); color: rgba(232,228,218,.8);
+  border-top: 1px solid rgba(155,155,164,.14);
+}
+.exitrow b { color: var(--gold); min-width: 40px; }
+.exitrow .x { margin-left: auto; color: var(--dimgray); cursor: pointer; padding: 0 4px; }
+.exitrow .x:hover { color: #e8848a; }
+.exitrow.cross b { color: #e8848a; }
+
+/* ------------------------------------------------------------- the findings */
+.findings { display: grid; gap: 8px; max-height: 300px; overflow-y: auto; }
+.f {
+  font: 12px/1.5 var(--sans); padding: 8px 10px;
+  border-left: 3px solid var(--dimgray); background: rgba(0,0,0,.25);
+}
+.f.err  { border-left-color: #d8555a; }
+.f.warn { border-left-color: var(--gold); }
+.f code {
+  font: 600 10px/1 var(--mono); letter-spacing: .08em; color: var(--dimgray);
+  display: block; margin-bottom: 3px;
+}
+</style>
+</head>
+<body>
+
+<header class="banner">
+  <div class="wrap">
+    <a class="mark" href="/">Folio Game Engine</a>
+    <nav>
+      <a href="/#library">Library</a>
+      <a href="/make/">Make one</a>
+      <a href="/docs/" class="hide-sm">Docs</a>
+      <a href="https://github.com/rdyplayerB/folio">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap ed">
+
+  <div class="edbar">
+    <button id="addRoom" class="ebtn">+ Room</button>
+    <button id="delRoom" class="ebtn ghost">Delete</button>
+    <span class="sep"></span>
+    <label class="efile">Open a .folio<input type="file" id="openFile" accept=".folio"></label>
+    <button id="sample" class="ebtn ghost">Load an example</button>
+    <span class="sep"></span>
+    <button id="exportWorld" class="ebtn ghost">Export world.json</button>
+    <span class="grow"></span>
+    <span id="badge" class="badge">empty</span>
+  </div>
+
+  <div class="edmain">
+    <div class="canvaswrap">
+      <canvas id="map" width="1200" height="760"></canvas>
+      <p class="hint" id="hint">
+        Click the canvas to put a room down. Drag a room to move it. Drag from one
+        room to another to join them: the direction comes from where you put them,
+        so the map is the map.
+      </p>
+    </div>
+
+    <aside class="panel">
+      <div id="inspector" class="pane">
+        <p class="ptitle">Nothing selected</p>
+        <p class="pdim">Click a room to edit it.</p>
+      </div>
+
+      <div class="pane">
+        <p class="ptitle">What the engine says</p>
+        <div id="findings" class="findings"><p class="pdim">Put a room down to begin.</p></div>
+      </div>
+    </aside>
+  </div>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Open source · MIT</span>
+    <a href="https://github.com/rdyplayerB/folio">Source</a>
+    <a href="/docs/world/">The format</a>
+    <span>A <a href="https://mochilabs.xyz">Mochi Labs</a> project</span>
+  </div>
+</footer>
+
+<script>//  Browser-side .folio reader.
+//
+//  A .folio must open in a page with no build step and no library download — the
+//  portability promise collapses the moment playing a game requires npm. So this
+//  reads the container using only what a browser already has: DataView for the
+//  headers and DecompressionStream for the payloads.
+//
+//  Deliberately read-only. Packing is an authoring operation and belongs in the
+//  CLI; a player that could also write archives is a larger attack surface for no
+//  benefit to the person playing.
+
+(function (root) {
+  'use strict';
+
+  const CDIR_SIG = 0x02014b50;
+  const EOCD_SIG = 0x06054b50;
+
+  /**
+   * @param {ArrayBuffer|Uint8Array} input
+   * @returns {Promise<Object<string, Uint8Array>>}
+   */
+  async function readFolio(input) {
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    // Scan back for the end-of-central-directory record. The comment field can be
+    // up to 64KB, so the scan is bounded rather than unbounded.
+    let eocd = -1;
+    const floor = Math.max(0, bytes.length - 65558);
+    for (let i = bytes.length - 22; i >= floor; i--) {
+      if (view.getUint32(i, true) === EOCD_SIG) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('not a .folio: no end-of-central-directory record');
+
+    const count = view.getUint16(eocd + 10, true);
+    let p = view.getUint32(eocd + 16, true);
+    const out = {};
+
+    for (let i = 0; i < count; i++) {
+      if (view.getUint32(p, true) !== CDIR_SIG) throw new Error('corrupt central directory');
+      const method = view.getUint16(p + 10, true);
+      const compSize = view.getUint32(p + 20, true);
+      const nameLen = view.getUint16(p + 28, true);
+      const extraLen = view.getUint16(p + 30, true);
+      const commentLen = view.getUint16(p + 32, true);
+      const localOff = view.getUint32(p + 42, true);
+      const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen));
+
+      // The local header repeats the name and extra lengths, and they may differ
+      // from the central directory's, so the data offset must come from the local
+      // header or entries silently decode as garbage.
+      const lNameLen = view.getUint16(localOff + 26, true);
+      const lExtraLen = view.getUint16(localOff + 28, true);
+      const start = localOff + 30 + lNameLen + lExtraLen;
+      const body = bytes.subarray(start, start + compSize);
+
+      out[name] = method === 0 ? body : await inflateRaw(body);
+      p += 46 + nameLen + extraLen + commentLen;
+    }
+    return out;
+  }
+
+  async function inflateRaw(bytes) {
+    if (typeof DecompressionStream !== 'function') {
+      throw new Error('this browser cannot decompress .folio entries (no DecompressionStream)');
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  const text = (u8) => new TextDecoder().decode(u8);
+  const json = (u8) => JSON.parse(text(u8));
+
+  root.FolioZip = { readFolio, text, json };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+(function () {
+  'use strict';
+  // A registry standing in for node's module resolution. Each file is
+  // evaluated once, on first require, exactly as node would.
+  var REG = {}, CACHE = {};
+  function require(name) {
+    var key = String(name).replace(/^\.\.?\//, '').replace(/^.*\//, '');
+    if (CACHE[key]) return CACHE[key].exports;
+    var def = REG[key];
+    if (!def) throw new Error('no such module: ' + name);
+    var m = CACHE[key] = { exports: {} };
+    def(m, m.exports, require);
+    return m.exports;
+  }
+  REG["mapshape.js"] = function (module, exports, require) {
+//  One definition of what a loop is.
+//
+//  There were two, and they disagreed about the same file. The design audit
+//  halved the count of directed exits, which is only correct if every passage is
+//  reciprocal; the corpus profiler did not halve at all. An author building a
+//  Verne adaptation was told the map was "a tree, 0 loops per room" while the
+//  project's own profile command reported 4 loops on the same world, and spent
+//  more time decoding that than on anything else in the build.
+//
+//  A one-way passage is still a connection. The fall into the blind gallery, the
+//  wreck, the blast and the eruption are all real links between rooms, and each
+//  was counted as half an edge and quietly penalised. The author ended up adding
+//  six reciprocal connections purely to satisfy the formula, inventing fiction to
+//  appease a bug.
+//
+//  So: a connection is an unordered pair of rooms with at least one passage
+//  between them, in either direction, and loops are connections minus rooms plus
+//  one. Both tools call this now, and a test asserts they agree.
+
+'use strict';
+
+/** Unordered key for a link between two rooms. */
+const link = (a, b) => (a < b ? a + ' ' + b : b + ' ' + a);
+
+/**
+ * Distinct connections implied by a set of directed passages.
+ * @param {Array<Array<string>>} passages  [from, to] pairs
+ */
+function connections(passages) {
+  const out = new Set();
+  for (const p of passages) {
+    const from = p[0], to = p[1];
+    if (!from || !to || from === to) continue;   // a self-loop is not a circuit
+    out.add(link(from, to));
+  }
+  return out;
+}
+
+/** Cyclomatic complexity of the room graph. A corridor is 0; a circuit is 1. */
+function loops(connectionCount, roomCount) {
+  if (!roomCount) return 0;
+  return Math.max(0, connectionCount - roomCount + 1);
+}
+
+/** Read the passages straight out of a declared world. */
+function passagesOf(world) {
+  const out = [];
+  for (const room of (world.rooms || [])) {
+    for (const ex of (room.exits || [])) out.push([room.id, ex.to]);
+  }
+  return out;
+}
+
+module.exports = { connections, loops, passagesOf, link };
+
+  };
+  REG["index.js"] = function (module, exports, require) {
+//  @folio/world — Path B logic backend: a declarative world interpreter.
+//
+//  Runs a world.json directly. This is how a story that was never a game becomes
+//  one: there is no compiler and no scripting language, only data. A .folio can
+//  therefore never contain executable code, which is a security property worth
+//  advertising and the reason a game is safe to open from a stranger.
+//
+//  Deliberately less expressive than ZIL or Inform. A bounded model is what makes
+//  generation reliable and validation tractable: because every effect comes from a
+//  closed vocabulary, the validator can see statically everything a game can ever
+//  do. When the vocabulary genuinely cannot express something the community needs,
+//  it grows in a spec revision — with conformance fixtures keeping old games alive.
+//
+//  It emits the same World State Contract as @folio/zmachine. That is the whole
+//  point: one shell, two backends, and a cross-path parity suite to keep them
+//  honest as both evolve.
+
+'use strict';
+
+const DIRS = ['NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW', 'UP', 'DOWN', 'IN', 'OUT'];
+
+class World {
+  constructor(world, opts) {
+    opts = opts || {};
+    this.def = world;
+    this.rng = mulberry32(opts.seed !== undefined ? opts.seed : (world.meta && world.meta.seed) || 1);
+
+    this.rooms = index(world.rooms);
+    this.items = index(world.items);
+    this.actors = index(world.actors || []);
+    this.rules = world.rules || [];
+    this.timers = (world.timers || []).map(t => Object.assign({ elapsed: 0 }, t));
+
+    this.flags = Object.assign({}, world.flags);
+    // Numbers. Flags are booleans, and without counters an author has no way to
+    // say "the third time" except by chaining near-identical rules and reading
+    // trip number out of flag state. That was the workaround the first cold build
+    // reached for, and it called it out as the idiom nothing had taught it.
+    this.counters = Object.assign({}, world.counters);
+    this.here = world.meta.start;
+    this.moves = 0;
+    this.score = 0;
+    this.ended = null;             // null | {win:boolean, reason:string}
+    this.visited = new Set([this.here]);
+
+    // Live location per item: room id, 'PLAYER', or a container's id.
+    this.loc = {};
+    for (const it of world.items) this.loc[it.id] = it.location;
+    this.actorLoc = {};
+    for (const a of (world.actors || [])) this.actorLoc[a.id] = a.location;
+
+    this.log = [];
+  }
+
+  // -------------------------------------------------------------- contract
+  /** Project into the World State Contract — identical shape to @folio/zmachine. */
+  state() {
+    const room = this.rooms[this.here] || {};
+    const objects = [];
+    const contents = {};
+    const flags = {};
+
+    for (const id of Object.keys(this.loc)) {
+      const where = this.loc[id];
+      const item = this.items[id];
+      if (!item) continue;
+      if (where === this.here) {
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+      } else if (this.items[where] && this.loc[where] === this.here && this.isOpen(where)) {
+        // One level into open containers, matching the Z-machine projection.
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+        (contents[where] = contents[where] || []).push(id);
+      }
+    }
+    for (const id of Object.keys(this.actorLoc)) {
+      // "PLAYER" means travelling with you, the same way it means carried for an
+      // item. An adaptation of a novel about three people walking together had no
+      // way to say Hans follows, so he was teleported between his eight
+      // plot-critical rooms and existed as prose everywhere else, which meant
+      // speaking to him anywhere else hit the absent default.
+      if (this.actorLoc[id] === this.here || this.actorLoc[id] === 'PLAYER') {
+        objects.push(id);
+        flags[id] = this.flagsOf(id);
+      }
+    }
+
+    const inventory = Object.keys(this.loc).filter(id => this.loc[id] === 'PLAYER');
+    for (const id of inventory) flags[id] = this.flagsOf(id);
+
+    return {
+      roomId: this.here,
+      roomName: room.name || this.here,
+      score: this.score,
+      moves: this.moves,
+      dark: this.isDark(),
+      objects,
+      inventory,
+      contents,
+      flags,
+      exits: this.exits(),
+      // Counters live alongside flags in globals rather than in a key of their
+      // own, because the contract has to look identical on both paths and a
+      // Z-machine game has no counters to report.
+      globals: Object.assign({}, this.flags, this.counters),
+      fighting: objects.some(id => this.actors[id] && this.actors[id].hostile),
+      lampTurns: this.lampTurns()
+    };
+  }
+
+  /**
+   * Live exits, keyed by direction. Three states, not two:
+   *   "ROOM-ID"  passable now
+   *   false      the passage exists but is blocked (locked door, boarded window)
+   *   absent     no passage in that direction at all
+   *
+   * The middle state is the one worth having: it lets the compass grey out a door
+   * the player can see but cannot yet use, which is information the player needs.
+   * Path A emits it natively (Zork's boarded front door reports EAST: false), and
+   * cross-path parity is what surfaced that Path B was collapsing it. An author who
+   * genuinely wants a passage concealed marks the exit `hidden` and it disappears
+   * entirely until its condition is met.
+   */
+  exits() {
+    const room = this.rooms[this.here];
+    const out = {};
+    if (!room) return out;
+    for (const ex of (room.exits || [])) {
+      if (!DIRS.includes(ex.dir)) continue;
+      const blocked = (ex.condition && !this.test(ex.condition)) ||
+                      (ex.door && !this.isOpen(ex.door));
+      if (blocked) {
+        if (!ex.hidden) out[ex.dir] = false;
+      } else {
+        out[ex.dir] = ex.to;
+      }
+    }
+    return out;
+  }
+
+  flagsOf(id) {
+    const thing = this.items[id] || this.actors[id] || {};
+    const a = Object.assign({}, thing.attributes);
+    if (this.flags['_open_' + id] !== undefined) a.OPENBIT = !!this.flags['_open_' + id];
+    if (this.flags['_lit_' + id] !== undefined) a.ONBIT = !!this.flags['_lit_' + id];
+    return a;
+  }
+
+  /** Is this thing somewhere the player could look at it? */
+  visibleHere(id) {
+    if (this.loc[id] === 'PLAYER' || this.loc[id] === this.here) return true;
+    if (this.actorLoc[id] === this.here || this.actorLoc[id] === 'PLAYER') return true;
+    const where = this.loc[id];
+    return !!(where && this.items[where] && this.loc[where] === this.here && this.isOpen(where));
+  }
+
+  isOpen(id) {
+    if (this.flags['_open_' + id] !== undefined) return !!this.flags['_open_' + id];
+    const it = this.items[id] || {};
+    return !!(it.attributes && (it.attributes.OPENBIT || it.attributes.TRANSPARENT));
+  }
+
+  isLit(id) {
+    if (this.flags['_lit_' + id] !== undefined) return !!this.flags['_lit_' + id];
+    const it = this.items[id] || {};
+    return !!(it.attributes && it.attributes.ONBIT);
+  }
+
+  isDark() {
+    const room = this.rooms[this.here] || {};
+    if (!room.dark) return false;
+    // A lit light source in the room or carried defeats the dark.
+    for (const id of Object.keys(this.loc)) {
+      const it = this.items[id];
+      if (!it || !it.attributes || !it.attributes.LIGHTSOURCE) continue;
+      if (!this.isLit(id)) continue;
+      if (this.loc[id] === 'PLAYER' || this.loc[id] === this.here) return false;
+    }
+    return true;
+  }
+
+  lampTurns() {
+    const lamp = Object.keys(this.items).find(id =>
+      this.items[id].attributes && this.items[id].attributes.LIGHTSOURCE &&
+      this.items[id].fuel !== undefined);
+    if (!lamp) return null;
+    const used = this.flags['_fuelUsed_' + lamp] || 0;
+    return Math.max(0, this.items[lamp].fuel - used);
+  }
+
+  // ---------------------------------------------------------------- command
+  /**
+   * Submit a command. Returns verbatim authored prose plus the new state.
+   * Rules are consulted first; the engine's default responses only speak when no
+   * rule matched, so authors write the interesting cases and nothing else.
+   */
+  submit(verb, noun, indirect) {
+    if (this.ended) return { prose: this.endText(), state: this.state() };
+    verb = String(verb || '').toUpperCase();
+    noun = noun ? String(noun).toUpperCase() : null;
+
+    indirect = indirect ? String(indirect).toUpperCase() : null;
+
+    let prose = null;
+    for (const rule of this.rules) {
+      if (!this.matches(rule, verb, noun, indirect)) continue;
+      if (rule.if && !rule.if.every(c => this.test(c))) continue;
+      prose = this.apply(rule.do || []);
+      break;
+    }
+    if (prose === null) prose = this.builtin(verb, noun);
+
+    this.moves++;
+    const timed = this.tickTimers();
+    if (timed) prose += '\n\n' + timed;
+    if (this.ended) prose += '\n\n' + this.endText();
+
+    this.log.push({ verb, noun, prose });
+    return { prose, state: this.state() };
+  }
+
+  matches(rule, verb, noun, indirect) {
+    const on = rule.on || {};
+    // An arrival rule is dispatched by fireEnter and nowhere else. Every other
+    // field here is optional, so without this an enter rule matched the first
+    // command of any kind and answered everything in the game.
+    if (on.enter) return false;
+    if (on.verb && String(on.verb).toUpperCase() !== verb) return false;
+    if (on.noun && String(on.noun).toUpperCase() !== noun) return false;
+    if (on.room && on.room !== this.here) return false;
+    // Two-object interactions: USE KEY ON DOOR, PUT EGG IN CASE.
+    //
+    // The board has always had this. TWO_OBJ marks USE and HIT as taking a
+    // second target, so the interface asks the player to click another thing and
+    // sends it. matches() then dropped it on the floor, and no rule could ever
+    // name it, so the player picked two objects and the game said nothing. The
+    // central MacVenture gesture was wired up at both ends and connected to
+    // nothing in the middle.
+    if (on.second && String(on.second).toUpperCase() !== indirect) return false;
+    // A rule with no `second` must not swallow a two-object command, or the
+    // one-object fallback fires first and the specific pairing never runs.
+    if (!on.second && indirect) return false;
+    return true;
+  }
+
+  /** Closed condition vocabulary — everything the validator must reason about. */
+  test(c) {
+    switch (c.type) {
+      case 'flag': return !!this.flags[c.flag] === (c.value === undefined ? true : !!c.value);
+      case 'carrying': return this.loc[c.item] === 'PLAYER';
+      case 'in-room': return this.loc[c.item] === this.here;
+      case 'present': return this.loc[c.item] === 'PLAYER' || this.loc[c.item] === this.here;
+      case 'at': return this.here === c.room;
+      case 'visited': return this.visited.has(c.room);
+      case 'open': return this.isOpen(c.item);
+      case 'lit': return this.isLit(c.item);
+      // Rolls come off the world's own seeded generator, so a game plays the same
+      // way every time it is played and a walkthrough that passed keeps passing.
+      // Within a single run the rolls differ, which is what a fight needs.
+      case 'chance': return this.rng() * 100 < (c.percent === undefined ? 50 : c.percent);
+      case 'score-at-least': return this.score >= c.value;
+      case 'counter-at-least': return (this.counters[c.counter] || 0) >= c.value;
+      case 'counter-equals': return (this.counters[c.counter] || 0) === c.value;
+      case 'actor-here':
+        return this.actorLoc[c.actor] === this.here || this.actorLoc[c.actor] === 'PLAYER';
+      case 'fighting': return Object.keys(this.actorLoc).some(id =>
+        (this.actorLoc[id] === this.here || this.actorLoc[id] === 'PLAYER') &&
+        this.actors[id] && this.actors[id].hostile);
+      case 'not': return !this.test(c.condition);
+      // Boolean composition. Only `not` nested before, so an author needing OR
+      // had to mirror it into a flag by hand and keep the two in step.
+      case 'all': return (c.conditions || []).every(x => this.test(x));
+      case 'any': return (c.conditions || []).some(x => this.test(x));
+      default: return false;
+    }
+  }
+
+  /** Closed effect vocabulary. No scripting; a .folio can contain no code. */
+  apply(effects) {
+    const said = [];
+    for (const e of effects) {
+      switch (e.type) {
+        case 'print': said.push(e.text); break;
+        case 'set-flag': this.flags[e.flag] = e.value === undefined ? true : e.value; break;
+        case 'move-item': this.loc[e.item] = e.to; break;
+        case 'take': this.loc[e.item] = 'PLAYER'; break;
+        case 'destroy': this.loc[e.item] = 'NOWHERE'; break;
+        case 'open': this.flags['_open_' + e.item] = true; break;
+        case 'close': this.flags['_open_' + e.item] = false; break;
+        case 'light': this.flags['_lit_' + e.item] = true; break;
+        case 'extinguish': this.flags['_lit_' + e.item] = false; break;
+        case 'goto': this.here = e.room; this.visited.add(e.room); break;   // arrival fires via goTo
+        case 'score': this.score += e.value; break;
+        case 'set-counter': this.counters[e.counter] = e.value; break;
+        case 'add-counter':
+          this.counters[e.counter] = (this.counters[e.counter] || 0) + e.value; break;
+        case 'move-actor': this.actorLoc[e.actor] = e.to; break;
+        // An ending is allowed more than one breath. A single string made the
+        // whole epilogue of a novel-length adaptation one monolithic wall: it
+        // read well and it was a scroll rather than a scene.
+        case 'win':
+          this.ended = { win: true, reason: endingText(e), pages: endingPages(e) }; break;
+        case 'lose':
+          this.ended = { win: false, reason: endingText(e), pages: endingPages(e) }; break;
+        default: break;   // unknown effects are inert; T1 rejects them at validation
+      }
+    }
+    return said.join('\n');
+  }
+
+  tickTimers() {
+    const fired = [];
+    for (const t of this.timers) {
+      if (t.done) continue;
+      if (t.startFlag && !this.flags[t.startFlag]) continue;
+      // A countdown you cannot defeat is a cutscene. Without a stop condition
+      // the most Verne-appropriate mechanic in the book, dying of thirst unless
+      // you find water, was unwritable: a lose inside a timer could not be
+      // cancelled or guarded by any means the format offered.
+      if (t.stopFlag && this.flags[t.stopFlag]) { t.done = true; continue; }
+      if (t.if && !t.if.every(c => this.test(c))) continue;
+      t.elapsed++;
+      if (t.fuelFor) this.flags['_fuelUsed_' + t.fuelFor] = t.elapsed;
+      if (t.elapsed >= t.turns) {
+        t.done = !t.repeat;
+        if (!t.repeat) t.elapsed = 0;
+        const text = this.apply(t.do || []);
+        if (text) fired.push(text);
+      }
+    }
+    return fired.join('\n');
+  }
+
+  /**
+   * Move the player, then let the room react to their arrival.
+   *
+   * Nothing could happen BECAUSE the player arrived somewhere: every consequence
+   * had to hang off a verb, so a floor that gives way when you step on it, or an
+   * ambush, or a door closing behind you, were all unwritable. That is a large
+   * part of what an adventure does to you rather than for you.
+   */
+  goTo(dest, depth) {
+    this.here = dest;
+    this.visited.add(dest);
+    let text = this.describe();
+    const extra = this.fireEnter(dest, depth || 0);
+    return extra ? text + '\n\n' + extra : text;
+  }
+
+  fireEnter(room, depth) {
+    if (depth > 8) return '';         // an entry rule that walks you onward
+    for (const rule of this.rules) {
+      const on = rule.on || {};
+      if (on.enter !== room) continue;
+      if (rule.if && !rule.if.every(c => this.test(c))) continue;
+      const before = this.here;
+      const said = this.apply(rule.do || []);
+      // If the rule moved the player on, describe where they ended up.
+      if (this.here !== before) {
+        return said + (said ? '\n\n' : '') + this.goTo(this.here, depth + 1);
+      }
+      return said;
+    }
+    return '';
+  }
+
+  endText() {
+    return this.ended ? this.ended.reason : '';
+  }
+
+  /** Default responses. Tone is configurable so authors only write what matters. */
+  builtin(verb, noun) {
+    const room = this.rooms[this.here] || {};
+    const tone = (this.def.meta && this.def.meta.defaults) || {};
+    if (DIRS.includes(verb)) {
+      const dest = this.exits()[verb];
+      if (!dest) {
+        // A refusal that belongs to the passage rather than to the whole game.
+        // One global `blocked` string was shown for a locked gate in Hamburg and
+        // a granite wall thirty leagues under the Atlantic, and the only way to
+        // say anything specific was a guarded rule sitting above every exit.
+        const ex = ((room.exits || []).find(x => x.dir === verb) || {});
+        return ex.blocked || tone.blocked || 'You cannot go that way.';
+      }
+      return this.goTo(dest);
+    }
+    switch (verb) {
+      case 'LOOK': {
+        // LOOK with a noun is EXAMINE. It used to ignore the noun entirely and
+        // re-describe the room, so clicking LOOK on an object told you about the
+        // floor, and inspecting anything had to be hand-rolled as a USE rule,
+        // which then counted the object as load-bearing.
+        if (!noun) return this.describe();
+        const it = this.items[noun] || this.actors[noun];
+        if (!it) return tone.absent || 'You do not see that here.';
+        if (!this.visibleHere(noun)) return tone.absent || 'You do not see that here.';
+        return it.description || tone.plain ||
+          ('You see nothing special about the ' + (it.name || String(noun).toLowerCase()) + '.');
+      }
+      // Letting a turn go by is a move in its own right, and every parser since
+      // 1977 has had it. LOOK passed a turn as a side effect, which is not the
+      // same as being able to say "I wait".
+      case 'WAIT': case 'Z': return tone.wait || 'Time passes.';
+      case 'TAKE': {
+        if (!noun) return tone.what || 'Take what?';
+        if (this.loc[noun] === 'PLAYER') return tone.already || 'You already have that.';
+        if (this.loc[noun] !== this.here) return tone.absent || 'You do not see that here.';
+        const it = this.items[noun] || {};
+        if (!(it.attributes && it.attributes.TAKEBIT)) return tone.fixed || 'That is not something you can carry.';
+        this.loc[noun] = 'PLAYER';
+        return tone.taken || 'Taken.';
+      }
+      case 'DROP':
+        if (this.loc[noun] !== 'PLAYER') return tone.nothave || 'You are not carrying that.';
+        this.loc[noun] = this.here;
+        return tone.dropped || 'Dropped.';
+      case 'OPEN':
+        if (!this.items[noun]) return tone.absent || 'You do not see that here.';
+        if (this.isOpen(noun)) return tone.alreadyOpen || 'It is already open.';
+        return tone.locked || 'It will not open.';
+      case 'INVENTORY': {
+        const inv = Object.keys(this.loc).filter(i => this.loc[i] === 'PLAYER');
+        if (!inv.length) return tone.empty || 'You are empty-handed.';
+        return 'You are carrying:\n' + inv.map(i => '  ' + ((this.items[i] || {}).name || i)).join('\n');
+      }
+      default:
+        return tone.unknown || 'Nothing happens.';
+    }
+  }
+
+  describe() {
+    if (this.isDark()) {
+      return (this.def.meta && this.def.meta.defaults && this.def.meta.defaults.dark) ||
+        'It is pitch black.';
+    }
+    const room = this.rooms[this.here] || {};
+    const here = Object.keys(this.loc).filter(i => this.loc[i] === this.here);
+    // A room that reads the same before and after everything that happens in it
+    // is a backdrop rather than a place. Variants are tried in order and the
+    // first whose conditions hold wins, falling back to `prose`.
+    //
+    // Without this the only dynamic room text was an item's roomProse, so an
+    // author wanting a hall to change once the ogre wakes had to park scenery in
+    // NOWHERE and move it in. That trick worked and nothing had taught it, which
+    // is a sign the format was missing something rather than that the author was
+    // clever.
+    let body = room.prose || '';
+    for (const v of (room.variants || [])) {
+      if ((v.if || []).every(c => this.test(c))) { body = v.prose; break; }
+    }
+    let out = (room.name || this.here) + '\n' + body;
+    for (const id of here) {
+      const it = this.items[id];
+      if (it && it.roomProse) out += '\n' + it.roomProse;
+    }
+    return out;
+  }
+}
+
+// An ending is either one string or a run of beats. Both collapse to `reason`
+// for anything that only wants the text; `pages` is there for a presentation
+// layer that can pace them.
+function endingPages(e) {
+  if (Array.isArray(e.pages) && e.pages.length) return e.pages.slice();
+  return [e.text || ''];
+}
+function endingText(e) {
+  return endingPages(e).filter(Boolean).join('\n\n') ||
+    (e.type === 'win' ? 'You have won.' : 'You have died.');
+}
+
+function index(list) {
+  const out = {};
+  for (const x of (list || [])) out[x.id] = x;
+  return out;
+}
+
+// Small deterministic PRNG. Determinism is not a nicety here: walkthrough replay,
+// the blind solver, and every regression transcript depend on identical runs.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Create a Path B backend. Mirrors @folio/zmachine's createBackend shape. */
+function createBackend(worldJson, opts) {
+  // Accept a string, raw bytes (Buffer in node, Uint8Array in a browser), or an
+  // already-parsed object. The engine has to run in a page with no build step, so
+  // it cannot assume Buffer exists.
+  let def = worldJson;
+  if (typeof worldJson === 'string') {
+    def = JSON.parse(worldJson);
+  } else if (worldJson && typeof worldJson.byteLength === 'number') {
+    def = JSON.parse(new TextDecoder().decode(worldJson));
+  }
+  if (!def || !def.meta || !def.meta.start) {
+    throw new Error('@folio/world: world.json needs meta.start');
+  }
+  const w = new World(def, opts);
+  return {
+    world: w,
+    banner: (def.meta.title || 'Untitled') + '\n\n' + w.describe(),
+    state: () => w.state(),
+    submit: (verb, noun, indirect) => w.submit(verb, noun, indirect)
+  };
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports = { createBackend, World };
+if (typeof window !== 'undefined') { window.FolioWorld = { createBackend, World }; }
+
+  };
+  REG["graph.js"] = function (module, exports, require) {
+//  T2 — dependency-graph analysis for a Path B world.
+//
+//  A .folio is a puzzle dependency chart in disguise (Ron Gilbert's LucasArts
+//  technique), and once the world is machine-readable the chart can be computed
+//  rather than drawn. T2 and T3 are complementary and neither implies the other:
+//
+//    the graph proves NO DEAD ENDS EXIST
+//    the replay proves ONE PATH COMPLETES
+//
+//  The method is a fixpoint reachability analysis. Start where the player starts,
+//  holding nothing. Repeatedly work out everything reachable with what is held,
+//  collect whatever that exposes, fire whatever rules become satisfiable, and go
+//  again until nothing changes. What the fixpoint cannot reach, a player cannot
+//  reach either — which is the whole question.
+//
+//  It is deliberately optimistic about ordering (it assumes the player does the
+//  right things in the right order) and pessimistic about availability (it will
+//  not use an item it has not proved obtainable). That combination means a T2
+//  failure is a real defect, not a scheduling quibble — the property that makes
+//  the findings worth acting on.
+
+'use strict';
+
+function analyse(world) {
+  const findings = [];
+  const err = (code, msg, hint) => findings.push({ level: 'error', code, msg, hint });
+  const warn = (code, msg, hint) => findings.push({ level: 'warning', code, msg, hint });
+
+  const rooms = index(world.rooms);
+  const items = index(world.items);
+  const actors = index(world.actors || []);
+  const rules = world.rules || [];
+  const start = world.meta && world.meta.start;
+
+  if (!start || !rooms[start]) {
+    err('E300', 'meta.start does not name a real room: "' + start + '"');
+    return { ok: false, findings };
+  }
+
+  // ------------------------------------------------------- referential integrity
+  // Cheap, and it catches the overwhelmingly common authoring mistake: a typo in
+  // a room or item id that would otherwise surface as a dead end at play time.
+  for (const room of world.rooms) {
+    for (const ex of (room.exits || [])) {
+      if (!rooms[ex.to]) {
+        err('E301', 'room "' + room.id + '" has an exit ' + ex.dir + ' to "' + ex.to +
+          '", which does not exist');
+      }
+      if (ex.door && !items[ex.door]) {
+        err('E302', 'room "' + room.id + '" has a door "' + ex.door + '" that is not an item');
+      }
+    }
+  }
+  for (const it of world.items) {
+    if (it.location && it.location !== 'PLAYER' && it.location !== 'NOWHERE' &&
+        !rooms[it.location] && !items[it.location]) {
+      err('E303', 'item "' + it.id + '" starts in "' + it.location + '", which is neither ' +
+        'a room nor a container');
+    }
+  }
+  for (let i = 0; i < rules.length; i++) {
+    for (const e of (rules[i].do || [])) {
+      if (e.type === 'goto' && !rooms[e.room]) {
+        err('E304', 'rule ' + i + ' sends the player to "' + e.room + '", which does not exist');
+      }
+      if ((e.type === 'move-item' || e.type === 'take' || e.type === 'destroy') &&
+          e.item && !items[e.item]) {
+        err('E305', 'rule ' + i + ' acts on item "' + e.item + '", which does not exist');
+      }
+      if (e.type === 'move-actor' && e.actor && !index(world.actors || [])[e.actor]) {
+        err('E305', 'rule ' + i + ' moves actor "' + e.actor + '", which does not exist');
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------- fixpoint
+  const reachRooms = new Set([start]);
+  const held = new Set();
+  const flags = new Set(
+    Object.keys(world.flags || {}).filter(k => world.flags[k]));
+
+  // Seed the state the runtime already considers true at boot.
+  //
+  // isOpen() falls back to OPENBIT or TRANSPARENT and isLit() falls back to
+  // ONBIT, and this analysis knew about neither, so it began every run believing
+  // nothing was open and nothing was alight. A treasure in a chest declared open
+  // was therefore unreachable, and a puzzle gated on a lamp that starts lit could
+  // never be solved. Both play perfectly; only the checker could refuse to ship
+  // them, and it did.
+  for (const it of (world.items || [])) {
+    const a = it.attributes || {};
+    if (a.OPENBIT || a.TRANSPARENT) flags.add('_open_' + it.id);
+    if (a.ONBIT) flags.add('_lit_' + it.id);
+  }
+  const firedRules = new Set();
+  // Every noun that was reachable at any point in the analysis. Reachability is
+  // not monotonic once actors and items start moving, so the final state is not a
+  // safe thing to conclude "never" from.
+  const everPresent = new Set();
+  const firedTimers = new Set();
+  let won = false;
+
+  // Shared by rules and timers, because both advance the world the same way and
+  // an earlier version that only understood rules could not see half of it.
+  function applyEffects(list) {
+    for (const e of list) {
+      switch (e.type) {
+        case 'set-flag': if (e.value !== false) flags.add(e.flag); else flags.delete(e.flag); break;
+        case 'open': flags.add('_open_' + e.item); break;
+        case 'light': flags.add('_lit_' + e.item); break;
+        case 'take': held.add(e.item); break;
+        // This fixpoint only ever ADDS capability, which is what makes it
+        // optimistic about ordering and therefore trustworthy: a T2 failure is a
+        // real defect rather than a scheduling quibble. destroy, close and
+        // extinguish only take capability away, and modelling them turned a
+        // perfectly ordinary pattern, spend an item after its last use, into a
+        // hard error the moment any later rule mentioned it. W314 is the check
+        // that owns that hazard, and it is advisory on purpose.
+        case 'move-item':
+          itemLoc[e.item] = e.to;
+          // Being handed something is the same as taking it. Without this an
+          // item a rule gave you was never counted as carried, so every
+          // condition depending on it failed and the win looked unreachable.
+          if (e.to === 'PLAYER') held.add(e.item);
+          break;
+        case 'move-actor': actorLoc[e.actor] = e.to; break;
+        case 'goto': reachRooms.add(e.room); break;
+        case 'win': won = true; break;
+        default: break;
+      }
+    }
+  }
+
+  const canSatisfy = (c) => {
+    if (!c) return true;
+    switch (c.type) {
+      case 'flag': return c.value === false ? !flags.has(c.flag) : flags.has(c.flag);
+      case 'carrying': return held.has(c.item);
+      case 'in-room': return itemReachable(c.item);
+      case 'present': return held.has(c.item) || itemReachable(c.item);
+      case 'at': return reachRooms.has(c.room);
+      case 'visited': return reachRooms.has(c.room);
+      case 'open': return flags.has('_open_' + c.item);
+      case 'lit': return flags.has('_lit_' + c.item);
+      case 'score-at-least': return true;   // score is monotonic; assume attainable
+      // Counters, like score, only ever climb toward a threshold, so a
+      // counter gate is assumed reachable for the same reason.
+      case 'counter-at-least': return true;
+      case 'counter-equals': return true;
+      // Optimistic, like the rest of this analysis: a roll that can come up will.
+      // T3 then replays the real sequence and catches a game that actually
+      // depends on winning one.
+      case 'chance': return true;
+      case 'actor-here': return actorReachable(c.actor) ||
+        (actorLoc[c.actor] !== undefined && actorLoc[c.actor] !== 'NOWHERE');
+      case 'fighting': return (world.actors || []).some(a => a.hostile);
+      case 'not': return !canSatisfy(c.condition);
+      case 'all': return (c.conditions || []).every(canSatisfy);
+      case 'any': return (c.conditions || []).some(canSatisfy);
+      default: return false;
+    }
+  };
+
+  // An item is reachable if it sits in a reachable room, or inside a container
+  // that is itself reachable and open.
+  function itemReachable(id) {
+    const it = items[id];
+    if (!it) return false;
+    if (held.has(id)) return true;
+    const where = itemLoc[id];
+    if (where === 'PLAYER') return true;
+    if (where === 'NOWHERE') return false;
+    if (rooms[where]) return reachRooms.has(where);
+    if (items[where]) return itemReachable(where) && flags.has('_open_' + where);
+    return false;
+  }
+
+  // Actors are nouns too, and this analysis used to forget that entirely.
+  //
+  // The effect was not subtle: every rule whose trigger named a character was
+  // reported as unfireable, so the flag it set was unreachable, so every room
+  // behind that flag was unreachable, and a perfectly good game came back with a
+  // cascade of E311s and an unreachable win. Any world with an NPC puzzle in it
+  // was rejected. Found by writing a game against the published spec rather than
+  // against the engine, which is exactly what that exercise is for.
+  function actorReachable(id) {
+    if (!actors[id]) return false;
+    const where = actorLoc[id];
+    if (where === 'NOWHERE') return false;
+    if (where === 'PLAYER') return true;      // travelling with you, so always here
+    return rooms[where] ? reachRooms.has(where) : false;
+  }
+
+  /** Anything the player could name in a command: an item or an actor. */
+  function nounReachable(id) {
+    return held.has(id) || itemReachable(id) || actorReachable(id);
+  }
+
+  const itemLoc = {};
+  for (const it of world.items) itemLoc[it.id] = it.location;
+  const actorLoc = {};
+  for (const a of (world.actors || [])) actorLoc[a.id] = a.location;
+
+  let changed = true;
+  let guard = 0;
+  while (changed && guard++ < 200) {
+    changed = false;
+
+    // 1. Walk every passable exit out of every reachable room.
+    for (const rid of Array.from(reachRooms)) {
+      for (const ex of ((rooms[rid] || {}).exits || [])) {
+        if (!rooms[ex.to]) continue;
+        if (ex.condition && !canSatisfy(ex.condition)) continue;
+        if (ex.door && !flags.has('_open_' + ex.door)) continue;
+        if (!reachRooms.has(ex.to)) { reachRooms.add(ex.to); changed = true; }
+      }
+    }
+
+    // 2. Pick up everything takeable that is now reachable.
+    for (const it of world.items) {
+      if (held.has(it.id)) continue;
+      if (!(it.attributes && it.attributes.TAKEBIT)) continue;
+      if (itemReachable(it.id)) { held.add(it.id); changed = true; }
+    }
+
+    // 2b. Remember what was reachable this round, before any rule moves it.
+    for (const it of world.items) if (nounReachable(it.id)) everPresent.add(it.id);
+    for (const a of (world.actors || [])) if (nounReachable(a.id)) everPresent.add(a.id);
+
+    // 2c. Fire every timer whose start condition is reachable.
+    //
+    // Timers were invisible here, and the consequences were severe and badly
+    // diagnosed. A world that hid the player in an oven while timers brought the
+    // ogre home, fed him and put him to sleep came back with an unreachable win,
+    // an unreachable room and twelve dead rules — every one a symptom, with the
+    // cause reported nowhere. The author found it by noticing that everything
+    // broken traced back to a timer-set flag.
+    //
+    // Treating them as reachable is sound rather than generous. Nothing in the
+    // vocabulary can cancel a timer, so one whose startFlag is satisfiable WILL
+    // fire given enough turns, and this analysis is already optimistic about
+    // ordering. Leaving them out was not caution, it was a hole.
+    for (let ti = 0; ti < (world.timers || []).length; ti++) {
+      if (firedTimers.has(ti)) continue;
+      const t = world.timers[ti];
+      if (t.startFlag && !flags.has(t.startFlag)) continue;
+      firedTimers.add(ti);
+      changed = true;
+      applyEffects(t.do || []);
+    }
+
+    // 3. Fire every rule whose trigger is now performable and whose conditions hold.
+    for (let i = 0; i < rules.length; i++) {
+      if (firedRules.has(i)) continue;
+      const r = rules[i];
+      const on = r.on || {};
+      if (on.room && !reachRooms.has(on.room)) continue;
+      // The noun must be present for the player to act on it at all.
+      if (on.noun && !nounReachable(on.noun)) continue;
+      // A pairing needs both halves. Without this a rule gated on an unobtainable
+      // second object would be assumed firable and mask a real dead end.
+      if (on.second && !nounReachable(on.second)) continue;
+      if (r.if && !r.if.every(canSatisfy)) continue;
+
+      firedRules.add(i);
+      changed = true;
+      applyEffects(r.do || []);
+    }
+  }
+
+  // --------------------------------------------------------------- the verdict
+  if (!won) {
+    err('E310', 'the win state is not reachable',
+      'No sequence of reachable actions fires a "win" effect. Either a puzzle has ' +
+      'no solution from the start state, or nothing declares a win.');
+  }
+
+  // Naming the blocker rather than guessing at it.
+  //
+  // This used to say "usually a missing exit or an unsatisfiable condition",
+  // which was actively wrong in the case that mattered: the condition was
+  // perfectly satisfiable and the analysis simply could not see what set it. A
+  // report of fourteen unreachable things, none of which named a cause, cost the
+  // author most of a build. Every entrance to the room is now listed with the
+  // reason it does not open.
+  const setters = new Map();
+  const noteSetter = (list, what, index) => {
+    for (const e of (list || [])) {
+      if (e.type === 'set-flag' && e.value !== false) {
+        if (!setters.has(e.flag)) setters.set(e.flag, { what, index });
+      }
+    }
+  };
+  rules.forEach((r, i) => noteSetter(r.do, 'rule ' + i +
+    ' (' + (((r.on || {}).verb || '?') + ' ' + ((r.on || {}).noun || '')).trim() + ')', i));
+  (world.timers || []).forEach((t, i) => noteSetter(t.do, 'timer ' + i, -1));
+
+  // Why can that rule not fire? Naming the flag and the rule that sets it was
+  // an improvement and still stopped one step short of the answer, which is
+  // always one link further down the chain.
+  function whyRuleStuck(idx) {
+    const r = rules[idx];
+    if (!r) return '';
+    const on = r.on || {};
+    if (on.room && !reachRooms.has(on.room)) {
+      return ', and that rule needs the player in "' + on.room + '", which is also unreachable';
+    }
+    if (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) {
+      return ', and that rule needs "' + on.noun + '", which the player can never reach';
+    }
+    if (on.second && !nounReachable(on.second) && !everPresent.has(on.second)) {
+      return ', and that rule needs "' + on.second + '" in hand, which the player can never get';
+    }
+    const bad = (r.if || []).find(c => !canSatisfy(c));
+    if (bad) {
+      const what = bad.item || bad.room || bad.flag || bad.actor || bad.counter;
+      return ', and that rule is itself waiting on ' + bad.type +
+        (what ? ' "' + what + '"' : '') + ', which never becomes true';
+    }
+    return '';
+  }
+
+  function whyBlocked(ex, fromReachable) {
+    if (!fromReachable) return 'its source room is itself unreachable';
+    if (ex.door && !flags.has('_open_' + ex.door)) {
+      return 'its door "' + ex.door + '" is never opened';
+    }
+    if (ex.condition && !canSatisfy(ex.condition)) {
+      const f = ex.condition.flag;
+      if (f) {
+        if (!setters.has(f)) return 'it is gated on flag "' + f + '", which nothing ever sets';
+        const set = setters.get(f);
+        return 'it is gated on flag "' + f + '", set by ' + set.what +
+          ', which never becomes reachable' + whyRuleStuck(set.index);
+      }
+      return 'its condition is never satisfied';
+    }
+    return 'no reason found, which is a bug worth reporting';
+  }
+
+  for (const room of world.rooms) {
+    if (reachRooms.has(room.id)) continue;
+    const ways = [];
+    for (const other of world.rooms) {
+      for (const ex of (other.exits || [])) {
+        if (ex.to !== room.id) continue;
+        ways.push(other.id + ' ' + ex.dir + ': ' + whyBlocked(ex, reachRooms.has(other.id)));
+      }
+    }
+    const goes = rules.some(r => (r.do || []).some(e => e.type === 'goto' && e.room === room.id));
+    err('E311', 'room "' + room.id + '" is unreachable',
+      ways.length
+        ? 'Every way in is closed. ' + ways.slice(0, 4).join('; ') + '.'
+        : (goes ? 'No exit leads here. A rule sends the player here with goto, but that ' +
+                  'rule is not reachable either.'
+                : 'No exit anywhere leads to this room, and no rule sends the player here.'));
+  }
+
+  for (const it of world.items) {
+    if (it.location === 'NOWHERE') continue;
+    if (!itemReachable(it.id) && !held.has(it.id)) {
+      warn('W312', 'item "' + it.id + '" can never be reached',
+        'It exists but no player will ever see it.');
+    }
+  }
+
+  // Dead-rule reporting keys off the TRIGGER, not the conditions — a distinction
+  // this analysis got wrong on its first run and that matters a great deal.
+  //
+  // The fixpoint is optimistic about ordering: it assumes the player lights the
+  // lamp before descending. So a rule guarding the *wrong* order ("you grope in
+  // the dark and find nothing") never fires during analysis, even though a real
+  // player hits it constantly. Flagging those would train authors to delete their
+  // failure branches — exactly the writing that makes a game feel authored.
+  //
+  // A rule is genuinely dead only when the player can never even attempt it:
+  // its room is unreachable, or its noun can never be present.
+  //
+  // "Can never be present" also has to mean EVER, not "at the end of the
+  // analysis". The fixpoint moves things: feeding the dog sends it to NOWHERE, so
+  // by the last round the dog is unreachable and the unguarded "it shows you its
+  // teeth" fallback looked dead. A player meets that line every time they try the
+  // dog empty-handed. Same failure as the ordering one above, arriving by a
+  // different route, so the test is against everything that was reachable at any
+  // point rather than against the final state.
+  for (let i = 0; i < rules.length; i++) {
+    if (firedRules.has(i)) continue;
+    const on = rules[i].on || {};
+    const roomDead = on.room && !reachRooms.has(on.room);
+    const nounDead = (on.noun && !nounReachable(on.noun) && !everPresent.has(on.noun)) ||
+      (on.second && !nounReachable(on.second) && !everPresent.has(on.second));
+    if (roomDead || nounDead) {
+      warn('W313', 'rule ' + i + ' (' + (on.verb || '?') + ' ' + (on.noun || '') +
+        ') can never fire',
+        roomDead ? 'Its room "' + on.room + '" is unreachable.'
+                 : 'Its noun "' + on.noun + '" can never be present.');
+    }
+  }
+
+  // Walks that are really cuts.
+  //
+  // A film cuts and a map cannot. An adaptation wired its scene changes as
+  // compass exits, because that was the only way the format let anything move
+  // between rooms, and the result was a game where leaving a Humvee on a road in
+  // Afghanistan and heading OUT put you on the floor of Caesars Palace. Six more
+  // like it: a Malibu roof to an Afghan village by walking south-east, a desert
+  // to an airbase in California by walking west.
+  //
+  // A compass exit is a claim that two places are next to each other. When rooms
+  // declare which region they are in, that claim is checkable, and the honest way
+  // to express a jump is a rule with a goto: the player does something and the
+  // story moves, which is what a cut actually is.
+  //
+  // Silent unless a world uses regions at all, because a game with none has made
+  // no claim to check.
+  const regionOf = {};
+  let anyRegion = false;
+  for (const room of world.rooms) {
+    if (room.region) { regionOf[room.id] = room.region; anyRegion = true; }
+  }
+  if (anyRegion) {
+    const crossings = [];
+    for (const room of world.rooms) {
+      const from = regionOf[room.id];
+      for (const ex of (room.exits || [])) {
+        const to = regionOf[ex.to];
+        if (!from || !to || from === to) continue;
+        crossings.push(room.id + ' ' + ex.dir + ' to ' + ex.to +
+          ' (' + from + ' to ' + to + ')');
+      }
+    }
+    if (crossings.length) {
+      warn('W512', crossings.length + ' exit' + (crossings.length > 1 ? 's walk' : ' walks') +
+        ' between regions',
+        'A compass exit says two places are next to each other. These cross a region ' +
+        'boundary, so a player walks from one part of the world to another in a step: ' +
+        crossings.slice(0, 5).join('; ') +
+        '. A scene change belongs in a rule with a goto, where the player does ' +
+        'something and the story moves, rather than on the compass.');
+    }
+  }
+
+  // Rules standing in front of rules.
+  //
+  // Two written, working scenes shipped certified and never played, because a
+  // build step put expanded fallbacks above the room-specific rules they were
+  // meant to back up. First match wins, so the general rule answered every time
+  // and the specific one was dead. Nothing noticed: the world was sound, the
+  // walkthrough finished, and the only way it was found was grepping a play
+  // transcript for lines that should have been in it.
+  //
+  // A rule shadows a later one when it is unguarded and its trigger is at least
+  // as broad: same verb or no verb at all, same noun or any noun, same room or
+  // anywhere. The two-object case is the exception that matters, since a rule
+  // without `second` never matches a paired command and so cannot shadow one.
+  const broaderThan = (a, b) => {
+    const A = a.on || {}, B = b.on || {};
+    if (a.if && a.if.length) return false;              // guarded: may fall through
+    if (A.enter || B.enter) return A.enter === B.enter;  // arrivals are their own path
+    if (A.verb && String(A.verb).toUpperCase() !== String(B.verb || '').toUpperCase()) return false;
+    if (A.noun && String(A.noun).toUpperCase() !== String(B.noun || '').toUpperCase()) return false;
+    if (A.room && A.room !== B.room) return false;
+    if (A.second) {
+      return String(A.second).toUpperCase() === String(B.second || '').toUpperCase();
+    }
+    return !B.second;      // a bare rule cannot swallow a pairing
+  };
+  const shadowed = [];
+  for (let j = 0; j < rules.length; j++) {
+    for (let i = 0; i < j; i++) {
+      if (!broaderThan(rules[i], rules[j])) continue;
+      const on = rules[j].on || {};
+      shadowed.push('rule ' + j + ' (' +
+        ((on.verb || 'any') + ' ' + (on.noun || '')).trim() +
+        (on.room ? ' in ' + on.room : '') + ') is shadowed by rule ' + i);
+      break;
+    }
+  }
+  if (shadowed.length) {
+    warn('W511', shadowed.length + ' rule' + (shadowed.length > 1 ? 's are' : ' is') +
+      ' unreachable behind an earlier one',
+      'First match wins, so an unguarded rule answers every command a later, more ' +
+      'specific one was written for, and the later one never runs. The world still ' +
+      'works and the scene never plays. ' + shadowed.slice(0, 4).join('; ') +
+      '. Move the specific rules above the general ones.');
+  }
+
+  // One-way passages you can walk through under-equipped.
+  //
+  // T2 proves a path exists. It is optimistic about ordering, so it assumes the
+  // player picks everything up while it is still reachable, and that assumption
+  // is exactly what a one-way passage breaks. A Verne adaptation certified with a
+  // player who leaves the gun cotton in Hamburg unwinnable ninety moves later,
+  // with no warning anywhere, because a path did exist: the one where you took it.
+  //
+  // So: for each passage with no way back, anything required on the far side and
+  // obtainable only on the near side is a trap the player cannot undo.
+  const canReturn = (from, to) => {
+    const seen = new Set([to]);
+    const queue = [to];
+    while (queue.length) {
+      const at = queue.shift();
+      if (at === from) return true;
+      for (const ex of ((rooms[at] || {}).exits || [])) {
+        if (!seen.has(ex.to)) { seen.add(ex.to); queue.push(ex.to); }
+      }
+    }
+    return false;
+  };
+  const reachableFrom = (start) => {
+    const seen = new Set([start]);
+    const queue = [start];
+    while (queue.length) {
+      const at = queue.shift();
+      for (const ex of ((rooms[at] || {}).exits || [])) {
+        if (!seen.has(ex.to)) { seen.add(ex.to); queue.push(ex.to); }
+      }
+    }
+    return seen;
+  };
+  const neededBy = new Map();      // item -> a rule that requires carrying it
+  rules.forEach((r, i) => {
+    for (const c of (r.if || [])) {
+      const walk = (x) => {
+        if (!x) return;
+        if (x.type === 'carrying' && !neededBy.has(x.item)) neededBy.set(x.item, i);
+        if (x.type === 'not') walk(x.condition);
+        for (const sub of (x.conditions || [])) walk(sub);
+      };
+      walk(c);
+    }
+    if ((r.on || {}).second && !neededBy.has(r.on.second)) neededBy.set(r.on.second, i);
+  });
+
+  const traps = [];
+  for (const room of world.rooms) {
+    for (const ex of (room.exits || [])) {
+      if (!rooms[ex.to] || canReturn(room.id, ex.to)) continue;
+      const beyond = reachableFrom(ex.to);
+      for (const [itemId, ruleIdx] of neededBy) {
+        const it = items[itemId];
+        if (!it || !(it.attributes && it.attributes.TAKEBIT)) continue;
+        const home = itemLoc[itemId];
+        if (home === 'PLAYER' || beyond.has(home)) continue;     // still gettable
+        const gateRoom = (rules[ruleIdx].on || {}).room;
+        const gateNoun = (rules[ruleIdx].on || {}).noun;
+        const gateAt = gateRoom || (gateNoun && itemLoc[gateNoun]);
+        if (gateAt && !beyond.has(gateAt)) continue;             // needed before the drop
+        traps.push(itemId + ' (left behind at ' + home + ', needed past ' +
+          room.id + ' ' + ex.dir + ')');
+      }
+    }
+  }
+  if (traps.length) {
+    warn('W510', traps.length + ' item' + (traps.length > 1 ? 's' : '') +
+      ' can be left behind before a passage with no way back',
+      'The walkthrough works because it carries them. A player who does not is ' +
+      'stuck with no way to tell: ' + [...new Set(traps)].slice(0, 4).join('; ') +
+      '. Give the passage a warning, put the item past it, or open a way back.');
+  }
+
+  // Softlock heuristic: an item that some rule destroys, and that another rule
+  // still requires. Destroying it first is a dead end the player cannot undo.
+  const destroyed = new Set();
+  for (const r of rules) for (const e of (r.do || [])) if (e.type === 'destroy') destroyed.add(e.item);
+  for (const id of destroyed) {
+    const needed = rules.some(r => (r.if || []).some(c =>
+      (c.type === 'carrying' || c.type === 'present') && c.item === id));
+    if (needed) {
+      warn('W314', 'item "' + id + '" can be destroyed but is also required by a rule',
+        'A player who destroys it first may be unable to finish. Consider making it ' +
+        'unbreakable, replaceable, or the destruction itself a win/lose branch.');
+    }
+  }
+
+  const errors = findings.filter(f => f.level === 'error');
+  return {
+    ok: errors.length === 0,
+    findings,
+    stats: {
+      rooms: world.rooms.length,
+      reachable: reachRooms.size,
+      items: world.items.length,
+      obtainable: held.size,
+      rules: rules.length,
+      live: firedRules.size,
+      winReachable: won
+    }
+  };
+}
+
+function index(list) {
+  const out = {};
+  for (const x of (list || [])) out[x.id] = x;
+  return out;
+}
+
+module.exports = { analyse };
+
+  };
+  REG["replay.js"] = function (module, exports, require) {
+//  T3 — proof of completability by cold-start walkthrough replay.
+//
+//  The single claim Folio makes that no other platform in this space currently
+//  makes, and the rules below are what the claim rests on:
+//
+//    COLD START.  The run begins at the game's own start state. No teleporting the
+//                 player, no granting items, no setting flags.
+//    NO PRIVILEGED VERBS.  Only commands a player could type.
+//    DETERMINISTIC.  Same seed, same run, every time.
+//
+//  Inform 7 has shipped a TEST ME facility for twenty years and it is the closest
+//  prior art. It also shows exactly where the idea leaks: its scripts accept
+//  stipulations that teleport state ("in the Kitchen holding the jam") and a
+//  PURLOIN verb that conjures any object. A green run there proves a vignette
+//  works from a fabricated state — not that the game is finishable. Folio refuses
+//  those affordances on purpose; without that refusal the badge means nothing.
+//
+//  What this proves and does not prove, stated plainly because the distinction is
+//  the whole integrity of the certification: it proves a path exists. It does not
+//  prove a human could find it. That is T4's blind solver, and the badge reads
+//  "verified completable", never "verified fair".
+
+'use strict';
+
+const world = require('../world/index.js');
+
+/**
+ * Replay a walkthrough against a Path B world from a cold start.
+ * @returns {{ok, findings, transcript, stats}}
+ */
+function replay(worldDef, walkthrough, opts) {
+  opts = opts || {};
+  const findings = [];
+  const err = (code, msg, hint) => findings.push({ level: 'error', code, msg, hint });
+
+  const cmds = String(walkthrough || '')
+    .split('\n')
+    .map(l => l.split('#')[0].trim())
+    .filter(Boolean);
+
+  if (!cmds.length) {
+    err('E400', 'the walkthrough contains no commands');
+    return { ok: false, findings, transcript: [], stats: {} };
+  }
+
+  let be;
+  try {
+    be = world.createBackend(worldDef, { seed: opts.seed === undefined ? 1234 : opts.seed });
+  } catch (e) {
+    err('E401', 'the game would not start: ' + e.message);
+    return { ok: false, findings, transcript: [], stats: {} };
+  }
+
+  const transcript = [];
+  const visited = new Set([be.state().roomId]);
+  let firedRules = 0;
+
+  for (let i = 0; i < cmds.length; i++) {
+    const line = cmds[i];
+    const [verb, ...rest] = line.split(/\s+/);
+
+    // `expect:` lines are assertions, not commands — they let an author pin the
+    // run's shape so a walkthrough that still completes by accident is caught.
+    if (verb.toLowerCase() === 'expect:') {
+      const [what, ...want] = rest;
+      const s = be.state();
+      const got = what === 'score' ? String(s.score)
+        : what === 'room' ? s.roomId
+        : what === 'moves' ? String(s.moves) : undefined;
+      if (got === undefined) {
+        err('E402', 'line ' + (i + 1) + ': unknown assertion "' + what + '"',
+          'Supported: expect: score N | expect: room ID | expect: moves N');
+      } else if (got.toUpperCase() !== want.join(' ').toUpperCase()) {
+        err('E403', 'line ' + (i + 1) + ': expected ' + what + ' ' + want.join(' ') +
+          ', got ' + got);
+      }
+      continue;
+    }
+
+    const before = be.state();
+    let r;
+    try {
+      const noun = rest.length ? String(rest.shift()).toUpperCase() : null;
+      const second = rest.length ? rest.join(' ').toUpperCase() : null;
+      r = be.submit(verb, noun, second);
+    } catch (e) {
+      err('E404', 'line ' + (i + 1) + ' ("' + line + '") threw: ' + e.message);
+      break;
+    }
+    const after = be.state();
+    if (after.roomId !== before.roomId) visited.add(after.roomId);
+    if (after.score !== before.score) firedRules++;
+    transcript.push({ cmd: line, prose: r.prose, room: after.roomId, score: after.score });
+
+    if (be.world.ended) break;
+  }
+
+  const end = be.world.ended;
+  if (!end) {
+    const s = be.state();
+    err('E410', 'the walkthrough ran to the end without winning',
+      'Stopped in ' + s.roomId + ' at ' + s.score + ' points after ' + s.moves +
+      ' moves. The last command was "' + (transcript[transcript.length - 1] || {}).cmd + '".');
+  } else if (!end.win) {
+    err('E411', 'the walkthrough ends in a loss, not a win', end.reason);
+  }
+
+  const s = be.state();
+  const totalRooms = (worldDef.rooms || []).length;
+  return {
+    ok: findings.filter(f => f.level === 'error').length === 0,
+    findings,
+    transcript,
+    stats: {
+      commands: cmds.length,
+      moves: s.moves,
+      score: s.score,
+      won: !!(end && end.win),
+      roomsVisited: visited.size,
+      roomCoverage: totalRooms ? Math.round((visited.size / totalRooms) * 100) : 0
+    }
+  };
+}
+
+module.exports = { replay };
+
+  };
+  REG["design.js"] = function (module, exports, require) {
+//  T4 — the design audit. Is this a *game*, or merely a completable artifact?
+//
+//  T0–T3 have a blind spot big enough to drive a demo through: a single room
+//  containing a lamp, where `take lamp` fires a win, passes every one of them. It
+//  is schema-valid, referentially sound, has no dead ends, and its walkthrough
+//  completes. It is also not a game.
+//
+//  This matters most for generated games. A Zork port inherits Infocom's design;
+//  a world compiled from a novel inherits nothing, and the failure mode is not a
+//  broken game but a *hollow* one — beautiful rooms with nothing to do in them.
+//  Scale is the specific risk with a long source: a thousand-page novel that
+//  compiles to six rooms has not been adapted, it has been abandoned.
+//
+//  So T4 reports a PROFILE, not a verdict. "Good" is not binary and pretending
+//  otherwise would produce a number nobody trusts. The thresholds that gate the
+//  certified badge are calibrated against the classics by the corpus profiler;
+//  what this module owns is the measurement.
+
+'use strict';
+
+/**
+ * Measure the design shape of a Path B world.
+ * @returns {{metrics:object, findings:Array}}
+ */
+function audit(world, opts) {
+  opts = opts || {};
+  const findings = [];
+  const warn = (code, msg, hint) => findings.push({ level: 'warning', code, msg, hint });
+
+  const rooms = world.rooms || [];
+  const items = world.items || [];
+  const rules = world.rules || [];
+
+  // ------------------------------------------------------- 1. puzzle chain depth
+  //
+  // The headline metric, and the one that separates a game from a demo. A demo is
+  // 1. Zork's deepest chains run to roughly 9. Depth is what "you had to work for
+  // this" actually feels like from the inside.
+  //
+  // Measured by layered reachability rather than by rule-to-rule edges, because a
+  // first attempt at the latter scored this project's own fixture at 1 when its
+  // real chain is four steps long. Dependencies do not only run rule→rule: they
+  // run through picking an item up (no rule involved), and through an exit whose
+  // condition a rule satisfied (no second rule involved). Counting only rule edges
+  // silently under-reports every game, which is worse than not measuring at all.
+  //
+  // So: run the same fixpoint T2 uses, but record which ROUND each thing first
+  // becomes available. The number of rounds needed to converge is precisely the
+  // length of the longest dependency chain in the world.
+  const requires = rules.map(r => new Set(statesRequired(r)));
+  const depth = chainDepth(world);
+
+  // --------------------------------------------------- 2. participation & utility
+  //
+  // What proportion of the world is load-bearing? Decorative items and empty rooms
+  // are not sins in themselves — Zork is full of scenery — but a game that is
+  // mostly decoration is a set, not a game.
+  const referenced = new Set();
+  for (const r of rules) {
+    // NOT r.on.noun. Answering when a player pokes at something is what makes it
+    // scenery, not what makes it matter, and counting it meant an author who
+    // wrote a flavour line for every prop was told their world was 100 per cent
+    // load-bearing and had to strip the texture back out to pass. The spec says
+    // write every verb; this said the opposite. Depended on, or changed, is the
+    // test. A pairing counts, because you have to be holding the second thing.
+    for (const c of (r.if || [])) if (c.item) referenced.add(c.item);
+    if (r.on && r.on.second) referenced.add(r.on.second);
+    for (const e of (r.do || [])) if (e.item) referenced.add(e.item);
+  }
+  const takeable = items.filter(i => i.attributes && i.attributes.TAKEBIT);
+  const itemParticipation = items.length
+    ? Math.round((items.filter(i => referenced.has(i.id)).length / items.length) * 100) : 0;
+
+  const activeRooms = new Set();
+  for (const r of rules) if (r.on && r.on.room) activeRooms.add(r.on.room);
+  for (const it of items) if (it.location && rooms.some(rm => rm.id === it.location)) activeRooms.add(it.location);
+  const roomUtility = rooms.length
+    ? Math.round((activeRooms.size / rooms.length) * 100) : 0;
+
+  // ------------------------------------------------------------- 3. map shape
+  //
+  // Corridors are the signature of a generated map. Real adventure maps loop: they
+  // let a player wander, return, and recognise. Cyclomatic complexity over the room
+  // graph distinguishes the two — a tree scores 1, a looping map scores higher.
+  // Shared with the corpus profiler, because these two used to disagree about
+  // the same file and only a probe told the author which one the audit believed.
+  //
+  // Connections that cross a region are left out, and that correction matters
+  // more than it sounds. An adaptation of a film scored 0.53 loops per room, the
+  // best map score of any game built on this engine, BECAUSE its author had to
+  // invent adjacency to make a scene list walkable. Twenty-nine of its exits
+  // crossed continents. The measure was rewarding the exact failure W512 exists
+  // to report, and a narrative defect was manufacturing a mechanical pass.
+  const shape = require('./mapshape.js');
+  const regionOf = {};
+  let regioned = false;
+  for (const rm of rooms) if (rm.region) { regionOf[rm.id] = rm.region; regioned = true; }
+  const passages = shape.passagesOf(world).filter(p => {
+    if (!regioned) return true;
+    const a = regionOf[p[0]], b = regionOf[p[1]];
+    return !a || !b || a === b;
+  });
+  const conns = shape.connections(passages);
+  // Circulation is only meaningful inside a region. Ten rooms in one place with
+  // three ways round is a place; ten rooms on four continents is an itinerary.
+  const loopRooms = regioned
+    ? new Set([...conns].flatMap(k => k.split(' '))).size || rooms.length
+    : rooms.length;
+  const loops = shape.loops(conns.size, loopRooms);
+
+  // -------------------------------------------------------- 4. gate separation
+  //
+  // How far is a key from its lock? Zero means the key sits beside the door, which
+  // is a formality rather than a puzzle. Distance is what makes the player carry
+  // something in the hope it matters.
+  const dist = roomDistances(rooms);
+  const gaps = [];
+  for (const r of rules) {
+    const needed = [...requires[rules.indexOf(r)]].filter(s => s.startsWith('carry:'));
+    for (const n of needed) {
+      const itemId = n.slice(6);
+      const it = items.find(i => i.id === itemId);
+      const gateRoom = (r.on && r.on.room) || roomOf(items, (r.on || {}).noun);
+      if (it && it.location && gateRoom && dist[it.location] && dist[it.location][gateRoom] !== undefined) {
+        gaps.push(dist[it.location][gateRoom]);
+      }
+    }
+  }
+  const meanGateDistance = gaps.length
+    ? Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10 : 0;
+
+  // --------------------------------------------------------------- 5. stakes
+  // Timers count. A hazard on a clock is the commonest way a world kills you and
+  // often the only one, so looking at rules alone told an author with a drowning
+  // timer that nothing in their world had any stakes.
+  const killsIn = (list) => (list || []).some(x => (x.do || []).some(e => e.type === 'lose'));
+  const hasDeath = killsIn(rules) || killsIn(world.timers);
+  const scoringRules = rules.filter(r => (r.do || []).some(e => e.type === 'score')).length;
+
+  const metrics = {
+    rooms: rooms.length,
+    items: items.length,
+    takeableItems: takeable.length,
+    rules: rules.length,
+    puzzleChainDepth: depth,
+    itemParticipation,
+    roomUtility,
+    mapLoops: loops,
+    mapConnections: conns.size,
+    loopsPerRoom: loopRooms ? Math.round((loops / loopRooms) * 100) / 100 : 0,
+    meanGateDistance,
+    scoringMoments: scoringRules,
+    hasDeathState: hasDeath
+  };
+
+  // ------------------------------------------------------------- the findings
+  //
+  // Thresholds are calibrated against conformance/corpus/zork-1.json — measured by
+  // replaying the real game, not estimated. Two of my original guesses were wrong
+  // in instructive ways, and the corrections are the point of having a corpus:
+  //
+  //   participation: guessed a 40% floor. Zork's take rate is 43%, meaning most of
+  //     its world is scenery ON PURPOSE. A world where everything is takeable reads
+  //     as a shopping list; scenery is what makes the takeable things feel chosen.
+  //     So the floor drops, and a HIGH ratio becomes its own (gentler) warning.
+  //
+  //   map loops: guessed "at least one". Zork runs 0.67 loops per room — nearly
+  //     every room sits on a circuit. A single loop in a fifty-room map is still a
+  //     corridor, so the test has to be scale-free.
+  //
+  // Scale itself is deliberately NOT taken from the corpus. Zork has 82 rooms
+  // because Zork is Zork; a game adapted from a short story should not be held to
+  // that. Absolute size comes from the source material via the Story Compiler's
+  // budget, and `opts.sourceScale` carries it when the caller knows it.
+  const scale = opts.sourceScale || {};
+  const T = Object.assign({
+    minRooms: scale.expectedRooms ? Math.round(scale.expectedRooms * 0.6) : 8,
+    minDepth: 3,
+    minParticipation: 25,
+    maxParticipation: 90,
+    minRoomUtility: 60,
+    minLoopsPerRoom: 0.15,
+    expectDeaths: true
+  }, opts.thresholds);
+
+  if (metrics.rooms < T.minRooms) {
+    warn('W500', 'only ' + metrics.rooms + ' rooms' +
+      (scale.expectedRooms ? ', against ~' + scale.expectedRooms + ' the source suggests' : ''),
+      scale.expectedRooms
+        ? 'The source carries more places than the adaptation used. This is the ' +
+          'characteristic failure of compiling a long book: a hollow game that is ' +
+          'faithful to the plot and ignores the world.'
+        : 'Short enough to read as a demo. Zork I runs 82 rooms; a short story ' +
+          'need not, but a novel should not come out this size.');
+  }
+  if (metrics.puzzleChainDepth < T.minDepth) {
+    warn('W501', 'longest puzzle chain is ' + metrics.puzzleChainDepth,
+      'Nothing here requires several steps of planning. Depth is what makes a ' +
+      'solution feel earned; a chain of 1 is an errand.');
+  }
+  if (metrics.itemParticipation < T.minParticipation) {
+    warn('W502', 'only ' + metrics.itemParticipation + '% of items do anything',
+      'Almost nothing here is load-bearing. Zork carries a lot of scenery too — ' +
+      'only 43% of what a player sees is ever picked up — but below about a ' +
+      'quarter the world stops rewarding curiosity at all.');
+  }
+  if (metrics.itemParticipation > T.maxParticipation && metrics.items > 6) {
+    warn('W507', metrics.itemParticipation + '% of items are load-bearing — almost no scenery',
+      'A world where everything matters reads as a shopping list. Zork keeps ' +
+      'roughly half its objects as pure scenery, and that is what makes the ' +
+      'useful ones feel chosen rather than issued.');
+  }
+  if (metrics.roomUtility < T.minRoomUtility) {
+    warn('W503', 'only ' + metrics.roomUtility + '% of rooms contain anything',
+      'The rest are corridors. Empty rooms are the most common way a generated ' +
+      'map inflates its size without adding a game.');
+  }
+  if (metrics.loopsPerRoom < T.minLoopsPerRoom) {
+    warn('W504', 'the map runs ' + metrics.loopsPerRoom + ' loops per room' +
+      (metrics.mapLoops === 0 ? ' (a tree)' : ''),
+      'Counted as connections minus rooms plus one, where a connection is any pair ' +
+      'of rooms joined in either direction: ' + metrics.mapConnections + ' connections ' +
+      'across ' + metrics.rooms + ' rooms. One-way passages count in full. ' +
+      'Corridor maps are the signature of generated geography. Zork runs 0.67 ' +
+      'loops per room — nearly every room sits on a circuit — which is what lets ' +
+      'a player take a shortcut and feel the map as a place rather than a menu.');
+  }
+  if (!metrics.hasDeathState && T.expectDeaths) {
+    warn('W505', 'nothing in this world can kill or defeat the player',
+      'Without stakes, exploration carries no tension. Not mandatory — some fine ' +
+      'games have no death — but worth having decided rather than defaulted.');
+  }
+  if (metrics.meanGateDistance === 0 && metrics.rules > 2) {
+    warn('W506', 'keys sit in the same room as their locks',
+      'A key beside its door is a formality, not a puzzle. Distance is what makes ' +
+      'a player carry something in the hope that it matters.');
+  }
+
+  // Rules that fire and say nothing.
+  //
+  // Found by playing a freshly built game through the tools rather than by
+  // testing it. "unlock gate" set the flag, opened the way, and printed an empty
+  // line. The command had worked perfectly and the player had no way to know: a
+  // successful rule with no print is indistinguishable from a command the game
+  // did not understand.
+  //
+  // Only player-triggered rules count. A rule with no verb is machinery, and a
+  // timer appends to whatever else happened that turn.
+  // win and lose carry their own text and the engine prints it, so a rule that
+  // ends in either is not silent. Counting print effects alone reported five
+  // perfectly good death scenes as saying nothing, and the author added redundant
+  // one-line prints in front of them purely to quiet the warning, which made the
+  // writing worse. A check that degrades the work it is auditing is worse than
+  // no check.
+  const speaks = (e) => e.type === 'print' ||
+    ((e.type === 'win' || e.type === 'lose') && e.text);
+  const silent = (world.rules || []).filter(r =>
+    (r.on || {}).verb && !(r.do || []).some(speaks));
+  if (silent.length) {
+    warn('W508', silent.length + ' rule' + (silent.length > 1 ? 's fire' : ' fires') +
+      ' without printing anything',
+      'A rule that succeeds silently looks exactly like a command the game did not ' +
+      'understand. Triggers: ' +
+      silent.slice(0, 5).map(r => (r.on.verb + ' ' + (r.on.noun || '')).trim()).join(', ') +
+      '. Add a print effect, even a short one.');
+  }
+
+  // Verbs a player cannot actually click.
+  //
+  // The board has eight verb buttons and a compass. On Path B those buttons send
+  // exactly their own verb, so a rule triggered by anything else can only be
+  // reached by opening the on-screen keyboard and typing it, which is the single
+  // thing this engine exists to avoid.
+  //
+  // This project's own worked example failed it. Cellar Door is built on UNLOCK
+  // and LIGHT and cannot be finished by pointing and clicking, and that went
+  // unnoticed through the spec, the quickstart and a screenshot on the docs page.
+  // The first person to build a game from the spec avoided the trap by instinct,
+  // having no way to know it was there.
+  // WAIT is here because the engine answers it and meta.defaults invites you to
+  // word it. It has no button, so it must never gate progress, but flagging a
+  // flavour response to it as an unclickable custom verb was pure noise.
+  const CLICKABLE = ['LOOK', 'TAKE', 'DROP', 'OPEN', 'CLOSE', 'USE', 'HIT', 'SPEAK',
+    'INVENTORY', 'WAIT', 'NORTH', 'SOUTH', 'EAST', 'WEST', 'NE', 'NW', 'SE', 'SW',
+    'UP', 'DOWN', 'IN', 'OUT'];
+  const offGrid = [...new Set(rules
+    .map(r => ((r.on || {}).verb || '').toUpperCase())
+    .filter(v => v && !CLICKABLE.includes(v)))];
+  if (offGrid.length) {
+    warn('W509', offGrid.length + ' verb' + (offGrid.length > 1 ? 's are' : ' is') +
+      ' not on the verb grid: ' + offGrid.join(', '),
+      'A player can only click the eight grid verbs and the compass, so these can ' +
+      'be reached only by typing them on the on-screen keyboard. Rewrite them ' +
+      'against USE, OPEN, HIT or SPEAK, or accept that the game needs typing.');
+  }
+
+  return { metrics, findings };
+}
+
+// --------------------------------------------------------------------- helpers
+
+// The state vocabulary is closed, so what a rule produces and requires can be
+// named exactly — which is what makes the dependency DAG computable at all.
+function statesProduced(r) {
+  const out = [];
+  for (const e of (r.do || [])) {
+    if (e.type === 'set-flag' && e.value !== false) out.push('flag:' + e.flag);
+    if (e.type === 'open') out.push('open:' + e.item);
+    if (e.type === 'light') out.push('lit:' + e.item);
+    if (e.type === 'take') out.push('carry:' + e.item);
+    if (e.type === 'move-item') out.push('at:' + e.item + '@' + e.to);
+    if (e.type === 'goto') out.push('room:' + e.room);
+    if (e.type === 'set-counter' || e.type === 'add-counter') out.push('count:' + e.counter);
+    if (e.type === 'move-actor') out.push('actor:' + e.actor + '@' + e.to);
+  }
+  return out;
+}
+
+function statesRequired(r) {
+  const out = [];
+  const walk = (c) => {
+    if (!c) return;
+    if (c.type === 'flag' && c.value !== false) out.push('flag:' + c.flag);
+    if (c.type === 'carrying') out.push('carry:' + c.item);
+    if (c.type === 'open') out.push('open:' + c.item);
+    if (c.type === 'lit') out.push('lit:' + c.item);
+    if (c.type === 'at' || c.type === 'visited') out.push('room:' + c.room);
+    if (c.type === 'counter-at-least' || c.type === 'counter-equals') out.push('count:' + c.counter);
+    if (c.type === 'actor-here') out.push('actor:' + c.actor);
+    if (c.type === 'chance') out.push('chance');
+    if (c.type === 'not') walk(c.condition);
+    // Composition nests, so the walk has to recurse through it or every
+    // dependency expressed with all/any becomes invisible to chain depth.
+    for (const sub of (c.conditions || [])) walk(sub);
+  };
+  // A pairing depends on holding the second object, which is a real dependency
+  // edge and the commonest shape in a MacVenture-style game.
+  if (r.on && r.on.second) out.push('carry:' + r.on.second);
+  for (const c of (r.if || [])) walk(c);
+  return out;
+}
+
+// Layered reachability. Each round unlocks everything the previous round made
+// possible; the round count on convergence is the longest dependency chain.
+// Dependencies flow through three channels, and all three must be modelled:
+// picking things up, firing rules, and walking through exits that a rule opened.
+function chainDepth(world) {
+  const rooms = {};
+  for (const r of (world.rooms || [])) rooms[r.id] = r;
+  const items = {};
+  for (const i of (world.items || [])) items[i.id] = i;
+  const rules = world.rules || [];
+  const start = world.meta && world.meta.start;
+  if (!start) return 0;
+
+  const reach = new Set([start]);
+  const held = new Set();
+  const flags = new Set(Object.keys(world.flags || {}).filter(k => world.flags[k]));
+  const fired = new Set();
+
+  const loc = {};
+  for (const i of (world.items || [])) loc[i.id] = i.location;
+
+  const present = (id) => {
+    if (held.has(id)) return true;
+    const w = loc[id];
+    if (w === 'PLAYER') return true;
+    if (rooms[w]) return reach.has(w);
+    if (items[w]) return present(w) && flags.has('_open_' + w);
+    return false;
+  };
+  const sat = (c) => {
+    if (!c) return true;
+    switch (c.type) {
+      case 'flag': return c.value === false ? !flags.has(c.flag) : flags.has(c.flag);
+      case 'carrying': return held.has(c.item);
+      case 'in-room': case 'present': return present(c.item);
+      case 'at': case 'visited': return reach.has(c.room);
+      case 'open': return flags.has('_open_' + c.item);
+      case 'lit': return flags.has('_lit_' + c.item);
+      case 'score-at-least': return true;
+      case 'not': return !sat(c.condition);
+      default: return false;
+    }
+  };
+
+  // Strict layering: every test in a round is evaluated against the world as it
+  // stood at the START of that round, and results land in the next layer. Without
+  // the snapshot, a single round cascades — reach a room, grab the key it holds,
+  // unlock a door with it, and walk through, all "simultaneously" — which collapses
+  // a four-step chain into one and reports every game as shallower than it is.
+  let rounds = 0;
+  for (let guard = 0; guard < 200; guard++) {
+    const snapReach = new Set(reach);
+    const snapHeld = new Set(held);
+    const snapFlags = new Set(flags);
+    const snapLoc = Object.assign({}, loc);
+
+    const presentAt = (id) => {
+      if (snapHeld.has(id)) return true;
+      const w = snapLoc[id];
+      if (w === 'PLAYER') return true;
+      if (rooms[w]) return snapReach.has(w);
+      if (items[w]) return presentAt(w) && snapFlags.has('_open_' + w);
+      return false;
+    };
+    const satAt = (c) => {
+      if (!c) return true;
+      switch (c.type) {
+        case 'flag': return c.value === false ? !snapFlags.has(c.flag) : snapFlags.has(c.flag);
+        case 'carrying': return snapHeld.has(c.item);
+        case 'in-room': case 'present': return presentAt(c.item);
+        case 'at': case 'visited': return snapReach.has(c.room);
+        case 'open': return snapFlags.has('_open_' + c.item);
+        case 'lit': return snapFlags.has('_lit_' + c.item);
+        case 'score-at-least': return true;
+        case 'not': return !satAt(c.condition);
+        default: return false;
+      }
+    };
+
+    let changed = false;
+
+    for (const rid of snapReach) {
+      for (const ex of ((rooms[rid] || {}).exits || [])) {
+        if (!rooms[ex.to] || reach.has(ex.to)) continue;
+        if (ex.condition && !satAt(ex.condition)) continue;
+        if (ex.door && !snapFlags.has('_open_' + ex.door)) continue;
+        reach.add(ex.to); changed = true;
+      }
+    }
+    for (const id of Object.keys(items)) {
+      if (held.has(id)) continue;
+      if (!(items[id].attributes && items[id].attributes.TAKEBIT)) continue;
+      if (presentAt(id)) { held.add(id); changed = true; }
+    }
+    for (let i = 0; i < rules.length; i++) {
+      if (fired.has(i)) continue;
+      const on = rules[i].on || {};
+      if (on.room && !snapReach.has(on.room)) continue;
+      if (on.noun && !presentAt(on.noun)) continue;
+      if (rules[i].if && !rules[i].if.every(satAt)) continue;
+      fired.add(i); changed = true;
+      for (const e of (rules[i].do || [])) {
+        if (e.type === 'set-flag') { if (e.value !== false) flags.add(e.flag); else flags.delete(e.flag); }
+        else if (e.type === 'open') flags.add('_open_' + e.item);
+        else if (e.type === 'light') flags.add('_lit_' + e.item);
+        else if (e.type === 'take') held.add(e.item);
+        else if (e.type === 'move-item') loc[e.item] = e.to;
+        else if (e.type === 'goto') reach.add(e.room);
+      }
+    }
+
+    if (!changed) break;
+    rounds++;
+  }
+  return rounds;
+}
+
+function roomOf(items, id) {
+  const it = items.find(i => i.id === id);
+  return it ? it.location : null;
+}
+
+// All-pairs shortest paths over the room graph, ignoring conditions — the question
+// is how far apart things are in the world, not whether a route is open yet.
+function roomDistances(rooms) {
+  const ids = rooms.map(r => r.id);
+  const adj = {};
+  for (const r of rooms) {
+    adj[r.id] = (r.exits || []).map(e => e.to).filter(t => ids.includes(t));
+  }
+  const out = {};
+  for (const start of ids) {
+    const d = { [start]: 0 };
+    const q = [start];
+    while (q.length) {
+      const cur = q.shift();
+      for (const nx of (adj[cur] || [])) {
+        if (d[nx] === undefined) { d[nx] = d[cur] + 1; q.push(nx); }
+      }
+    }
+    out[start] = d;
+  }
+  return out;
+}
+
+module.exports = { audit };
+
+  };
+  REG["brief.js"] = function (module, exports, require) {
+//  The authoring brief — the dials a creator actually turns.
+//
+//  Without these you get whatever the compiler felt like producing. With them you
+//  get intent, and intent is what makes a tool feel like an instrument rather than
+//  a slot machine.
+//
+//  The important design decision is that the dials are NOT raw knobs. Nobody knows
+//  what "chain depth 6" means, and asking is a bad question anyway: difficulty is
+//  not one quantity. It is chain depth, clue explicitness, how far a key sits from
+//  its lock, and how long the game dares to go without paying out — and those move
+//  together in ways a creator should not have to hand-tune.
+//
+//  So a creator states an intent ("cruel", "epic") and the brief resolves it into
+//  concrete targets, anchored on the measured Zork I profile as "standard".
+//
+//  The second decision matters more: THE SAME RESOLVED BRIEF IS BOTH THE
+//  GENERATION TARGET AND THE VALIDATION THRESHOLD. The compiler builds toward it;
+//  T4 judges against it. One source of truth, so a game cannot be generated to one
+//  standard and graded against another — which is exactly how a "difficulty
+//  setting" quietly becomes decorative in tools that keep the two apart.
+
+'use strict';
+
+// Zork I, measured (conformance/corpus/zork-1.json). "Standard" is not a guess.
+const ZORK = {
+  rooms: 82,
+  loopsPerRoom: 0.67,
+  takeRate: 43,
+  movesPerScoreEvent: 11.5,
+  longestDrySpell: 69,
+  chainDepth: 9
+};
+
+const LENGTH = {
+  short:    { rooms: 12, label: 'an hour or so' },
+  standard: { rooms: 35, label: 'an evening' },
+  epic:     { rooms: 82, label: 'a Zork-scale undertaking' }
+};
+
+// Difficulty is four dials moving together. Gentle is not "fewer puzzles" — it is
+// shallower chains, clues placed near their locks, and rewards that arrive often
+// enough to keep faith. Cruel earns its patience budget.
+const DIFFICULTY = {
+  gentle:   { chainDepth: 3, gateDistance: 1, drySpell: 20, cluePolicy: 'explicit',
+              label: 'forgiving — clues near their locks, frequent rewards' },
+  standard: { chainDepth: 5, gateDistance: 3, drySpell: 45, cluePolicy: 'stated',
+              label: 'fair — the classic rhythm' },
+  cruel:    { chainDepth: 9, gateDistance: 6, drySpell: 69, cluePolicy: 'implied',
+              label: 'Zork-hard — long chains, distant keys, real dry spells' }
+};
+
+const DEADLINESS = {
+  none:    { deaths: 0, warned: true,  label: 'nothing can kill you' },
+  fair:    { deaths: 3, warned: true,  label: 'you can die, but you are always warned first' },
+  classic: { deaths: 8, warned: false, label: 'the grue is out there and it does not announce itself' }
+};
+
+// Sprawl controls map interconnection. Linear is a corridor and reads as generated
+// geography; open is Zork, where nearly every room sits on a circuit.
+const SPRAWL = {
+  linear:   { loopsPerRoom: 0.05, label: 'a path through' },
+  balanced: { loopsPerRoom: 0.35, label: 'some circling back' },
+  open:     { loopsPerRoom: 0.67, label: 'a place you learn to navigate' }
+};
+
+// Density is the scenery ratio, and more is not better. Zork keeps 57% of what a
+// player sees as pure scenery; that is what makes the useful objects feel chosen.
+const DENSITY = {
+  sparse:   { takeRate: 25, label: 'mostly scenery, a few things that matter' },
+  balanced: { takeRate: 43, label: "Zork's ratio — over half the world is texture" },
+  packed:   { takeRate: 70, label: 'most things are useful' }
+};
+
+/**
+ * Resolve a creator's intent into concrete targets.
+ *
+ * @param {object} brief
+ * @param {string|{rooms:number}} [brief.length]      short | standard | epic
+ * @param {string} [brief.difficulty]                 gentle | standard | cruel
+ * @param {string} [brief.deadliness]                 none | fair | classic
+ * @param {string} [brief.sprawl]                     linear | balanced | open
+ * @param {string} [brief.density]                    sparse | balanced | packed
+ * @param {object} [brief.source]                     what the Story Bible counted
+ * @param {number} [brief.source.locations]           named places in the source
+ * @param {number} [brief.source.objects]             significant objects
+ */
+function resolve(brief) {
+  brief = brief || {};
+  const notes = [];
+
+  // ---- length: an explicit dial, or inferred from what the source actually holds
+  let rooms;
+  if (brief.length && typeof brief.length === 'object' && brief.length.rooms) {
+    rooms = brief.length.rooms;
+    notes.push('length set explicitly to ' + rooms + ' rooms');
+  } else if (brief.length && LENGTH[brief.length]) {
+    rooms = LENGTH[brief.length].rooms;
+    notes.push('length "' + brief.length + '" — ' + LENGTH[brief.length].label);
+  } else if (brief.source && brief.source.locations) {
+    // The answer to "how do we stop a thousand-page novel compiling to six rooms".
+    // Scale follows the source unless a creator overrides it, so a long book is
+    // judged against the world it actually contains.
+    rooms = clamp(brief.source.locations, 8, 200);
+    notes.push('length inferred from the source: ' + brief.source.locations +
+      ' named locations found, targeting ' + rooms + ' rooms');
+  } else {
+    rooms = LENGTH.standard.rooms;
+    notes.push('length defaulted to standard (' + rooms + ' rooms)');
+  }
+
+  const diff = DIFFICULTY[brief.difficulty] || DIFFICULTY.standard;
+  const dead = DEADLINESS[brief.deadliness] || DEADLINESS.fair;
+  const spr = SPRAWL[brief.sprawl] || SPRAWL.balanced;
+  const den = DENSITY[brief.density] || DENSITY.balanced;
+
+  // Chain depth cannot exceed what the map can carry. A 12-room world cannot host
+  // a 9-step chain without every room being a gate, which is a corridor wearing a
+  // puzzle costume — so a small "cruel" game is honestly reported as capped.
+  const maxSupportable = Math.max(2, Math.floor(rooms / 3));
+  const chainDepth = Math.min(diff.chainDepth, maxSupportable);
+  if (chainDepth < diff.chainDepth) {
+    notes.push('chain depth capped at ' + chainDepth + ' (a ' + rooms +
+      '-room world cannot carry ' + diff.chainDepth + ' without becoming a corridor of gates)');
+  }
+
+  const targets = {
+    rooms,
+    chainDepth,
+    gateDistance: Math.min(diff.gateDistance, Math.max(1, Math.floor(rooms / 6))),
+    longestDrySpell: diff.drySpell,
+    cluePolicy: diff.cluePolicy,
+    deaths: dead.deaths,
+    deathsWarned: dead.warned,
+    loopsPerRoom: spr.loopsPerRoom,
+    takeRate: den.takeRate,
+    items: Math.round(rooms * 1.07),          // Zork: 88 objects across 82 rooms
+    scoreEvents: Math.max(3, Math.round(rooms / 1.9))  // Zork: 43 events, 82 rooms
+  };
+
+  return {
+    targets,
+    notes,
+    // T4 reads this directly. Floors sit below target so a game that lands near
+    // its brief is not nagged for missing it by one — the dial is an aim, not a
+    // tripwire.
+    thresholds: {
+      minRooms: Math.round(targets.rooms * 0.6),
+      minDepth: Math.max(2, Math.round(targets.chainDepth * 0.6)),
+      minLoopsPerRoom: targets.loopsPerRoom * 0.5,
+      minParticipation: Math.max(15, Math.round(targets.takeRate * 0.6)),
+      maxParticipation: Math.min(95, Math.round(targets.takeRate * 1.8)),
+      minRoomUtility: 60,
+      // A dial must silence the warning it authorises, or the creator is nagged
+      // for doing exactly what they asked for — the fastest way to teach someone
+      // to ignore the whole report.
+      expectDeaths: targets.deaths > 0
+    },
+    describe: () => describe(brief, targets)
+  };
+}
+
+function describe(brief, t) {
+  const lines = [];
+  lines.push('A ' + t.rooms + '-room game with puzzle chains up to ' + t.chainDepth + ' steps deep.');
+  lines.push((DIFFICULTY[brief.difficulty] || DIFFICULTY.standard).label + '.');
+  lines.push((DEADLINESS[brief.deadliness] || DEADLINESS.fair).label + '.');
+  lines.push('Map: ' + (SPRAWL[brief.sprawl] || SPRAWL.balanced).label + '.');
+  lines.push('World: ' + (DENSITY[brief.density] || DENSITY.balanced).label + '.');
+  lines.push('Expect a reward roughly every ' +
+    Math.round((t.rooms * 6) / t.scoreEvents) + ' moves, with dry spells up to ' +
+    t.longestDrySpell + '.');
+  return lines.join('\n');
+}
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+module.exports = { resolve, ZORK, LENGTH, DIFFICULTY, DEADLINESS, SPRAWL, DENSITY };
+
+  };
+  REG["scenes.js"] = function (module, exports, require) {
+//  Scaffolding the art.
+//
+//  There was never an art pipeline. Zork's pictures are three hundred and ninety
+//  seven kilobytes of hand-written drawing code, one function per room, produced
+//  across many sessions by a person reading a room description and writing
+//  JavaScript. That worked and it is not a process anybody else can follow, and
+//  the consequence showed up the first time somebody built a thirty-room game:
+//  no art, and therefore no hotspots, and therefore a game that could not be
+//  played at all.
+//
+//  This is the first honest half of that pipeline. It cannot draw a room — that
+//  is a decision about what the place looks like, and the engine has no opinion.
+//  What it can do is everything around the drawing, which turns out to be most of
+//  the work and all of the parts that go wrong:
+//
+//    · a stub per room, so nothing is silently missing
+//    · hotspots already correct, derived from what the world says is in the room
+//    · exits placed on the edge they point at, so the picture agrees with the map
+//    · a backdrop guessed from the room's own prose, using the engine's kit
+//
+//  Hotspots are the part worth automating. They have to agree with three things
+//  at once — the picture, the world's item ids, and the exits — and a mismatch is
+//  invisible until a player clicks the wrong thing. Generating them from the world
+//  means they cannot disagree with it.
+//
+//  What comes out is a working, ugly, playable game. Making it beautiful is the
+//  author's job, and now it is the only part left.
+
+'use strict';
+
+//  Words a room might use about itself, and what to lay down when it does.
+//  Deliberately small and obvious. A guess that is wrong is easy to replace; a
+//  guess that is clever and wrong wastes somebody's afternoon.
+//  sky() paints down to y=37 and grass(y) paints from y to the floor, so the two
+//  have to meet or the picture has a black stripe across its middle. Every
+//  outdoor backdrop below starts its ground at 37 for that reason.
+const BACKDROPS = [
+  { when: /\b(cave|cavern|tunnel|shaft|mine|underground|grotto)\b/i, name: 'cave',
+    body: ['K.rect(ctx, 0, 0, W, H, K.PAL.STONE_DK);',
+           'K.caveCeiling(ctx, W);',
+           'K.rockWall(ctx, 0, 14, W, H - 36);',
+           'K.cavefloor(ctx, H - 22, W);'] },
+  { when: /\b(night|stars|moonlight|midnight)\b/i, name: 'night',
+    body: ['K.nightSky(ctx);',
+           'K.grass(ctx, 46, W);'] },
+  { when: /\b(river|lake|sea|water|shore|beach|coast|ocean)\b/i, name: 'water',
+    body: ['K.sky(ctx, t);',
+           'K.water(ctx, 0, 37, W, H - 37, t);',
+           'K.riverbank(ctx, 0, H - 20, W);'] },
+  { when: /\b(hall|room|kitchen|cellar|attic|chamber|corridor|office|lab|shed)\b/i,
+    name: 'interior',
+    body: ['K.rect(ctx, 0, 0, W, H, K.PAL.BLACK);',
+           'K.houseWall(ctx, 0, 0, W, H - 18);',
+           'K.rect(ctx, 0, H - 18, W, 18, K.PAL.WOOD);',
+           'K.dither(ctx, 0, H - 18, W, 4, K.PAL.WOOD, K.PAL.WOOD_DK);'] },
+  { when: /\b(forest|wood|tree|clearing|path|road|field|garden|yard|hill|sky|cloud)\b/i,
+    name: 'outdoors',
+    body: ['K.sky(ctx, t);',
+           'K.grass(ctx, 37, W);',
+           '// tree(x, y, size): size is HEIGHT IN PIXELS, and y is the top, so a',
+           '// tree standing on the horizon starts about its own height above it.',
+           '// A negative size draws a pine.',
+           'K.tree(ctx, 10, 22, 34);',
+           'K.tree(ctx, W - 38, 30, 26);'] }
+];
+
+const FALLBACK = { name: 'plain',
+  body: ['K.sky(ctx, t);', 'K.grass(ctx, 37, W);'] };
+
+// Where an exit sits in the picture. A door out of the north side belongs at the
+// top of the frame, or the picture and the compass are telling different stories.
+const EXIT_RECTS = {
+  NORTH: [56, 6, 32, 20], SOUTH: [56, 78, 32, 20],
+  WEST: [2, 40, 18, 34], EAST: [124, 40, 18, 34],
+  NW: [4, 8, 22, 18], NE: [118, 8, 22, 18],
+  SW: [4, 78, 22, 18], SE: [118, 78, 22, 18],
+  UP: [104, 6, 26, 18], DOWN: [104, 80, 26, 18],
+  IN: [60, 44, 24, 26], OUT: [2, 6, 20, 18]
+};
+
+/** Room prose, including any variant, so the guess reads everything on offer. */
+function proseOf(room) {
+  let s = (room.name || '') + ' ' + (room.prose || '');
+  for (const v of (room.variants || [])) s += ' ' + (v.prose || '');
+  return s;
+}
+
+function backdropFor(room) {
+  const text = proseOf(room);
+  for (const b of BACKDROPS) if (b.when.test(text)) return b;
+  return FALLBACK;
+}
+
+/**
+ * Where the things in a room sit in its picture.
+ *
+ * Laid out on a shelf across the middle, which is wrong for almost every room and
+ * right in the only way that matters at this stage: every object is somewhere, and
+ * somewhere is clickable. Moving a rectangle is a minute's work. Discovering three
+ * months later that an object was never clickable is not.
+ */
+function objectRects(items) {
+  const out = [];
+  const perRow = 4, w = 26, h = 24, gapX = 8, gapY = 6;
+  const startX = Math.max(4, (144 - (perRow * w + (perRow - 1) * gapX)) / 2) | 0;
+  for (let i = 0; i < items.length; i++) {
+    const col = i % perRow, row = (i / perRow) | 0;
+    out.push({
+      id: items[i].id,
+      name: items[i].name || items[i].id,
+      x: startX + col * (w + gapX),
+      y: 34 + row * (h + gapY),
+      w, h
+    });
+  }
+  return out;
+}
+
+const q = (s) => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+
+/**
+ * Generate a starter scenes.js for a world.
+ * @param {object} def   a world.json
+ * @returns {string}     JavaScript, ready to drop in presentation/
+ */
+function scaffold(def) {
+  const rooms = def.rooms || [];
+  const items = def.items || [];
+  const actors = def.actors || [];
+
+  const out = [];
+  out.push('//  Scene art, scaffolded by `folio scenes`.');
+  out.push('//');
+  out.push('//  Every room has a picture and every picture is clickable, which is where');
+  out.push('//  the engine can get you on its own. What it cannot do is decide what a');
+  out.push('//  place looks like, so the draw bodies below are a starting backdrop and');
+  out.push('//  a shelf of boxes. Replace them.');
+  out.push('//');
+  out.push('//  The hotspots are already right: they come from the world itself, so they');
+  out.push('//  cannot disagree with it. Move the rectangles to match whatever you draw,');
+  out.push('//  and keep the ids.');
+  out.push('//');
+  out.push('//  The canvas is 144x104 and never scales: draw in those coordinates and the');
+  out.push('//  engine handles every screen. GUE.kit carries the primitives — sky, grass,');
+  out.push('//  rockWall, houseWall, cavefloor, tree, water, door, stairsDown, torch,');
+  out.push('//  dither, noise, and the palette in K.PAL (SKY, GRASS, STONE, WOOD,');
+  out.push('//  WATER, TORCH, BONE, GOLD, and the rest — all upper case).');
+  out.push('');
+  out.push('(function (root) {');
+  out.push("  'use strict';");
+  out.push('  var GUE = root.GUE = root.GUE || {};');
+  out.push('  var K = GUE.kit;');
+  out.push('  var W = 144, H = 104;');
+  out.push('  GUE.scenes = GUE.scenes || {};');
+  out.push('');
+
+  let drawn = 0;
+  for (const room of rooms) {
+    const here = items.filter(i => i.location === room.id);
+    const who = actors.filter(a => a.location === room.id);
+    const things = here.concat(who);
+    const rects = objectRects(things);
+    const back = backdropFor(room);
+
+    out.push('  // ' + (room.name || room.id) +
+      (room.dark ? '   (dark: the engine draws the dark, this only runs when lit)' : ''));
+    out.push('  GUE.scenes[' + q(room.id) + '] = {');
+    out.push('    draw: function (ctx, S, t) {');
+    out.push('      // backdrop guessed from the room\'s own words: ' + back.name);
+    for (const line of back.body) out.push('      ' + line);
+    if (rects.length) {
+      out.push('');
+      out.push('      // a box per thing, standing in until you draw them');
+      for (const r of rects) {
+        out.push('      K.rect(ctx, ' + r.x + ', ' + r.y + ', ' + r.w + ', ' + r.h +
+          ', K.PAL.BLACK);');
+        out.push('      K.frame(ctx, ' + r.x + ', ' + r.y + ', ' + r.w + ', ' + r.h +
+          ', K.PAL.WHITE);   // ' + r.name);
+      }
+    }
+    out.push('    },');
+    out.push('    hotspots: function (S) {');
+    out.push('      return [');
+    for (const r of rects) {
+      out.push('        { x: ' + r.x + ', y: ' + r.y + ', w: ' + r.w + ', h: ' + r.h +
+        ', obj: ' + q(r.id) + ' },');
+    }
+    for (const ex of (room.exits || [])) {
+      const box = EXIT_RECTS[ex.dir];
+      if (!box) continue;
+      out.push('        { x: ' + box[0] + ', y: ' + box[1] + ', w: ' + box[2] + ', h: ' + box[3] +
+        ', dir: ' + q(ex.dir) + ' },   // to ' + ex.to);
+    }
+    out.push('      ];');
+    out.push('    }');
+    out.push('  };');
+    out.push('');
+    drawn++;
+  }
+
+  out.push('})(typeof window !== \'undefined\' ? window : globalThis);');
+  return { source: out.join('\n') + '\n', rooms: drawn };
+}
+
+module.exports = { scaffold, backdropFor, objectRects, BACKDROPS, EXIT_RECTS };
+
+  };
+  REG["schema.js"] = function (module, exports, require) {
+//  A small JSON Schema checker, and the world schema it exists to run.
+//
+//  Why not a library: this package has no dependencies and that is a feature, not
+//  an aesthetic. A .folio has to be readable in a browser with no build step, and
+//  every dependency is a thing that can rot out from under an archive format whose
+//  whole promise is that games keep working. So this implements the subset of
+//  JSON Schema that world.schema.json actually uses and nothing else.
+//
+//  Supported: type, required, properties, additionalProperties, items, enum,
+//  const, oneOf, $ref into $defs, minimum, minItems, minLength.
+//
+//  The one piece of cleverness is oneOf. The condition and effect vocabularies are
+//  discriminated unions on `type`, and a naive oneOf failure reports "matched none
+//  of 14 branches", which tells an author nothing. When the branches discriminate
+//  on a const, this picks the branch the instance was clearly aiming at and reports
+//  that branch's real error instead.
+
+'use strict';
+
+
+
+
+const WORLD_SCHEMA = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://folio.games/schema/world-0.1.0.json",
+  "title": "Folio world",
+  "description": "A Path B game world. Data only: this format cannot express executable code, which is why a .folio from a stranger is safe to open. The condition and effect vocabularies are closed on purpose, so a validator can see statically everything a game is able to do.",
+  "type": "object",
+  "required": [
+    "meta",
+    "rooms",
+    "items"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "flags": {
+      "description": "Named booleans you invent. This is the memory of the world; every puzzle that has to remember something remembers it here.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "rooms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/room"
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "actors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/actor"
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    },
+    "timers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/timer"
+      }
+    },
+    "counters": {
+      "description": "Named integers. Flags are booleans; without these there is no way to say \"the third time\" except by chaining near-identical rules.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "description": "A stable identifier. Convention is upper case with hyphens, matching what the Z-machine path produces.",
+      "type": "string",
+      "minLength": 1
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "NORTH",
+        "SOUTH",
+        "EAST",
+        "WEST",
+        "NE",
+        "NW",
+        "SE",
+        "SW",
+        "UP",
+        "DOWN",
+        "IN",
+        "OUT"
+      ]
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "start"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/id",
+          "description": "Room the player begins in. Must name a real room or nothing boots."
+        },
+        "title": {
+          "type": "string"
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Seeds the world RNG. Runs are deterministic; the CLI and validator override this so a replay is reproducible across machines."
+        },
+        "magicWords": {
+          "description": "Words no player would guess to type, offered as buttons on the on-screen keyboard. Read by the presentation layer, not by the logic.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaults": {
+          "$ref": "#/$defs/defaults"
+        }
+      }
+    },
+    "defaults": {
+      "description": "Overrides for the engine's built-in responses. These are what a player hears when no rule of yours matched, so they decide whether the world feels responsive or dead.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "type": "string",
+          "description": "Walking a direction with no exit."
+        },
+        "dark": {
+          "type": "string",
+          "description": "Looking in an unlit dark room."
+        },
+        "what": {
+          "type": "string",
+          "description": "TAKE with no noun."
+        },
+        "already": {
+          "type": "string",
+          "description": "Taking something already carried."
+        },
+        "absent": {
+          "type": "string",
+          "description": "Acting on something that is not here."
+        },
+        "fixed": {
+          "type": "string",
+          "description": "Taking something without TAKEBIT."
+        },
+        "taken": {
+          "type": "string",
+          "description": "A successful take."
+        },
+        "nothave": {
+          "type": "string",
+          "description": "Dropping something not carried."
+        },
+        "dropped": {
+          "type": "string",
+          "description": "A successful drop."
+        },
+        "alreadyOpen": {
+          "type": "string",
+          "description": "Opening something already open."
+        },
+        "locked": {
+          "type": "string",
+          "description": "Opening something that will not open."
+        },
+        "empty": {
+          "type": "string",
+          "description": "INVENTORY while empty-handed."
+        },
+        "unknown": {
+          "type": "string",
+          "description": "Any verb with no rule and no built-in. The most-heard line in most games."
+        },
+        "wait": {
+          "type": "string",
+          "description": "Letting a turn pass."
+        },
+        "plain": {
+          "type": "string",
+          "description": "Examining something with no description of its own."
+        }
+      }
+    },
+    "attributes": {
+      "description": "Booleans the engine understands. Anything else you add is carried through to the presentation layer and ignored by the logic.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "properties": {
+        "TAKEBIT": {
+          "type": "boolean",
+          "description": "The player can pick it up."
+        },
+        "LIGHTSOURCE": {
+          "type": "boolean",
+          "description": "Counts as light when lit, defeating a dark room."
+        },
+        "ONBIT": {
+          "type": "boolean",
+          "description": "Starts lit."
+        },
+        "OPENBIT": {
+          "type": "boolean",
+          "description": "Starts open."
+        },
+        "TRANSPARENT": {
+          "type": "boolean",
+          "description": "Contents are visible without opening it."
+        }
+      }
+    },
+    "room": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "description": "The heading the player sees. Falls back to the id, which looks like a bug."
+        },
+        "prose": {
+          "type": "string",
+          "description": "Printed on entry and on LOOK."
+        },
+        "dark": {
+          "type": "boolean",
+          "description": "Unreadable unless a lit LIGHTSOURCE is carried or present."
+        },
+        "exits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exit"
+          }
+        },
+        "variants": {
+          "description": "Alternative descriptions, tried in order; the first whose conditions all hold replaces `prose`. This is how a room changes once something has happened in it.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "prose"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "if": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/condition"
+                }
+              },
+              "prose": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "region": {
+          "type": "string",
+          "description": "Which part of the world this room belongs to, for example \"afghanistan\" or \"malibu\". Rooms in different regions are not next to each other, so a compass exit between them is a scene change wearing a walk's clothes and is reported as W512. Express a jump as a rule with a goto instead."
+        }
+      },
+      "description": "A place. `variants` change its description as the world changes; an `enter` rule makes something happen because the player arrived."
+    },
+    "exit": {
+      "description": "One way out, in one direction only. A return journey is a second exit on the other room.",
+      "type": "object",
+      "required": [
+        "dir",
+        "to"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "$ref": "#/$defs/direction"
+        },
+        "to": {
+          "$ref": "#/$defs/id"
+        },
+        "condition": {
+          "$ref": "#/$defs/condition",
+          "description": "Blocked until this passes."
+        },
+        "door": {
+          "$ref": "#/$defs/id",
+          "description": "An item id. Blocked while that item is closed."
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "While blocked, vanish entirely rather than showing as blocked. Use only when the passage itself is the secret."
+        },
+        "blocked": {
+          "type": "string",
+          "description": "What to say when this way is closed. Without it every locked door in the game shares one sentence."
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": [
+        "id",
+        "location"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "description": "What the player is shown."
+        },
+        "location": {
+          "$ref": "#/$defs/id",
+          "description": "A room id, another item's id to start inside a container, \"PLAYER\" to start carried, or \"NOWHERE\" to keep it out of play."
+        },
+        "roomProse": {
+          "type": "string",
+          "description": "A line appended to the room description while the item is still lying there. Stops appearing once it moves."
+        },
+        "attributes": {
+          "$ref": "#/$defs/attributes"
+        },
+        "fuel": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Turns of light remaining, for a LIGHTSOURCE. Drives the lamp gauge. Burn it down with a timer's fuelFor."
+        },
+        "description": {
+          "type": "string",
+          "description": "What LOOK at this thing says. LOOK with a noun is examine."
+        }
+      }
+    },
+    "actor": {
+      "description": "Something that is somebody. Projected into the scene like an item, but cannot be carried.",
+      "type": "object",
+      "required": [
+        "id",
+        "location"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/id",
+          "description": "A room id, \"NOWHERE\" until they arrive, or \"PLAYER\" to travel with the player. A companion at \"PLAYER\" is present in every room you enter."
+        },
+        "hostile": {
+          "type": "boolean",
+          "description": "While present, the contract reports fighting: true. Does no harm by itself; the harm is a rule or a timer."
+        },
+        "attributes": {
+          "$ref": "#/$defs/attributes"
+        },
+        "description": {
+          "type": "string",
+          "description": "What LOOK at them says."
+        }
+      }
+    },
+    "rule": {
+      "description": "A trigger, a guard, and a consequence. Rules are tried in array order and the FIRST match wins, so the specific case goes above the general one.",
+      "type": "object",
+      "required": [
+        "do"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "on": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "verb": {
+              "type": "string",
+              "description": "Matched case-insensitively. Omit to match any verb."
+            },
+            "noun": {
+              "type": "string",
+              "description": "Matched case-insensitively against the object id. Omit to match any noun, including none."
+            },
+            "room": {
+              "$ref": "#/$defs/id",
+              "description": "Only fires while the player is here."
+            },
+            "second": {
+              "$ref": "#/$defs/id",
+              "description": "A second object, for pairings like USE KEY ON DOOR. USE and HIT ask the player for one on the board. A rule without `second` will not match a two-object command, so write the pairing above the single-object fallback."
+            },
+            "enter": {
+              "$ref": "#/$defs/id",
+              "description": "Fires when the player arrives in this room, instead of on a command. Use it for a floor that gives way, an ambush, a door closing behind you. A rule with `enter` is never matched by a typed or clicked command."
+            }
+          }
+        },
+        "if": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "description": "Every one must pass."
+        },
+        "do": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        }
+      }
+    },
+    "timer": {
+      "description": "Ticks once per move, after the command's rule has run. How anything happens that the player did not directly cause.",
+      "type": "object",
+      "required": [
+        "turns",
+        "do"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "turns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "startFlag": {
+          "type": "string",
+          "description": "Does not tick at all until this flag is true. Without it, counts from move one."
+        },
+        "repeat": {
+          "type": "boolean",
+          "description": "Fire every `turns` moves instead of once."
+        },
+        "fuelFor": {
+          "$ref": "#/$defs/id",
+          "description": "An item id. Elapsed ticks are published as that item's fuel consumption, which moves the lamp gauge."
+        },
+        "do": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/effect"
+          }
+        },
+        "stopFlag": {
+          "type": "string",
+          "description": "Cancel the timer when this flag is true. A countdown that cannot be defeated is a cutscene."
+        },
+        "if": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "description": "The timer only ticks while every one of these holds."
+        }
+      }
+    },
+    "condition": {
+      "description": "Seventeen types, and no more. An unrecognised type evaluates to false rather than throwing, so a typo silently disables a rule.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "oneOf": [
+        {
+          "title": "flag",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "flag"
+            },
+            "flag": {
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean",
+              "description": "Defaults to true."
+            }
+          },
+          "required": [
+            "type",
+            "flag"
+          ]
+        },
+        {
+          "title": "carrying",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "carrying"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "in-room",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "in-room"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "present",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "present"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "at",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "at"
+            },
+            "room": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "room"
+          ]
+        },
+        {
+          "title": "visited",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "visited"
+            },
+            "room": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "room"
+          ]
+        },
+        {
+          "title": "open",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "open"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "lit",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "lit"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "score-at-least",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "score-at-least"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "title": "not",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "not"
+            },
+            "condition": {
+              "$ref": "#/$defs/condition"
+            }
+          },
+          "required": [
+            "type",
+            "condition"
+          ]
+        },
+        {
+          "title": "counter-at-least",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "counter-at-least"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ]
+        },
+        {
+          "title": "counter-equals",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "counter-equals"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ]
+        },
+        {
+          "title": "actor-here",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "actor-here"
+            },
+            "actor": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "actor"
+          ]
+        },
+        {
+          "title": "fighting",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "fighting"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "A hostile actor shares the room."
+        },
+        {
+          "title": "all",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "all"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "title": "any",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "any"
+            },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/condition"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "conditions"
+          ]
+        },
+        {
+          "title": "chance",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "chance"
+            },
+            "percent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "A roll off the world's seeded generator, defaulting to 50. Rolls differ within a run and repeat exactly across runs, so a walkthrough that passed keeps passing."
+        }
+      ]
+    },
+    "effect": {
+      "description": "Sixteen types, and no more. An unrecognised type is inert at runtime and rejected by validation.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "oneOf": [
+        {
+          "title": "print",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "print"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "title": "set-flag",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "set-flag"
+            },
+            "flag": {
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean",
+              "description": "Defaults to true."
+            }
+          },
+          "required": [
+            "type",
+            "flag"
+          ]
+        },
+        {
+          "title": "take",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "take"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ],
+          "description": "Moves it to the player, ignoring TAKEBIT. The attribute governs what a player may take unaided; an effect is you deciding."
+        },
+        {
+          "title": "move-item",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "move-item"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            },
+            "to": {
+              "$ref": "#/$defs/id",
+              "description": "A room id, \"PLAYER\", a container id, or \"NOWHERE\"."
+            }
+          },
+          "required": [
+            "type",
+            "item",
+            "to"
+          ]
+        },
+        {
+          "title": "destroy",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "destroy"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "open",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "open"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "close",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "close"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "light",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "light"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "extinguish",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "extinguish"
+            },
+            "item": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "item"
+          ]
+        },
+        {
+          "title": "goto",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "goto"
+            },
+            "room": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "room"
+          ]
+        },
+        {
+          "title": "score",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "score"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ]
+        },
+        {
+          "title": "move-actor",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "move-actor"
+            },
+            "actor": {
+              "$ref": "#/$defs/id"
+            },
+            "to": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "type",
+            "actor",
+            "to"
+          ]
+        },
+        {
+          "title": "win",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "win"
+            },
+            "text": {
+              "type": "string"
+            },
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The ending in beats, so it can be paced rather than arriving as one wall of text. Use this or `text`, not both."
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "At least one win must be reachable, or validation fails with E310."
+        },
+        {
+          "title": "lose",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "lose"
+            },
+            "text": {
+              "type": "string"
+            },
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The ending in beats, so it can be paced rather than arriving as one wall of text. Use this or `text`, not both."
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "title": "set-counter",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "set-counter"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ]
+        },
+        {
+          "title": "add-counter",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "add-counter"
+            },
+            "counter": {
+              "type": "string"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "counter",
+            "value"
+          ],
+          "description": "Negative values subtract."
+        }
+      ]
+    }
+  }
+}
+;
+
+function typeOf(v) {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'array';
+  if (Number.isInteger(v)) return 'integer';
+  return typeof v;
+}
+
+function typeMatches(want, got, value) {
+  if (want === 'number') return got === 'number' || got === 'integer';
+  if (want === 'integer') return got === 'integer';
+  return want === got;
+}
+
+/**
+ * Check a value against a schema.
+ * @returns {Array<{path:string, msg:string}>} empty when valid
+ */
+function check(value, schema, root, where) {
+  root = root || schema;
+  where = where || '';
+  const errs = [];
+  const at = (p, msg) => errs.push({ path: p || '(root)', msg });
+
+  if (schema.$ref) {
+    const target = resolve(schema.$ref, root);
+    if (!target) { at(where, 'unresolvable $ref ' + schema.$ref); return errs; }
+    // A $ref sitting beside other keywords: apply both, which is what the 2020-12
+    // draft says and what this schema relies on for descriptions.
+    errs.push(...check(value, target, root, where));
+    const rest = Object.assign({}, schema);
+    delete rest.$ref;
+    if (Object.keys(rest).length) errs.push(...check(value, rest, root, where));
+    return errs;
+  }
+
+  const got = typeOf(value);
+
+  if (schema.const !== undefined && value !== schema.const) {
+    at(where, 'must be ' + JSON.stringify(schema.const));
+    return errs;
+  }
+  if (schema.enum && !schema.enum.includes(value)) {
+    at(where, 'must be one of ' + schema.enum.join(', ') + ', got ' + JSON.stringify(value));
+    return errs;
+  }
+  if (schema.type && !typeMatches(schema.type, got, value)) {
+    at(where, 'must be ' + schema.type + ', got ' + got);
+    return errs;                     // wrong type: further checks would be noise
+  }
+
+  if (got === 'string') {
+    if (schema.minLength !== undefined && value.length < schema.minLength) {
+      at(where, 'must not be empty');
+    }
+  }
+
+  if (got === 'integer' || got === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      at(where, 'must be at least ' + schema.minimum);
+    }
+  }
+
+  if (got === 'array') {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      at(where, 'must have at least ' + schema.minItems + ' item' + (schema.minItems > 1 ? 's' : ''));
+    }
+    if (schema.items) {
+      value.forEach((v, i) => errs.push(...check(v, schema.items, root, where + '[' + i + ']')));
+    }
+  }
+
+  if (got === 'object') {
+    for (const key of (schema.required || [])) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) {
+        at(where, 'is missing "' + key + '"');
+      }
+    }
+    const props = schema.properties || {};
+    for (const key of Object.keys(value)) {
+      const sub = where ? where + '.' + key : key;
+      if (props[key]) {
+        errs.push(...check(value[key], props[key], root, sub));
+      } else if (schema.additionalProperties === false) {
+        at(sub, 'is not a known field');
+      } else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+        errs.push(...check(value[key], schema.additionalProperties, root, sub));
+      }
+    }
+  }
+
+  if (schema.oneOf) {
+    const branch = discriminate(value, schema.oneOf);
+    if (branch) {
+      // The author clearly meant this one, so report why it did not fit rather
+      // than that fourteen alternatives all failed.
+      errs.push(...check(value, branch, root, where));
+    } else {
+      const matched = schema.oneOf.filter(s => check(value, s, root, where).length === 0);
+      if (matched.length !== 1) {
+        const kinds = schema.oneOf
+          .map(s => s.properties && s.properties.type && s.properties.type.const)
+          .filter(Boolean);
+        at(where, kinds.length
+          ? 'has an unknown "type". Known: ' + kinds.join(', ')
+          : 'does not match any allowed shape');
+      }
+    }
+  }
+
+  return errs;
+}
+
+// If every branch pins a literal `type`, and the instance names one of them, that
+// is the branch the author meant.
+function discriminate(value, branches) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (typeof value.type !== 'string') return null;
+  const all = branches.every(b => b.properties && b.properties.type && b.properties.type.const !== undefined);
+  if (!all) return null;
+  return branches.find(b => b.properties.type.const === value.type) || null;
+}
+
+function resolve(ref, root) {
+  if (ref.charAt(0) !== '#') return null;
+  let node = root;
+  for (const seg of ref.split('/').slice(1)) {
+    if (!node) return null;
+    node = node[decodeURIComponent(seg.replace(/~1/g, '/').replace(/~0/g, '~'))];
+  }
+  return node || null;
+}
+
+/**
+ * Validate a world definition against the published schema.
+ * @param {object|string|Uint8Array} world
+ * @returns {{ok:boolean, errors:Array<{path:string,msg:string}>}}
+ */
+function validateWorld(world) {
+  let def = world;
+  if (typeof def === 'string') def = JSON.parse(def);
+  else if (def && typeof def.byteLength === 'number') {
+    def = JSON.parse(Buffer.from(def).toString('utf8'));
+  }
+  const errors = check(def, WORLD_SCHEMA, WORLD_SCHEMA, '');
+  return { ok: errors.length === 0, errors };
+}
+
+/** The vocabularies, pulled out of the schema so callers never hardcode them. */
+function vocabulary() {
+  const names = (def) => def.oneOf
+    .map(b => b.properties && b.properties.type && b.properties.type.const)
+    .filter(Boolean);
+  return {
+    conditions: names(WORLD_SCHEMA.$defs.condition),
+    effects: names(WORLD_SCHEMA.$defs.effect),
+    directions: WORLD_SCHEMA.$defs.direction.enum,
+    attributes: Object.keys(WORLD_SCHEMA.$defs.attributes.properties),
+    defaults: Object.keys(WORLD_SCHEMA.$defs.defaults.properties)
+  };
+}
+
+module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
+
+  };
+  window.Folio = {
+    world: require('index.js'),
+    graph: require('graph.js'),
+    replay: require('replay.js'),
+    design: require('design.js'),
+    schema: require('schema.js'),
+    brief: require('brief.js'),
+    scenes: require('scenes.js')
+  };
+})();</script>
+<script>//  The map editor.
+//
+//  Built because of a bug that survived every automated check: an adaptation of a
+//  film wired its scene cuts as compass exits, and twenty-nine of its thirty rooms
+//  ended up joined to somewhere on another continent. Walking out of a Humvee on a
+//  road in Afghanistan put the player on the floor of a casino in Las Vegas. The
+//  world was sound, every tier passed, and it made no sense to anybody inside it.
+//
+//  That defect is invisible in JSON and impossible to miss in a picture. So:
+//
+//    THE DIRECTION COMES FROM THE POSITIONS. You do not choose NORTH; you put one
+//    room above another and joining them is northward. A map drawn this way cannot
+//    claim two places are adjacent while showing them apart, which is exactly the
+//    lie the format used to permit.
+//
+//  The other half is that the real validator runs here — the same graph.js,
+//  replay.js and design.js the command line runs, not a browser-shaped copy — so
+//  the badge in the corner cannot drift from the verdict you get when you pack.
+
+(function () {
+  'use strict';
+
+  var F = window.Folio;
+  var cv = document.getElementById('map');
+  var ctx = cv.getContext('2d');
+
+  // ---------------------------------------------------------------- the world
+  //  Two things are kept side by side: the world, which is what a .folio holds,
+  //  and the layout, which is where the rooms sit on this canvas. Layout is
+  //  editor state and rides along in meta.editorLayout so a map can be reopened
+  //  looking the way it was left.
+  var world = blank();
+  var layout = {};
+  var selected = null;
+
+  function blank() {
+    return {
+      meta: { title: 'Untitled', start: null },
+      flags: {}, rooms: [], items: [], rules: []
+    };
+  }
+
+  var DIRS = ['NORTH', 'NE', 'EAST', 'SE', 'SOUTH', 'SW', 'WEST', 'NW'];
+  var OPPOSITE = { NORTH: 'SOUTH', SOUTH: 'NORTH', EAST: 'WEST', WEST: 'EAST',
+    NE: 'SW', SW: 'NE', NW: 'SE', SE: 'NW', UP: 'DOWN', DOWN: 'UP', IN: 'OUT', OUT: 'IN' };
+
+  // Eight compass points, chosen by the angle between two rooms. This is the
+  // whole idea: the geometry decides, so the map and the exits agree by
+  // construction rather than by an author remembering to keep them in step.
+  function directionBetween(a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var ang = Math.atan2(-dy, dx) * 180 / Math.PI;      // 0 east, 90 north
+    if (ang < 0) ang += 360;
+    var i = Math.round(ang / 45) % 8;
+    return ['EAST', 'NE', 'NORTH', 'NW', 'WEST', 'SW', 'SOUTH', 'SE'][i];
+  }
+
+  var ROOM_W = 118, ROOM_H = 54;
+
+  function roomAt(x, y) {
+    for (var i = world.rooms.length - 1; i >= 0; i--) {
+      var r = world.rooms[i], p = layout[r.id];
+      if (!p) continue;
+      if (x >= p.x - ROOM_W / 2 && x <= p.x + ROOM_W / 2 &&
+          y >= p.y - ROOM_H / 2 && y <= p.y + ROOM_H / 2) return r;
+    }
+    return null;
+  }
+  var byId = function (id) {
+    for (var i = 0; i < world.rooms.length; i++) if (world.rooms[i].id === id) return world.rooms[i];
+    return null;
+  };
+
+  // -------------------------------------------------------------- the palette
+  //  The site's colours, so the tool and the games it makes look related.
+  var C = {
+    ink: '#06091a', panel: '#121a3a', line: '#3b4472',
+    gold: '#f2a71b', pale: '#e9c874', paper: '#e8e4da',
+    dim: '#70707c', green: '#92cc41', red: '#d8555a'
+  };
+  // Regions are coloured so that a crossing is a thing you see rather than a
+  // thing you are told about.
+  var REGION_COLOURS = ['#f2a71b', '#4fa3d1', '#92cc41', '#d8555a', '#b07cd6', '#e0a06a'];
+  function regionColour(name) {
+    if (!name) return C.line;
+    var list = regionList();
+    var i = list.indexOf(name);
+    return i < 0 ? C.line : REGION_COLOURS[i % REGION_COLOURS.length];
+  }
+  function regionList() {
+    var seen = [];
+    for (var i = 0; i < world.rooms.length; i++) {
+      var r = world.rooms[i].region;
+      if (r && seen.indexOf(r) < 0) seen.push(r);
+    }
+    return seen.sort();
+  }
+
+  // ------------------------------------------------------------------ drawing
+  function draw() {
+    ctx.fillStyle = C.ink;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    ctx.strokeStyle = 'rgba(59,68,114,.35)';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx < cv.width; gx += 40) {
+      ctx.beginPath(); ctx.moveTo(gx + .5, 0); ctx.lineTo(gx + .5, cv.height); ctx.stroke();
+    }
+    for (var gy = 0; gy < cv.height; gy += 40) {
+      ctx.beginPath(); ctx.moveTo(0, gy + .5); ctx.lineTo(cv.width, gy + .5); ctx.stroke();
+    }
+
+    drawExits();
+    if (dragLink) drawPendingLink();
+    for (var i = 0; i < world.rooms.length; i++) drawRoom(world.rooms[i]);
+  }
+
+  function drawExits() {
+    for (var i = 0; i < world.rooms.length; i++) {
+      var r = world.rooms[i], a = layout[r.id];
+      if (!a) continue;
+      for (var j = 0; j < (r.exits || []).length; j++) {
+        var ex = r.exits[j], b = layout[ex.to];
+        if (!b) continue;
+
+        // A line that crosses a region is drawn as what it is: a claim the world
+        // does not support. This is the picture of the bug that started all this.
+        var crossing = r.region && byId(ex.to) && byId(ex.to).region &&
+          r.region !== byId(ex.to).region;
+
+        ctx.strokeStyle = crossing ? C.red : 'rgba(232,228,218,.5)';
+        ctx.lineWidth = crossing ? 3 : 2;
+        if (crossing) ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // an arrowhead, so a one-way passage reads as one way
+        var ang = Math.atan2(b.y - a.y, b.x - a.x);
+        var tipX = b.x - Math.cos(ang) * (ROOM_W / 2 + 4);
+        var tipY = b.y - Math.sin(ang) * (ROOM_H / 2 + 4);
+        ctx.fillStyle = crossing ? C.red : 'rgba(232,228,218,.6)';
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - Math.cos(ang - .4) * 11, tipY - Math.sin(ang - .4) * 11);
+        ctx.lineTo(tipX - Math.cos(ang + .4) * 11, tipY - Math.sin(ang + .4) * 11);
+        ctx.fill();
+
+        var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        ctx.font = '600 11px ui-monospace, Menlo, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = C.ink;
+        ctx.fillRect(mx - 16, my - 8, 32, 15);
+        ctx.fillStyle = crossing ? C.red : C.dim;
+        ctx.fillText(ex.dir, mx, my + 3);
+      }
+    }
+  }
+
+  function drawPendingLink() {
+    var a = layout[dragLink.from];
+    ctx.strokeStyle = C.gold;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(dragLink.x, dragLink.y); ctx.stroke();
+    ctx.setLineDash([]);
+    var over = roomAt(dragLink.x, dragLink.y);
+    if (over && over.id !== dragLink.from) {
+      var d = directionBetween(a, layout[over.id]);
+      ctx.font = '700 12px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = C.gold;
+      ctx.fillText(d, (a.x + layout[over.id].x) / 2, (a.y + layout[over.id].y) / 2 - 10);
+    }
+  }
+
+  function drawRoom(r) {
+    var p = layout[r.id];
+    if (!p) return;
+    var x = p.x - ROOM_W / 2, y = p.y - ROOM_H / 2;
+    var isStart = world.meta.start === r.id;
+    var accent = regionColour(r.region);
+
+    ctx.fillStyle = C.panel;
+    ctx.fillRect(x, y, ROOM_W, ROOM_H);
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fillRect(x + 3, y + ROOM_H, ROOM_W, 3);           // the stepped print shadow
+
+    ctx.lineWidth = selected === r.id ? 3 : 2;
+    ctx.strokeStyle = selected === r.id ? C.gold : accent;
+    ctx.strokeRect(x + .5, y + .5, ROOM_W - 1, ROOM_H - 1);
+
+    if (r.region) { ctx.fillStyle = accent; ctx.fillRect(x, y, ROOM_W, 3); }
+    if (r.dark) {
+      ctx.fillStyle = 'rgba(0,0,0,.45)';
+      ctx.fillRect(x + 1, y + 4, ROOM_W - 2, ROOM_H - 5);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = isStart ? C.gold : C.paper;
+    ctx.fillText(clip(r.name || r.id, 15), p.x, p.y - 4);
+
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = C.dim;
+    var note = (isStart ? 'START  ' : '') + countHere(r.id) + ' items';
+    ctx.fillText(clip(note, 20), p.x, p.y + 11);
+
+    if (!r.prose) {
+      ctx.fillStyle = C.gold;
+      ctx.fillRect(x + ROOM_W - 9, y + ROOM_H - 9, 5, 5);   // no prose written yet
+    }
+  }
+
+  function countHere(id) {
+    var n = 0;
+    for (var i = 0; i < world.items.length; i++) if (world.items[i].location === id) n++;
+    return n;
+  }
+  function clip(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + '.' : s; }
+
+  // --------------------------------------------------------------- validating
+  //  The real checks, on every edit. Cheap enough to run continuously, which is
+  //  the point: a mistake is reported while you are still looking at the thing
+  //  that caused it.
+  var badge = document.getElementById('badge');
+  var findingsEl = document.getElementById('findings');
+
+  function check() {
+    if (!world.rooms.length) {
+      badge.className = 'badge'; badge.textContent = 'empty';
+      findingsEl.innerHTML = '<p class="pdim">Put a room down to begin.</p>';
+      return;
+    }
+    var found = [];
+
+    var shape = F.schema.validateWorld(stripLayout(world));
+    if (!shape.ok) {
+      for (var i = 0; i < shape.errors.length && i < 6; i++) {
+        found.push({ level: 'error', code: 'E212',
+          msg: shape.errors[i].path + ' ' + shape.errors[i].msg });
+      }
+    } else {
+      var g = F.graph.analyse(stripLayout(world));
+      for (var j = 0; j < g.findings.length; j++) {
+        found.push({ level: g.findings[j].level, code: g.findings[j].code,
+          msg: g.findings[j].msg, hint: g.findings[j].hint });
+      }
+      // The design audit is opinion rather than fault, and only worth showing
+      // once the structure holds up.
+      if (!g.findings.some(function (f) { return f.level === 'error'; })) {
+        var d = F.design.audit(stripLayout(world));
+        for (var k = 0; k < d.findings.length; k++) {
+          found.push({ level: 'note', code: d.findings[k].code, msg: d.findings[k].msg });
+        }
+      }
+    }
+
+    var errs = found.filter(function (f) { return f.level === 'error'; }).length;
+    var warns = found.filter(function (f) { return f.level === 'warning'; }).length;
+    badge.className = 'badge ' + (errs ? 'bad' : warns ? 'warn' : 'ok');
+    badge.textContent = errs ? errs + (errs > 1 ? ' errors' : ' error')
+      : warns ? warns + (warns > 1 ? ' warnings' : ' warning') : 'holds up';
+
+    if (!found.length) {
+      findingsEl.innerHTML = '<p class="pdim">Nothing to report. The world holds together.</p>';
+      return;
+    }
+    findingsEl.innerHTML = found.slice(0, 14).map(function (f) {
+      return '<div class="f ' + (f.level === 'error' ? 'err' : f.level === 'warning' ? 'warn' : '') +
+        '"><code>' + esc(f.code || '') + '</code>' + esc(f.msg) + '</div>';
+    }).join('');
+  }
+
+  // The layout is the editor's, not the game's, so nothing downstream ever sees
+  // it. It travels in meta only so a map can be reopened as it was left.
+  function stripLayout(w) {
+    var copy = JSON.parse(JSON.stringify(w));
+    if (copy.meta) delete copy.meta.editorLayout;
+    return copy;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+
+  // ------------------------------------------------------------- the inspector
+  var inspector = document.getElementById('inspector');
+
+  function showInspector() {
+    var r = selected && byId(selected);
+    if (!r) {
+      inspector.innerHTML = '<p class="ptitle">Nothing selected</p>' +
+        '<p class="pdim">Click a room to edit it.</p>';
+      return;
+    }
+    var regions = regionList();
+    var html = '<p class="ptitle">' + esc(r.id) + '</p>';
+    html += field('Name', 'text', 'name', r.name || '');
+    html += '<div class="field"><label>Description</label>' +
+      '<textarea data-k="prose">' + esc(r.prose || '') + '</textarea></div>';
+    html += '<div class="field"><label>Region</label>' +
+      '<input type="text" data-k="region" list="regions" value="' + esc(r.region || '') + '">' +
+      '<datalist id="regions">' +
+      regions.map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') +
+      '</datalist></div>';
+    html += '<div class="field"><label class="check">' +
+      '<input type="checkbox" data-k="dark"' + (r.dark ? ' checked' : '') + '> Dark' +
+      '</label></div>';
+    html += '<div class="field"><label class="check">' +
+      '<input type="checkbox" data-k="start"' + (world.meta.start === r.id ? ' checked' : '') +
+      '> The game starts here</label></div>';
+
+    if ((r.exits || []).length) {
+      html += '<div class="exits"><p class="ptitle">Ways out</p>';
+      for (var i = 0; i < r.exits.length; i++) {
+        var ex = r.exits[i], to = byId(ex.to);
+        var cross = r.region && to && to.region && r.region !== to.region;
+        html += '<div class="exitrow' + (cross ? ' cross' : '') + '"><b>' + esc(ex.dir) + '</b>' +
+          esc(to ? (to.name || to.id) : ex.to) +
+          (cross ? ' <span title="crosses a region">⚠</span>' : '') +
+          '<span class="x" data-del="' + i + '">remove</span></div>';
+      }
+      html += '</div>';
+    }
+    inspector.innerHTML = html;
+
+    inspector.querySelectorAll('[data-k]').forEach(function (el) {
+      el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', function () {
+        var k = el.getAttribute('data-k');
+        var room = byId(selected);
+        if (!room) return;
+        if (k === 'start') { world.meta.start = el.checked ? room.id : null; }
+        else if (k === 'dark') { if (el.checked) room.dark = true; else delete room.dark; }
+        else if (el.value) { room[k] = el.value; }
+        else { delete room[k]; }
+        draw(); check();
+      });
+    });
+    inspector.querySelectorAll('[data-del]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var room = byId(selected);
+        room.exits.splice(Number(el.getAttribute('data-del')), 1);
+        showInspector(); draw(); check();
+      });
+    });
+  }
+
+  function field(label, type, key, value) {
+    return '<div class="field"><label>' + label + '</label>' +
+      '<input type="' + type + '" data-k="' + key + '" value="' + esc(value) + '"></div>';
+  }
+
+  // -------------------------------------------------------------- interaction
+  var drag = null, dragLink = null, downAt = null;
+
+  function toCanvas(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * cv.width / r.width,
+             y: (e.clientY - r.top) * cv.height / r.height };
+  }
+
+  cv.addEventListener('mousedown', function (e) {
+    var p = toCanvas(e);
+    var r = roomAt(p.x, p.y);
+    downAt = p;
+    if (!r) return;
+    selected = r.id;
+    showInspector();
+    // Shift starts a join; a plain drag moves the room.
+    if (e.shiftKey) dragLink = { from: r.id, x: p.x, y: p.y };
+    else drag = { id: r.id, dx: p.x - layout[r.id].x, dy: p.y - layout[r.id].y };
+    draw();
+  });
+
+  cv.addEventListener('mousemove', function (e) {
+    var p = toCanvas(e);
+    if (drag) {
+      layout[drag.id] = { x: p.x - drag.dx, y: p.y - drag.dy };
+      draw();
+    } else if (dragLink) {
+      dragLink.x = p.x; dragLink.y = p.y;
+      draw();
+    }
+    cv.style.cursor = roomAt(p.x, p.y) ? 'move' : 'crosshair';
+  });
+
+  window.addEventListener('mouseup', function (e) {
+    var p = toCanvas(e);
+    if (dragLink) {
+      var target = roomAt(p.x, p.y);
+      if (target && target.id !== dragLink.from) join(dragLink.from, target.id);
+      dragLink = null;
+      draw(); check(); showInspector();
+      return;
+    }
+    if (drag) {
+      // Moving a room can change what direction its exits are, so they are
+      // recomputed from the new geometry. The picture stays the source of truth.
+      relabel();
+      drag = null; draw(); check(); showInspector();
+      return;
+    }
+    // A click on empty canvas puts a room down there.
+    if (downAt && Math.abs(downAt.x - p.x) < 4 && Math.abs(downAt.y - p.y) < 4 &&
+        !roomAt(p.x, p.y) && p.x > 0 && p.y > 0 && p.x < cv.width && p.y < cv.height) {
+      addRoom(p.x, p.y);
+    }
+    downAt = null;
+  });
+
+  function join(fromId, toId) {
+    var a = layout[fromId], b = layout[toId];
+    var dir = directionBetween(a, b);
+    var from = byId(fromId), to = byId(toId);
+    from.exits = from.exits || [];
+    for (var i = 0; i < from.exits.length; i++) if (from.exits[i].to === toId) return;
+    from.exits.push({ dir: dir, to: toId });
+    // Two-way by default, because a passage you cannot come back through is a
+    // deliberate thing and should be the deliberate choice.
+    to.exits = to.exits || [];
+    for (var j = 0; j < to.exits.length; j++) if (to.exits[j].to === fromId) return;
+    to.exits.push({ dir: OPPOSITE[dir], to: fromId });
+  }
+
+  //  Directions follow the geometry, always. This is what makes the map honest:
+  //  drag a room to the other side of another and the exits between them turn
+  //  round to match, instead of quietly continuing to claim the old arrangement.
+  function relabel() {
+    for (var i = 0; i < world.rooms.length; i++) {
+      var r = world.rooms[i], a = layout[r.id];
+      if (!a) continue;
+      for (var j = 0; j < (r.exits || []).length; j++) {
+        var b = layout[r.exits[j].to];
+        if (!b) continue;
+        if (['UP', 'DOWN', 'IN', 'OUT'].indexOf(r.exits[j].dir) >= 0) continue;
+        r.exits[j].dir = directionBetween(a, b);
+      }
+    }
+  }
+
+  function addRoom(x, y) {
+    var n = world.rooms.length + 1;
+    var id = 'ROOM-' + n;
+    while (byId(id)) { n++; id = 'ROOM-' + n; }
+    var r = { id: id, name: 'Room ' + n, prose: '', exits: [] };
+    world.rooms.push(r);
+    layout[id] = { x: x, y: y };
+    if (!world.meta.start) world.meta.start = id;
+    selected = id;
+    draw(); check(); showInspector();
+  }
+
+  // ------------------------------------------------------------------ toolbar
+  document.getElementById('addRoom').addEventListener('click', function () {
+    addRoom(120 + (world.rooms.length % 8) * 130, 90 + Math.floor(world.rooms.length / 8) * 110);
+  });
+
+  document.getElementById('delRoom').addEventListener('click', function () {
+    if (!selected) return;
+    var gone = selected;
+    world.rooms = world.rooms.filter(function (r) { return r.id !== gone; });
+    world.items = world.items.filter(function (i) { return i.location !== gone; });
+    for (var i = 0; i < world.rooms.length; i++) {
+      world.rooms[i].exits = (world.rooms[i].exits || [])
+        .filter(function (e) { return e.to !== gone; });
+    }
+    delete layout[gone];
+    if (world.meta.start === gone) world.meta.start = world.rooms.length ? world.rooms[0].id : null;
+    selected = null;
+    draw(); check(); showInspector();
+  });
+
+  document.getElementById('exportWorld').addEventListener('click', function () {
+    var out = stripLayout(world);
+    out.meta.editorLayout = layout;
+    download(JSON.stringify(out, null, 2), 'world.json', 'application/json');
+  });
+
+  document.getElementById('openFile').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    file.arrayBuffer().then(function (buf) {
+      return window.FolioZip
+        ? window.FolioZip.readFolio(new Uint8Array(buf))
+        : Promise.reject(new Error('no zip reader on this page'));
+    }).then(function (files) {
+      var w = JSON.parse(new TextDecoder().decode(files['logic/world.json']));
+      adopt(w);
+    }).catch(function (err) {
+      findingsEl.innerHTML = '<div class="f err"><code>OPEN</code>' + esc(err.message) + '</div>';
+    });
+  });
+
+  document.getElementById('sample').addEventListener('click', function () {
+    fetch('/games/cellar-door.folio').then(function (r) { return r.arrayBuffer(); })
+      .then(function (buf) { return window.FolioZip.readFolio(new Uint8Array(buf)); })
+      .then(function (files) {
+        adopt(JSON.parse(new TextDecoder().decode(files['logic/world.json'])));
+      })
+      .catch(function () {
+        // Offline, or the gallery is not there. A hand-made example still shows
+        // the idea, and a tool that dies without a network is not much of a tool.
+        adopt(example());
+      });
+  });
+
+  function adopt(w) {
+    world = w;
+    world.items = world.items || [];
+    world.rules = world.rules || [];
+    layout = (w.meta && w.meta.editorLayout) || autoLayout(w);
+    if (w.meta) delete w.meta.editorLayout;
+    selected = null;
+    draw(); check(); showInspector();
+  }
+
+  //  A map for a world that has never been laid out: place the start room and
+  //  walk outward, putting each room in the direction its exit claims. A map that
+  //  was written as JSON gets drawn the way it says it is, and anything impossible
+  //  about it becomes visible immediately.
+  function autoLayout(w) {
+    var pos = {}, step = 150;
+    var VEC = { NORTH: [0, -1], SOUTH: [0, 1], EAST: [1, 0], WEST: [-1, 0],
+      NE: [1, -1], NW: [-1, -1], SE: [1, 1], SW: [-1, 1],
+      UP: [1, -1], DOWN: [-1, 1], IN: [1, 0], OUT: [-1, 0] };
+    var start = (w.meta && w.meta.start) || (w.rooms[0] && w.rooms[0].id);
+    if (!start) return {};
+    pos[start] = { x: cv.width / 2, y: cv.height / 2 };
+    var queue = [start], guard = 0;
+    while (queue.length && guard++ < 500) {
+      var id = queue.shift();
+      var room = null;
+      for (var i = 0; i < w.rooms.length; i++) if (w.rooms[i].id === id) room = w.rooms[i];
+      if (!room) continue;
+      for (var j = 0; j < (room.exits || []).length; j++) {
+        var ex = room.exits[j];
+        if (pos[ex.to]) continue;
+        var v = VEC[ex.dir] || [1, 0];
+        var p = { x: pos[id].x + v[0] * step, y: pos[id].y + v[1] * step };
+        while (occupied(pos, p)) { p.x += 36; p.y += 24; }
+        pos[ex.to] = p;
+        queue.push(ex.to);
+      }
+    }
+    // Anything the walk never reached still has to be somewhere.
+    var loose = 0;
+    for (var k = 0; k < w.rooms.length; k++) {
+      if (pos[w.rooms[k].id]) continue;
+      pos[w.rooms[k].id] = { x: 90 + (loose % 7) * 140, y: cv.height - 70 - Math.floor(loose / 7) * 80 };
+      loose++;
+    }
+    return fit(pos);
+  }
+  function occupied(pos, p) {
+    for (var k in pos) {
+      if (Math.abs(pos[k].x - p.x) < ROOM_W + 12 && Math.abs(pos[k].y - p.y) < ROOM_H + 12) return true;
+    }
+    return false;
+  }
+  // Bring the whole map inside the canvas, whatever shape the walk produced.
+  function fit(pos) {
+    var xs = [], ys = [];
+    for (var k in pos) { xs.push(pos[k].x); ys.push(pos[k].y); }
+    if (!xs.length) return pos;
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var pad = 80;
+    var sx = (cv.width - pad * 2) / Math.max(1, maxX - minX);
+    var sy = (cv.height - pad * 2) / Math.max(1, maxY - minY);
+    var s = Math.min(1, sx, sy);
+    for (var id in pos) {
+      pos[id] = { x: pad + (pos[id].x - minX) * s, y: pad + (pos[id].y - minY) * s };
+    }
+    return pos;
+  }
+
+  function example() {
+    return {
+      meta: { title: 'A start', start: 'PORCH' },
+      rooms: [
+        { id: 'PORCH', name: 'The Porch', region: 'house',
+          prose: 'Paint curls off the boards.', exits: [{ dir: 'NORTH', to: 'HALL' }] },
+        { id: 'HALL', name: 'The Hall', region: 'house',
+          prose: 'A narrow hall.', exits: [{ dir: 'SOUTH', to: 'PORCH' }] }
+      ],
+      items: [], rules: []
+    };
+  }
+
+  function download(text, name, type) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: type }));
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  // ---------------------------------------------------------------- and go
+  draw(); check(); showInspector();
+  window.FolioEditor = {
+    world: function () { return stripLayout(world); },
+    layout: function () { return layout; },
+    load: adopt,
+    addRoom: addRoom,
+    join: join,
+    select: function (id) { selected = id; showInspector(); draw(); },
+    badge: function () { return badge.textContent; }
+  };
+})();
+</script>
+</body>
+</html>
