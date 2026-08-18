@@ -33,6 +33,7 @@
   var cv = document.getElementById('map');
   var ctx = cv.getContext('2d');
   var VW = 1200, VH = 760;              // logical size; the canvas follows the box
+  var DPR = 1;                          // device pixels per logical one
 
   // ---------------------------------------------------------------- the world
   //  The world is what a .folio holds. The layout is where rooms sit on this
@@ -112,25 +113,59 @@
     VH = Math.max(280, Math.round(box.height));
     cv.width = VW * dpr;
     cv.height = VH * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
+    DPR = dpr;                 // draw() composes this with the view; it cannot
+    draw();                    // just be left standing in the context
+
   }
   window.addEventListener('resize', resize);
 
+  //  The canvas shows part of a map that may be much larger than it.
+  //
+  //  Rooms are laid out at a size that can be read, and then the view moves over
+  //  them. The alternative — scaling the positions to fit while the boxes stay
+  //  their original size — is what a small map gets away with and what a large
+  //  one cannot: at eighty rooms the boxes overlap into a solid block. Nothing
+  //  below this line knows about the view; everything works in map coordinates,
+  //  because the transform is applied once here and inverted once in toCanvas.
+  var view = { s: 1, ox: 0, oy: 0 };
+
   function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = C.ink;
     ctx.fillRect(0, 0, VW, VH);
+
+    ctx.setTransform(DPR * view.s, 0, 0, DPR * view.s, DPR * view.ox, DPR * view.oy);
     ctx.strokeStyle = 'rgba(59,68,114,.35)';
-    ctx.lineWidth = 1;
-    for (var gx = 0; gx < VW; gx += 40) {
-      ctx.beginPath(); ctx.moveTo(gx + .5, 0); ctx.lineTo(gx + .5, VH); ctx.stroke();
+    ctx.lineWidth = 1 / view.s;
+    var g = 40;
+    var x0 = Math.floor(-view.ox / view.s / g) * g, x1 = x0 + VW / view.s + g;
+    var y0 = Math.floor(-view.oy / view.s / g) * g, y1 = y0 + VH / view.s + g;
+    for (var gx = x0; gx < x1; gx += g) {
+      ctx.beginPath(); ctx.moveTo(gx, y0); ctx.lineTo(gx, y1); ctx.stroke();
     }
-    for (var gy = 0; gy < VH; gy += 40) {
-      ctx.beginPath(); ctx.moveTo(0, gy + .5); ctx.lineTo(VW, gy + .5); ctx.stroke();
+    for (var gy = y0; gy < y1; gy += g) {
+      ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke();
     }
     drawExits();
     if (dragLink) drawPendingLink();
     for (var i = 0; i < world.rooms.length; i++) drawRoom(world.rooms[i]);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  //  Frame the whole map, never magnifying past life size: a three-room game
+  //  blown up to fill a wall looks like a mistake.
+  function frame() {
+    var xs = [], ys = [];
+    for (var k in layout) { xs.push(layout[k].x); ys.push(layout[k].y); }
+    if (!xs.length) { view = { s: 1, ox: 0, oy: 0 }; return; }
+    var minX = Math.min.apply(null, xs) - ROOM_W, maxX = Math.max.apply(null, xs) + ROOM_W;
+    var minY = Math.min.apply(null, ys) - ROOM_H, maxY = Math.max.apply(null, ys) + ROOM_H;
+    var pad = 30;
+    var s = Math.min(1, (VW - pad * 2) / Math.max(1, maxX - minX),
+      (VH - pad * 2) / Math.max(1, maxY - minY));
+    view = { s: s,
+      ox: (VW - (maxX - minX) * s) / 2 - minX * s,
+      oy: (VH - (maxY - minY) * s) / 2 - minY * s };
   }
 
   function drawExits() {
@@ -229,6 +264,25 @@
       findingsEl.innerHTML = '<p class="pdim">Put a room down to begin.</p>';
       return;
     }
+    //  A survey is a map read off a compiled game, so the checks do not apply to
+    //  it. It has no items and no rules, not because it is a bad game but because
+    //  those live in machine code this never ran. Reporting an empty world here
+    //  would be measuring the surveyor rather than the game.
+    if (world.surveyed) {
+      var s = world.survey || {};
+      badge.className = 'badge'; badge.textContent = 'surveyed';
+      findingsEl.innerHTML =
+        '<div class="f"><code>MAP</code>' + s.rooms + ' rooms and ' + s.exits +
+        ' exits, read from the story file without running it.</div>' +
+        '<div class="f"><code>FIT</code>' + Math.round((s.reciprocity || 0) * 100) +
+        '% of passages lead back the way they came, which is how the directions ' +
+        'were worked out.</div>' +
+        '<div class="f warn"><code>READ ONLY</code>The rooms are all there is. ' +
+        'This game\'s things, prose and puzzles are compiled code, not data, so ' +
+        'there is nothing here to edit and nothing to save.</div>';
+      return;
+    }
+
     var found = [];
     var shape = F.schema.validateWorld(stripLayout(world));
     if (!shape.ok) {
@@ -341,7 +395,22 @@
     var r = selected && byId(selected);
     if (!r) {
       inspector.innerHTML = '<p class="ptitle">Nothing selected</p>' +
-        '<p class="pdim">Click the canvas to put a room down, or click a room to edit it.</p>';
+        '<p class="pdim">' + (readOnly
+          ? 'Drag to move about the map, scroll to zoom, and click a room to see ' +
+            'where it leads.'
+          : 'Click the canvas to put a room down, or click a room to edit it.') +
+        '</p>';
+      return;
+    }
+    if (readOnly) {
+      inspector.innerHTML = '<p class="ptitle">' + esc(r.name || r.id) + '</p>' +
+        '<p class="pdim"><code>' + esc(r.id) + '</code></p>' +
+        ((r.exits || []).length
+          ? '<div class="findings">' + r.exits.map(function (x) {
+              return '<div class="f"><code>' + esc(x.dir) + '</code>' + esc(x.to) + '</div>';
+            }).join('') + '</div>'
+          : '<p class="pdim">No way out that the story file states plainly. ' +
+            'A passage decided at runtime does not appear here.</p>');
       return;
     }
     var html = '';
@@ -813,17 +882,36 @@
   }
 
   // -------------------------------------------------------------- interaction
-  var drag = null, dragLink = null, downAt = null;
+  var drag = null, dragLink = null, downAt = null, readOnly = false;
 
   function toCanvas(e) {
     var r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left) * VW / r.width, y: (e.clientY - r.top) * VH / r.height };
+    var sx = (e.clientX - r.left) * VW / r.width, sy = (e.clientY - r.top) * VH / r.height;
+    return { x: (sx - view.ox) / view.s, y: (sy - view.oy) / view.s };
   }
+
+  var pan = null;
+
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = cv.getBoundingClientRect();
+    var sx = (e.clientX - r.left) * VW / r.width, sy = (e.clientY - r.top) * VH / r.height;
+    var before = { x: (sx - view.ox) / view.s, y: (sy - view.oy) / view.s };
+    var s = Math.max(0.2, Math.min(2, view.s * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    // Keep whatever sits under the pointer under the pointer.
+    view = { s: s, ox: sx - before.x * s, oy: sy - before.y * s };
+    draw();
+  }, { passive: false });
 
   cv.addEventListener('mousedown', function (e) {
     var p = toCanvas(e), r = roomAt(p.x, p.y);
     downAt = p;
-    if (!r) return;
+    if (!r) {
+      var b = cv.getBoundingClientRect();
+      pan = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, box: b, moved: false };
+      return;
+    }
+    if (readOnly) { selected = r.id; showInspector(); draw(); return; }
     selected = r.id;
     showInspector();
     if (e.shiftKey) dragLink = { from: r.id, x: p.x, y: p.y };
@@ -832,13 +920,27 @@
   });
 
   cv.addEventListener('mousemove', function (e) {
+    if (pan) {
+      var dx = (e.clientX - pan.x) * VW / pan.box.width;
+      var dy = (e.clientY - pan.y) * VH / pan.box.height;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) pan.moved = true;
+      view.ox = pan.ox + dx; view.oy = pan.oy + dy;
+      draw();
+      cv.style.cursor = 'grabbing';
+      return;
+    }
     var p = toCanvas(e);
     if (drag) { layout[drag.id] = { x: p.x - drag.dx, y: p.y - drag.dy }; draw(); }
     else if (dragLink) { dragLink.x = p.x; dragLink.y = p.y; draw(); }
-    cv.style.cursor = roomAt(p.x, p.y) ? 'move' : 'crosshair';
+    cv.style.cursor = roomAt(p.x, p.y) ? 'move' : readOnly ? 'grab' : 'crosshair';
   });
 
   window.addEventListener('mouseup', function (e) {
+    if (pan) {
+      var wasPan = pan.moved;
+      pan = null; cv.style.cursor = 'crosshair';
+      if (wasPan) { downAt = null; return; }   // a drag of the view is not a click
+    }
     var p = toCanvas(e);
     if (dragLink) {
       var t = roomAt(p.x, p.y);
@@ -847,7 +949,7 @@
     }
     if (drag) { relabel(); drag = null; redraw(); return; }
     if (downAt && Math.abs(downAt.x - p.x) < 4 && Math.abs(downAt.y - p.y) < 4 &&
-        !roomAt(p.x, p.y) && p.x > 0 && p.y > 0 && p.x < VW && p.y < VH) addRoom(p.x, p.y);
+        !roomAt(p.x, p.y) && !readOnly) addRoom(p.x, p.y);
     downAt = null;
   });
 
@@ -1002,11 +1104,35 @@
     if (!file) return;
     file.arrayBuffer()
       .then(function (b) { return window.FolioZip.readFolio(new Uint8Array(b)); })
-      .then(function (files) { adopt(JSON.parse(new TextDecoder().decode(files['logic/world.json']))); })
+      .then(function (files) { adopt(worldFrom(files)); })
       .catch(function (err) {
         findingsEl.innerHTML = '<div class="f err"><code>OPEN</code>' + esc(err.message) + '</div>';
       });
   });
+
+  //  A .folio holds one of two things, and only one of them is editable.
+  //
+  //  A world is data: rooms, things, rules, all of it declared, all of it
+  //  something this editor can change and hand back. A story file is a compiled
+  //  program. Its map is not written down anywhere — the rooms are objects in a
+  //  memory image and the puzzles are machine code — so there is nothing here to
+  //  edit, and an editor that pretended otherwise would be lying about what it
+  //  could save.
+  //
+  //  But the map can still be read. Calibration already works out which objects
+  //  are rooms and which property holds which direction, statically, without
+  //  running a single instruction. So a compiled game opens as a survey: the map
+  //  drawn, correctly, and locked.
+  function worldFrom(files) {
+    var world = files['logic/world.json'];
+    if (world) return JSON.parse(new TextDecoder().decode(world));
+
+    var story = null;
+    for (var k in files) if (/^logic\/.*\.z[1-8]$/.test(k)) { story = files[k]; break; }
+    if (!story) throw new Error('this .folio holds neither a world nor a story file');
+    if (!window.Folio.calibrate) throw new Error('no surveyor in this build');
+    return window.Folio.calibrate.survey(story);
+  }
   document.getElementById('sample').addEventListener('click', function () {
     fetch('/games/cellar-door.folio').then(function (r) { return r.arrayBuffer(); })
       .then(function (b) { return window.FolioZip.readFolio(new Uint8Array(b)); })
@@ -1023,64 +1149,93 @@
     walkthrough = (w.meta && w.meta.editorWalkthrough) || '';
     if (w.meta) { delete w.meta.editorLayout; delete w.meta.editorWalkthrough; }
     selected = null;
+    lock(!!w.surveyed);
+    frame();
     redraw();
+  }
+
+  //  A surveyed map is shown, not offered for editing. The controls that would
+  //  write go dead rather than disappearing, because a control that vanishes
+  //  leaves you wondering whether you imagined it.
+  function lock(on) {
+    readOnly = on;
+    ['addRoom', 'delRoom', 'findWalk', 'exportFolio', 'exportWorld'].forEach(function (id) {
+      document.getElementById(id).disabled = on;
+    });
+    document.getElementById('hint').textContent = on
+      ? 'A map read from a compiled game. You can look and drag rooms about to ' +
+        'read it more easily, but this game is a program, so there is nothing to edit.'
+      : 'Click the canvas to put a room down. Drag a room to move it. Drag from ' +
+        'one room to another to join them: the direction comes from where you put ' +
+        'them, so the map is the map.';
   }
 
   //  A world that has never been laid out gets a map by walking outward from the
   //  start room, putting each room where its exit claims it is. A game written
   //  entirely as JSON can then be understood at a glance, and anything impossible
   //  about it is visible immediately.
+  //  Rooms are placed on a grid of cells the size of a room, so two of them can
+  //  never land on the same spot. Each exit puts its destination in the cell the
+  //  direction points at; if that cell is taken, the room spirals out to the
+  //  nearest free one, which keeps it near where it belongs rather than sliding
+  //  away down a diagonal. The map may end up larger than the canvas, and that
+  //  is what the view is for.
   function autoLayout(w) {
-    var pos = {}, step = 150;
+    var CW = ROOM_W + 42, CH = ROOM_H + 46;
     var VEC = { NORTH: [0, -1], SOUTH: [0, 1], EAST: [1, 0], WEST: [-1, 0],
       NE: [1, -1], NW: [-1, -1], SE: [1, 1], SW: [-1, 1],
-      UP: [1, -1], DOWN: [-1, 1], IN: [1, 0], OUT: [-1, 0] };
-    var start = (w.meta && w.meta.start) || (w.rooms[0] && w.rooms[0].id);
+      UP: [0, -1], DOWN: [0, 1], IN: [1, 0], OUT: [-1, 0] };
+    var start = (w.meta && (w.meta.start || w.meta.layoutRoot)) ||
+      (w.rooms[0] && w.rooms[0].id);
     if (!start) return {};
-    pos[start] = { x: VW / 2, y: VH / 2 };
+
+    var taken = {}, cell = {};
+    function claim(id, cx, cy) {
+      for (var ring = 0; ring < 40; ring++) {
+        for (var dx = -ring; dx <= ring; dx++) {
+          for (var dy = -ring; dy <= ring; dy++) {
+            if (ring && Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+            var k = (cx + dx) + ',' + (cy + dy);
+            if (taken[k]) continue;
+            taken[k] = id; cell[id] = { cx: cx + dx, cy: cy + dy };
+            return;
+          }
+        }
+      }
+    }
+
+    claim(start, 0, 0);
     var queue = [start], guard = 0;
-    while (queue.length && guard++ < 600) {
+    while (queue.length && guard++ < 4000) {
       var id = queue.shift(), room = null;
       for (var i = 0; i < w.rooms.length; i++) if (w.rooms[i].id === id) room = w.rooms[i];
       if (!room) continue;
       for (var j = 0; j < (room.exits || []).length; j++) {
         var ex = room.exits[j];
-        if (pos[ex.to]) continue;
+        if (cell[ex.to] || !byIdIn(w, ex.to)) continue;
         var v = VEC[ex.dir] || [1, 0];
-        var p = { x: pos[id].x + v[0] * step, y: pos[id].y + v[1] * step };
-        var spin = 0;
-        while (occupied(pos, p) && spin++ < 40) { p.x += 34; p.y += 26; }
-        pos[ex.to] = p;
+        claim(ex.to, cell[id].cx + v[0], cell[id].cy + v[1]);
         queue.push(ex.to);
       }
     }
-    var loose = 0;
-    for (var k = 0; k < w.rooms.length; k++) {
-      if (pos[w.rooms[k].id]) continue;
-      pos[w.rooms[k].id] = { x: 100 + (loose % 7) * 145, y: VH - 70 - Math.floor(loose / 7) * 80 };
+
+    // Anything no exit leads to still has to go somewhere it can be seen.
+    var loose = 0, floor = 0;
+    for (var c in cell) floor = Math.max(floor, cell[c].cy);
+    for (var k2 = 0; k2 < w.rooms.length; k2++) {
+      var rid = w.rooms[k2].id;
+      if (cell[rid]) continue;
+      claim(rid, (loose % 8) - 4, floor + 2 + Math.floor(loose / 8));
       loose++;
     }
-    return fit(pos);
-  }
-  function occupied(pos, p) {
-    for (var k in pos) {
-      if (Math.abs(pos[k].x - p.x) < ROOM_W + 14 && Math.abs(pos[k].y - p.y) < ROOM_H + 16) return true;
-    }
-    return false;
-  }
-  function fit(pos) {
-    var xs = [], ys = [];
-    for (var k in pos) { xs.push(pos[k].x); ys.push(pos[k].y); }
-    if (!xs.length) return pos;
-    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
-    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
-    var pad = 78;
-    var s = Math.min(1, (VW - pad * 2) / Math.max(1, maxX - minX),
-      (VH - pad * 2) / Math.max(1, maxY - minY));
-    for (var id in pos) {
-      pos[id] = { x: pad + (pos[id].x - minX) * s, y: pad + (pos[id].y - minY) * s };
-    }
+
+    var pos = {};
+    for (var id2 in cell) pos[id2] = { x: cell[id2].cx * CW, y: cell[id2].cy * CH };
     return pos;
+  }
+  function byIdIn(w, id) {
+    for (var i = 0; i < w.rooms.length; i++) if (w.rooms[i].id === id) return w.rooms[i];
+    return null;
   }
 
   function example() {

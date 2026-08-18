@@ -552,5 +552,68 @@ function calibrate(bytes) {
   };
 }
 
-module.exports = { calibrate, decode, findExits, assignDirections, mintIds,
+//
+//  A survey: the map of a compiled game, in the shape the editor draws.
+//
+//  Calibration already works out which rooms exist and which property holds
+//  which direction. That is a map, and there is no good reason a person cannot
+//  look at it just because the game it came from is a program.
+//
+//  What comes back is deliberately not a world. It has rooms, names and exits
+//  and nothing else, because nothing else is knowable without running the game:
+//  the prose lives in compressed strings the routines choose between, and the
+//  puzzles live in the routines themselves. A surveyed map is for looking at.
+//
+function survey(bytes) {
+  const story = decode(bytes);
+  const exits = findExits(story);
+  const dirs = assignDirections(story, exits);
+  const { roommap } = mintIds(story, exits.rooms);
+
+  const idOf = {};
+  for (const num of Object.keys(roommap)) idOf[num] = roommap[num];
+
+  const rooms = [];
+  for (const num of Object.keys(roommap)) {
+    const n = Number(num);
+    const room = { id: roommap[num], name: title(story.objects[n].name), exits: [] };
+    for (const dir of Object.keys(dirs.dirprop)) {
+      if (!DIRS.includes(dir)) continue;              // LAND and friends have no compass
+      for (const e of (exits.byProp.get(dirs.dirprop[dir]) || [])) {
+        if (e.from !== n || !idOf[e.to]) continue;
+        room.exits.push({ dir, to: idOf[e.to] });
+      }
+    }
+    rooms.push(room);
+  }
+
+  //  No start room is claimed, and that is not an omission. The player object
+  //  sits unplaced in the initial object table because a game of this vintage
+  //  puts them somewhere from code on the first turn. Guessing would put a START
+  //  label on an arbitrary room, and a map that lies about where you come in is
+  //  worse than one that admits it does not know.
+  //
+  //  The layout still needs somewhere to start walking from, so it uses the
+  //  best-connected room. That is a drawing decision, not a claim about the game.
+  var hub = rooms.slice().sort(function (a, b) { return b.exits.length - a.exits.length; })[0];
+
+  return {
+    surveyed: true,
+    meta: { title: 'A surveyed map', layoutRoot: (hub || {}).id },
+    flags: {}, rooms, items: [], actors: [], rules: [],
+    survey: {
+      version: story.version, release: story.release, serial: story.serial,
+      rooms: rooms.length,
+      exits: rooms.reduce((n, r) => n + r.exits.length, 0),
+      reciprocity: dirs.reciprocity
+    }
+  };
+}
+
+function title(name) {
+  const s = String(name || '').trim();
+  return s ? s.replace(/\b\w/g, c => c.toUpperCase()) : 'Room';
+}
+
+module.exports = { calibrate, survey, decode, findExits, assignDirections, mintIds,
   inferAttributes, findPlayer, DIRS, OPPOSITE, NEEDED_FLAGS };

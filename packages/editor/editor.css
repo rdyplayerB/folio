@@ -28,6 +28,15 @@ body:has(.ed) footer { display: none; }
 .ebtn:hover { background: var(--palegold); border-color: var(--palegold); }
 .ebtn.ghost { background: transparent; color: var(--palegold); }
 .ebtn.ghost:hover { background: rgba(242,167,27,.14); }
+/* A control that cannot be used says so rather than going quietly dead: it is
+   still there, still legible, and plainly not for pressing. */
+.ebtn:disabled, .ebtn.ghost:disabled {
+  background: transparent; color: rgba(155,155,164,.55);
+  border-color: rgba(155,155,164,.3); cursor: not-allowed;
+}
+.ebtn:disabled:hover, .ebtn.ghost:disabled:hover {
+  background: transparent; border-color: rgba(155,155,164,.3);
+}
 
 .efile {
   font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;

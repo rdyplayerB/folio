@@ -113,6 +113,39 @@ ok('the census carries the right bit, with names, for every unresolved flag',
   resolvable.length === r.report.missingFlags.length,
   resolvable.length + '/' + r.report.missingFlags.length + ' resolvable by reading');
 
+//  The survey — the same tables, arranged as a map somebody can look at.
+//
+//  It is checked here rather than in the editor's own tests because this is the
+//  only place a real compiled game is available to check it against.
+const { survey } = require('../packages/zmachine/calibrate.js');
+const s = survey(fs.readFileSync(STORY));
+
+ok('a survey finds the same rooms the calibration does',
+  s.rooms.length === Object.keys(r.roommap.ROOMMAP).length,
+  s.rooms.length + ' rooms');
+
+ok('every exit leads to a room that is in the survey',
+  s.rooms.every(rm => rm.exits.every(x => s.rooms.some(o => o.id === x.to))),
+  s.survey.exits + ' exits');
+
+//  Spot-checked against the map anyone who has played it can draw from memory.
+//  If the direction assignment ever drifts, this is what notices.
+const west = s.rooms.find(rm => rm.id === 'WEST-OF-HOUSE');
+const goes = (room, dir) => ((room || {}).exits || []).filter(x => x.dir === dir).map(x => x.to);
+ok('west of house still runs north to north of house',
+  goes(west, 'NORTH').includes('NORTH-OF-HOUSE'), goes(west, 'NORTH').join(','));
+ok('west of house still runs south to south of house',
+  goes(west, 'SOUTH').includes('SOUTH-OF-HOUSE'), goes(west, 'SOUTH').join(','));
+ok('the kitchen is still west of the living room',
+  goes(s.rooms.find(rm => rm.id === 'KITCHEN'), 'WEST').includes('LIVING-ROOM'));
+
+//  The one thing it must not do is invent a starting room. Zork places the
+//  player from code, so the initial object table does not say where you begin,
+//  and a survey that guessed would put a START label on an arbitrary room.
+ok('no start room is claimed, because the story file does not state one',
+  s.meta.start === undefined && !!s.meta.layoutRoot,
+  'laid out from ' + s.meta.layoutRoot);
+
 console.log('\n' + (fail ? '\x1b[31m' + fail + ' failed\x1b[0m, ' : '') +
   '\x1b[32m' + pass + ' passed\x1b[0m\n');
 process.exit(fail ? 1 : 0);

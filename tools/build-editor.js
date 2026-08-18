@@ -31,7 +31,10 @@ const MODULES = [
   ['packages/format/brief.js', '../format/brief.js'],
   ['packages/format/scenes.js', '../format/scenes.js'],
   ['packages/validator/solve.js', './solve.js'],
-  ['packages/format/schema.js', '../format/schema.js']
+  ['packages/format/schema.js', '../format/schema.js'],
+  // So the editor can open a .folio that holds a compiled game and still show
+  // the map. It reads the binary's tables statically and never runs it.
+  ['packages/zmachine/calibrate.js', '../zmachine/calibrate.js']
 ];
 
 const SCHEMA = read('packages/format/world.schema.json');
@@ -81,7 +84,8 @@ parts.push('    design: require(\'design.js\'),');
 parts.push('    schema: require(\'schema.js\'),');
 parts.push('    brief: require(\'brief.js\'),');
 parts.push('    scenes: require(\'scenes.js\'),');
-parts.push('    solve: require(\'solve.js\')');
+parts.push('    solve: require(\'solve.js\'),');
+parts.push('    calibrate: require(\'calibrate.js\')');
 parts.push('  };');
 parts.push('})();');
 

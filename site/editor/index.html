@@ -38,6 +38,15 @@ body:has(.ed) footer { display: none; }
 .ebtn:hover { background: var(--palegold); border-color: var(--palegold); }
 .ebtn.ghost { background: transparent; color: var(--palegold); }
 .ebtn.ghost:hover { background: rgba(242,167,27,.14); }
+/* A control that cannot be used says so rather than going quietly dead: it is
+   still there, still legible, and plainly not for pressing. */
+.ebtn:disabled, .ebtn.ghost:disabled {
+  background: transparent; color: rgba(155,155,164,.55);
+  border-color: rgba(155,155,164,.3); cursor: not-allowed;
+}
+.ebtn:disabled:hover, .ebtn.ghost:disabled:hover {
+  background: transparent; border-color: rgba(155,155,164,.3);
+}
 
 .efile {
   font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
@@ -4931,6 +4940,628 @@ function vocabulary() {
 module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
 
   };
+  REG["calibrate.js"] = function (module, exports, require) {
+//  Calibration — deriving a room map from a Z-machine story file alone.
+//
+//  A Z-machine binary does not know it has rooms called anything. It has numbered
+//  objects. Before the engine can draw a picture of the kitchen it needs a table
+//  saying object 27 is the kitchen, and producing that table by hand is the whole
+//  difficulty of porting a game.
+//
+//  The origin project solved this for one game by constraint satisfaction against
+//  a hand-written description of Zork's world. That worked and does not generalise,
+//  because it was answering a question a new port never asks: "which of these
+//  fifteen objects named Maze is the one I already decided to call MAZE-7?" When
+//  nobody has named anything yet, the ids are ours to mint, and the hard half of
+//  the problem disappears. What is left is real but smaller:
+//
+//    1. decode the object table and every short name from the binary   (certain)
+//    2. work out which properties hold exits, and which is which       (solved)
+//    3. tell rooms from objects                                        (solved)
+//    4. mint stable ids, disambiguating repeated names                 (certain)
+//    5. work out which attribute bit means TAKEBIT, OPENBIT, and so on (inferred)
+//
+//  Step 5 is the one that cannot be finished from a bare binary. The compiler
+//  assigns attribute numbers per game, so their meanings have to be recovered from
+//  structure, and some flags leave a much clearer trace than others. Every guess
+//  is scored and reported rather than quietly written out, because a wrong
+//  TAKEBIT means the engine believes nothing in the game can be picked up, and
+//  that is not a failure anyone wants to discover from a player.
+//
+//  Nothing here executes the story. It is a static read of the binary.
+
+'use strict';
+
+const DIRS = ['NORTH', 'EAST', 'WEST', 'SOUTH', 'NE', 'NW', 'SE', 'SW',
+  'UP', 'DOWN', 'IN', 'OUT', 'LAND'];
+
+// The reciprocal of each direction. This is the lever that replaces the
+// hand-written world: a map is mostly two-way, so the assignment of property
+// numbers to direction names can be scored by how many exits lead back.
+const OPPOSITE = {
+  NORTH: 'SOUTH', SOUTH: 'NORTH', EAST: 'WEST', WEST: 'EAST',
+  NE: 'SW', SW: 'NE', NW: 'SE', SE: 'NW',
+  UP: 'DOWN', DOWN: 'UP', IN: 'OUT', OUT: 'IN'
+};
+
+// Exit property lengths, per the ZIL library (gverbs.zil).
+//   1 UEXIT [room]              2 NEXIT [string]        3 FEXIT [routine, pad]
+//   4 CEXIT [room, var, string] 5 DEXIT [room, door, string]
+// Lengths 1, 4 and 5 begin with the destination room's object number.
+const EXIT_HAS_ROOM = [1, 4, 5];
+
+// The ten flags the bridge projects into the World State Contract. Anything else
+// in the game's attribute table is real but nothing reads it.
+const NEEDED_FLAGS = ['TAKEBIT', 'OPENBIT', 'ONBIT', 'DOORBIT', 'CONTBIT',
+  'TRANSBIT', 'SURFACEBIT', 'LIGHTBIT', 'INVISIBLE', 'ACTORBIT'];
+
+// ---------------------------------------------------------------- text decode
+const A0 = 'abcdefghijklmnopqrstuvwxyz';
+const A1 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const A2 = ' \n0123456789.,!?_#\'"/\\-:()';
+
+/**
+ * Read a story file into everything statically knowable about its objects.
+ * @param {Buffer|Uint8Array} bytes  an unmodified Z-machine story file
+ */
+function decode(bytes) {
+  const data = bytes;
+  const W = (a) => (data[a] << 8) | data[a + 1];
+
+  const version = data[0];
+  if (version !== 3) {
+    throw new Error('calibrate: only v3 story files are supported, got v' + version);
+  }
+  const objtab = W(0x0a);
+  const abbrev = W(0x18);
+
+  // --- zscii ---------------------------------------------------------------
+  function zchars(addr) {
+    const out = [];
+    for (;;) {
+      const word = W(addr);
+      addr += 2;
+      out.push((word >> 10) & 31, (word >> 5) & 31, word & 31);
+      if (word & 0x8000) break;
+    }
+    return out;
+  }
+  const abbrevCache = new Map();
+  function abbreviation(n) {
+    // v3 forbids nested abbreviations, so the expansion decodes without them.
+    if (!abbrevCache.has(n)) abbrevCache.set(n, chars(zchars(W(abbrev + n * 2) * 2), false));
+    return abbrevCache.get(n);
+  }
+  function chars(cs, allowAbbrev) {
+    let s = '';
+    let alpha = 0;   // v3: shift zchars 4 and 5 affect exactly one character
+    for (let i = 0; i < cs.length; i++) {
+      const z = cs[i];
+      if (z === 0) { s += ' '; alpha = 0; continue; }
+      if (z === 1 || z === 2 || z === 3) {
+        const nz = cs[++i];
+        if (allowAbbrev && nz !== undefined) s += abbreviation(32 * (z - 1) + nz);
+        alpha = 0; continue;
+      }
+      if (z === 4) { alpha = 1; continue; }
+      if (z === 5) { alpha = 2; continue; }
+      if (alpha === 2 && z === 6) {                     // 10-bit ZSCII escape
+        const hi = cs[++i], lo = cs[++i];
+        if (lo !== undefined) s += String.fromCharCode((hi << 5) | lo);
+        alpha = 0; continue;
+      }
+      s += (alpha === 0 ? A0 : alpha === 1 ? A1 : A2)[z - 6];
+      alpha = 0;
+    }
+    return s;
+  }
+
+  // --- object table --------------------------------------------------------
+  const objStart = objtab + 31 * 2;   // 31 property-default words come first
+  const ENTRY = 9;                    // v3: 4 attribute bytes, 3 tree bytes, 2-byte pointer
+  const addrOf = (n) => objStart + (n - 1) * ENTRY;
+  // Object 1's property table sits immediately past the entry array, which is
+  // what fixes the object count without the header telling us.
+  const count = Math.floor((W(addrOf(1) + 7) - objStart) / ENTRY);
+
+  function attrsOf(n) {
+    const a = addrOf(n), out = [];
+    // Attribute 0 is the MOST significant bit of the first byte.
+    for (let i = 0; i < 32; i++) {
+      if ((data[a + (i >> 3)] >> (7 - (i & 7))) & 1) out.push(i);
+    }
+    return out;
+  }
+  function propsOf(n) {
+    const p = W(addrOf(n) + 7);
+    let a = p + 1 + data[p] * 2;
+    const out = new Map();
+    for (;;) {
+      const b = data[a];
+      if (b === 0) break;
+      const len = (b >> 5) + 1;                 // v3: bits 0-4 number, 5-7 length-1
+      out.set(b & 31, { len, addr: a + 1, b0: data[a + 1], b1: data[a + 2] });
+      a += 1 + len;
+    }
+    return out;
+  }
+
+  const objects = [null];
+  for (let n = 1; n <= count; n++) {
+    const p = W(addrOf(n) + 7);
+    objects.push({
+      num: n,
+      name: data[p] === 0 ? '' : chars(zchars(p + 1), true),
+      parent: data[addrOf(n) + 4],
+      sibling: data[addrOf(n) + 5],
+      child: data[addrOf(n) + 6],
+      attrs: new Set(attrsOf(n)),
+      props: propsOf(n)
+    });
+  }
+
+  return {
+    version, release: W(2),
+    serial: Array.from(data.slice(0x12, 0x18)).map(c => String.fromCharCode(c)).join(''),
+    count, objects
+  };
+}
+
+// ------------------------------------------------------- exits and directions
+/**
+ * Find the property numbers that behave like exits, then decide which direction
+ * each one is.
+ *
+ * Finding them is easy: a property whose length is 1, 4 or 5 and whose first byte
+ * is a valid object number is shaped like an exit. Naming them is the interesting
+ * part, and it is done by reciprocity. Under a correct assignment, walking NORTH
+ * out of a room and then SOUTH out of where you landed brings you back most of
+ * the time. Under a wrong one it almost never does.
+ */
+function findExits(story) {
+  const { objects, count } = story;
+  const valid = (t) => t >= 1 && t <= count;
+
+  // Candidate exit properties, with the edges each one implies.
+  const byProp = new Map();
+  for (let n = 1; n <= count; n++) {
+    for (const [prop, p] of objects[n].props) {
+      if (!EXIT_HAS_ROOM.includes(p.len) || !valid(p.b0)) continue;
+      if (!byProp.has(prop)) byProp.set(prop, []);
+      byProp.get(prop).push({ from: n, to: p.b0, len: p.len, door: p.len === 5 ? p.b1 : 0 });
+    }
+  }
+
+  // Rooms are the children of a single container object.
+  //
+  // ZIL declares every room inside one pseudo-object, conventionally ROOMS, and
+  // that turns out to be the cleanest signal in the whole binary. An earlier
+  // version of this guessed from exit shape instead and pulled in 62 false
+  // positives: buttons, ropes, a kitchen table, anything whose properties happened
+  // to hold a small number. Finding the container instead is exact.
+  //
+  // Which container is it? The one whose children carry the most exits. Nothing
+  // else in the tree comes close, because nothing else contains a map.
+  const carries = new Set([...byProp.values()].flat().map(e => e.from));
+  const tally = new Map();
+  for (const n of carries) {
+    const p = objects[n].parent;
+    if (!p) continue;
+    tally.set(p, (tally.get(p) || 0) + 1);
+  }
+  let roomsParent = null, most = 0;
+  for (const [p, k] of tally) if (k > most) { most = k; roomsParent = p; }
+
+  const rooms = new Set();
+  if (roomsParent) {
+    // Take every child, including rooms with no exits of their own, which are
+    // real: a cell you can only be put into is still a room.
+    let c = objects[roomsParent].child;
+    let guard = 0;
+    while (c && guard++ < 1024) { rooms.add(c); c = objects[c].sibling; }
+  }
+  // If the tree does not look like that, fall back to the mutual-exit test rather
+  // than returning nothing. Less accurate, and the report says so.
+  const byTree = rooms.size > 0;
+  if (!byTree) {
+    const pointed = new Set([...byProp.values()].flat().map(e => e.to));
+    for (const n of carries) if (pointed.has(n)) rooms.add(n);
+  }
+
+  // Keep only properties that are mostly room-to-room. Ordinary objects carry
+  // properties in the same numeric range that happen to hold small numbers.
+  const props = [...byProp.keys()].filter(prop => {
+    const edges = byProp.get(prop);
+    const good = edges.filter(e => rooms.has(e.from) && rooms.has(e.to)).length;
+    return edges.length > 0 && good / edges.length >= 0.6;
+  }).sort((a, b) => b - a);   // ZIL assigns directions downward from 31
+
+  return { byProp, rooms, props, roomsParent, byTree };
+}
+
+/**
+ * Assign direction names to exit property numbers.
+ *
+ * ZIL declares directions in a fixed order and the compiler numbers them downward
+ * from the top of the property space, so the descending order of the properties we
+ * found is the first hypothesis. It is only a hypothesis: a game is free to
+ * declare them differently. So it is scored by reciprocity and compared against
+ * swaps of each opposite pair, which is the mistake the ordering assumption would
+ * actually make.
+ */
+function assignDirections(story, exits) {
+  const { byProp, rooms, props } = exits;
+
+  const edgesOf = (prop) => (byProp.get(prop) || [])
+    .filter(e => rooms.has(e.from) && rooms.has(e.to));
+
+  // Score an assignment by how many of its edges have a matching edge back.
+  function score(map) {
+    let pairs = 0, total = 0;
+    for (const dir of Object.keys(map)) {
+      const back = OPPOSITE[dir];
+      if (!back || !map[back]) continue;
+      const there = edgesOf(map[dir]);
+      const home = edgesOf(map[back]);
+      for (const e of there) {
+        total++;
+        if (home.some(h => h.from === e.to && h.to === e.from)) pairs++;
+      }
+    }
+    return total ? pairs / total : 0;
+  }
+
+  const base = {};
+  DIRS.slice(0, props.length).forEach((d, i) => { base[d] = props[i]; });
+
+  let best = base, bestScore = score(base);
+  // Try swapping each opposite pair. A single wrong pairing is the failure the
+  // convention can produce, and it shows up as a collapse in reciprocity.
+  let improved = true, guard = 0;
+  while (improved && guard++ < 24) {
+    improved = false;
+    for (const dir of Object.keys(best)) {
+      const back = OPPOSITE[dir];
+      if (!back || !best[back]) continue;
+      const trial = Object.assign({}, best);
+      trial[dir] = best[back]; trial[back] = best[dir];
+      const s = score(trial);
+      if (s > bestScore + 1e-9) { best = trial; bestScore = s; improved = true; }
+    }
+  }
+
+  return { dirprop: best, reciprocity: bestScore, considered: props };
+}
+
+// ------------------------------------------------------------------- id minting
+/** A stable, readable id from a short name. */
+function slug(name, fallback) {
+  const s = String(name || '').toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return s || fallback;
+}
+
+/**
+ * Turn object numbers into stable ids.
+ *
+ * Repeated short names are the thing that made this look impossible, and they are
+ * only a problem when the ids already exist and have to be matched. Minting them
+ * fresh, MAZE-1 through MAZE-15 is as correct as any other assignment, because
+ * nothing downstream knows or cares which physical maze room got which number.
+ * The numbering is stable for a given binary, which is what actually matters:
+ * re-running this produces the same ids, so scene art keeps pointing at the same
+ * rooms.
+ */
+function mintIds(story, rooms) {
+  const seen = new Map();
+  const counts = new Map();
+  for (let n = 1; n <= story.count; n++) {
+    const base = slug(story.objects[n].name, 'OBJ-' + n);
+    counts.set(base, (counts.get(base) || 0) + 1);
+  }
+  const used = new Map();
+  const roommap = {}, objmap = {};
+  for (let n = 1; n <= story.count; n++) {
+    const o = story.objects[n];
+    if (!o.name) continue;                       // nameless internals stay unmapped
+    const base = slug(o.name, 'OBJ-' + n);
+    let id = base;
+    if (counts.get(base) > 1) {
+      const k = (used.get(base) || 0) + 1;
+      used.set(base, k);
+      id = base + '-' + k;
+    }
+    seen.set(n, id);
+    if (rooms.has(n)) roommap[String(n)] = id;
+    else objmap[String(n)] = id;
+  }
+  return { roommap, objmap, ids: seen };
+}
+
+// --------------------------------------------------------------- attribute bits
+/**
+ * Work out which attribute bit carries which ZIL flag.
+ *
+ * This is the part that cannot be finished from a bare binary, so it is done as
+ * evidence rather than as an answer. For each flag we build the set of objects
+ * that structure says should carry it, then look for the attribute bit whose
+ * actual membership matches best, and report how well it matched.
+ *
+ * The evidence is genuinely uneven. A door is named as the door operand of a
+ * DEXIT, so DOORBIT leaves a clean trace. Nothing in a static binary says which
+ * objects a player may pick up, so TAKEBIT is inferred from the weakest possible
+ * signal and should be confirmed by a human. Saying so is the whole point of
+ * reporting a score.
+ */
+function inferAttributes(story, exits, dirprop) {
+  const { objects, count } = story;
+  const { byProp, rooms } = exits;
+  const dirProps = new Set(Object.values(dirprop));
+
+  // --- structural evidence per flag ---------------------------------------
+  const doors = new Set();
+  for (const [prop, edges] of byProp) {
+    if (!dirProps.has(prop)) continue;
+    for (const e of edges) if (e.len === 5 && e.door >= 1 && e.door <= count) doors.add(e.door);
+  }
+
+  const hasChildren = new Set();
+  for (let n = 1; n <= count; n++) {
+    if (objects[n].child && !rooms.has(n)) hasChildren.add(n);
+  }
+
+  // Things sitting loose in a room, which is the population a takeable object is
+  // drawn from. Weak, and labelled as such downstream.
+  const looseInRoom = new Set();
+  for (let n = 1; n <= count; n++) {
+    if (!rooms.has(n) && objects[n].parent && rooms.has(objects[n].parent)) looseInRoom.add(n);
+  }
+
+  // --- which objects actually carry each bit ------------------------------
+  const bitSets = [];
+  for (let b = 0; b < 32; b++) {
+    const s = new Set();
+    for (let n = 1; n <= count; n++) if (objects[n].attrs.has(b)) s.add(n);
+    bitSets.push(s);
+  }
+  const nonRoom = (set) => [...set].filter(n => !rooms.has(n)).length;
+  const contains = (big, small) => {
+    if (!small.size) return 0;
+    let k = 0;
+    for (const x of small) if (big.has(x)) k++;
+    return k / small.size;
+  };
+
+  const attr = {}, report = [];
+  const taken = new Set();
+  const claim = (flag, bit, confidence, why) => {
+    if (bit !== null && !taken.has(bit)) { attr[flag] = bit; taken.add(bit); }
+    else if (bit !== null) bit = null;
+    report.push({ flag, bit, confidence, why });
+  };
+
+  // DOORBIT. A door is named as the second operand of a DEXIT, so this is not an
+  // inference so much as a reading. The bit is the one all of them share.
+  let doorBit = null, doorScore = 0;
+  for (let b = 0; b < 32; b++) {
+    if (!bitSets[b].size || bitSets[b].size > count / 4) continue;
+    const c = contains(bitSets[b], doors);
+    // Prefer full coverage by the tightest set, so a broad flag that happens to
+    // cover the doors cannot outrank the flag that means "door".
+    const s = c - (bitSets[b].size - doors.size) / (count || 1);
+    if (c >= 0.9 && s > doorScore) { doorScore = s; doorBit = b; }
+  }
+  claim('DOORBIT', doorBit, doorBit === null ? 0 : 1,
+    'every object named as the door of a DEXIT exit carries it');
+
+  // ACTORBIT, and the player along with it.
+  //
+  // Actors are a small set, and the player is the one member the game has not
+  // placed anywhere: ZIL leaves it parentless and its init routine puts it in the
+  // first room. That narrows it but does not finish the job, because other small
+  // flags also happen to have exactly one unplaced member. In Zork I, SEARCHBIT
+  // covers seven objects with one loose one, which is the same shape and the
+  // wrong answer.
+  //
+  // The name breaks the tie. ZIL's own name for the player object is a word no
+  // other object uses, and every candidate here is being read out of the binary
+  // anyway, so checking it costs nothing.
+  const PLAYER_NAME = /^(cretin|adventurer|yourself|you|me|player|hero)$/i;
+  let actorBit = null, actorLoose = null, actorNamed = false;
+  for (let b = 0; b < 32; b++) {
+    const set = bitSets[b];
+    if (set.size < 2 || set.size > 20) continue;
+    const loose = [...set].filter(n => !objects[n].parent && objects[n].name);
+    if (loose.length !== 1) continue;
+    const named = PLAYER_NAME.test(String(objects[loose[0]].name).trim());
+    // A named match wins outright; otherwise the smallest set is the better bet.
+    if (named && !actorNamed) { actorBit = b; actorLoose = loose[0]; actorNamed = true; continue; }
+    if (named === actorNamed &&
+        (actorBit === null || set.size < bitSets[actorBit].size)) {
+      actorBit = b; actorLoose = loose[0];
+    }
+  }
+  claim('ACTORBIT', actorBit, actorBit === null ? 0 : (actorNamed ? 0.95 : 0.4),
+    actorNamed
+      ? 'the one actor the game never placed, and its name says who it is'
+      : 'a small set with exactly one unplaced member; unconfirmed');
+  if (!actorNamed) actorLoose = null;   // do not hand back a guessed player
+
+  // Everything else has no signal in a static binary worth trusting.
+  //
+  // TAKEBIT is the one that matters most and the one with the least evidence:
+  // nothing in a compiled object table says what a player may pick up. Earlier
+  // versions of this guessed by proxy and were confidently wrong, which is worse
+  // than saying nothing, because an absent flag reads as false everywhere and at
+  // least stays consistent. So the remaining flags come back as a census instead,
+  // which a human resolves in about two minutes by reading the object names.
+  for (const flag of NEEDED_FLAGS) {
+    if (attr[flag] !== undefined || report.some(r => r.flag === flag)) continue;
+    report.push({ flag, bit: null, confidence: 0,
+      why: 'no reliable static signal; confirm from the census' });
+  }
+
+  const census = [];
+  for (let b = 0; b < 32; b++) {
+    if (!bitSets[b].size) continue;
+    census.push({
+      bit: b,
+      count: bitSets[b].size,
+      rooms: bitSets[b].size - nonRoom(bitSets[b]),
+      claimed: Object.keys(attr).find(f => attr[f] === b) || null,
+      sample: [...bitSets[b]].slice(0, 8).map(n => objects[n].name).filter(Boolean)
+    });
+  }
+
+  return { attr, report, bitSets, census, player: actorLoose };
+}
+
+// --------------------------------------------------------------------- player
+/**
+ * Find the player object.
+ *
+ * The obvious approaches both fail. Global 0 holds the current room at runtime but
+ * is zero in the file, because the game's init routine sets it. And the player's
+ * parent is zero for the same reason: ZIL leaves the object unplaced and moves it
+ * into the first room on startup.
+ *
+ * That last fact is the tell rather than the obstacle. Every other actor in the
+ * game is placed in the world at compile time, so the player is the one actor the
+ * file leaves nowhere. Attribute inference finds it while it is working out which
+ * bit means ACTORBIT, and this only has to break the tie if that came back empty.
+ */
+function findPlayer(story, rooms, fromAttrs) {
+  const { objects, count } = story;
+  if (fromAttrs) return { player: fromAttrs, candidates: [fromAttrs], how: 'the unplaced actor' };
+
+  // Fallback: parentless named objects, preferring one that reads like a person.
+  // ZIL's own name for it is "cretin", which is not a word any other object uses.
+  const loose = [];
+  for (let n = 1; n <= count; n++) {
+    if (rooms.has(n) || objects[n].parent || !objects[n].name) continue;
+    loose.push(n);
+  }
+  const byName = loose.find(n => /^(cretin|adventurer|yourself|you|me)$/i.test(objects[n].name.trim()));
+  return {
+    player: byName || null,
+    candidates: loose,
+    how: byName ? 'name' : 'unresolved, confirm from the candidates'
+  };
+}
+
+// ----------------------------------------------------------------------- main
+/**
+ * Derive a room map from a story file.
+ * @param {Buffer|Uint8Array} bytes
+ * @returns {{roommap:object, report:object}}
+ */
+function calibrate(bytes) {
+  const story = decode(bytes);
+  const exits = findExits(story);
+  const dirs = assignDirections(story, exits);
+  const { roommap, objmap } = mintIds(story, exits.rooms);
+  const attrs = inferAttributes(story, exits, dirs.dirprop);
+  const player = findPlayer(story, exits.rooms, attrs.player);
+
+  const out = {
+    ROOMMAP: roommap,
+    OBJMAP: objmap,
+    ATTR: attrs.attr,
+    ADVENTURER: player.player,
+    DIRPROP: dirs.dirprop,
+    EXIT_HAS_ROOM: EXIT_HAS_ROOM.slice()
+  };
+
+  const missing = NEEDED_FLAGS.filter(f => out.ATTR[f] === undefined);
+  return {
+    roommap: out,
+    report: {
+      story: { version: story.version, release: story.release, serial: story.serial,
+        objects: story.count },
+      rooms: Object.keys(roommap).length,
+      objects: Object.keys(objmap).length,
+      unnamed: story.count - Object.keys(roommap).length - Object.keys(objmap).length,
+      roomsFoundBy: exits.byTree ? 'containment tree' : 'exit shape (less reliable)',
+      directions: dirs,
+      attributes: attrs.report,
+      census: attrs.census,
+      missingFlags: missing,
+      player,
+      // Stated rather than implied. A port whose attribute table is half guessed
+      // will run and misbehave subtly, and the person running this is the only
+      // one positioned to catch it.
+      confident: missing.length === 0 && dirs.reciprocity >= 0.8
+    }
+  };
+}
+
+//
+//  A survey: the map of a compiled game, in the shape the editor draws.
+//
+//  Calibration already works out which rooms exist and which property holds
+//  which direction. That is a map, and there is no good reason a person cannot
+//  look at it just because the game it came from is a program.
+//
+//  What comes back is deliberately not a world. It has rooms, names and exits
+//  and nothing else, because nothing else is knowable without running the game:
+//  the prose lives in compressed strings the routines choose between, and the
+//  puzzles live in the routines themselves. A surveyed map is for looking at.
+//
+function survey(bytes) {
+  const story = decode(bytes);
+  const exits = findExits(story);
+  const dirs = assignDirections(story, exits);
+  const { roommap } = mintIds(story, exits.rooms);
+
+  const idOf = {};
+  for (const num of Object.keys(roommap)) idOf[num] = roommap[num];
+
+  const rooms = [];
+  for (const num of Object.keys(roommap)) {
+    const n = Number(num);
+    const room = { id: roommap[num], name: title(story.objects[n].name), exits: [] };
+    for (const dir of Object.keys(dirs.dirprop)) {
+      if (!DIRS.includes(dir)) continue;              // LAND and friends have no compass
+      for (const e of (exits.byProp.get(dirs.dirprop[dir]) || [])) {
+        if (e.from !== n || !idOf[e.to]) continue;
+        room.exits.push({ dir, to: idOf[e.to] });
+      }
+    }
+    rooms.push(room);
+  }
+
+  //  No start room is claimed, and that is not an omission. The player object
+  //  sits unplaced in the initial object table because a game of this vintage
+  //  puts them somewhere from code on the first turn. Guessing would put a START
+  //  label on an arbitrary room, and a map that lies about where you come in is
+  //  worse than one that admits it does not know.
+  //
+  //  The layout still needs somewhere to start walking from, so it uses the
+  //  best-connected room. That is a drawing decision, not a claim about the game.
+  var hub = rooms.slice().sort(function (a, b) { return b.exits.length - a.exits.length; })[0];
+
+  return {
+    surveyed: true,
+    meta: { title: 'A surveyed map', layoutRoot: (hub || {}).id },
+    flags: {}, rooms, items: [], actors: [], rules: [],
+    survey: {
+      version: story.version, release: story.release, serial: story.serial,
+      rooms: rooms.length,
+      exits: rooms.reduce((n, r) => n + r.exits.length, 0),
+      reciprocity: dirs.reciprocity
+    }
+  };
+}
+
+function title(name) {
+  const s = String(name || '').trim();
+  return s ? s.replace(/\b\w/g, c => c.toUpperCase()) : 'Room';
+}
+
+module.exports = { calibrate, survey, decode, findExits, assignDirections, mintIds,
+  inferAttributes, findPlayer, DIRS, OPPOSITE, NEEDED_FLAGS };
+
+  };
   window.Folio = {
     world: require('index.js'),
     graph: require('graph.js'),
@@ -4939,7 +5570,8 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     schema: require('schema.js'),
     brief: require('brief.js'),
     scenes: require('scenes.js'),
-    solve: require('solve.js')
+    solve: require('solve.js'),
+    calibrate: require('calibrate.js')
   };
 })();</script>
 <script>//  The map editor.
@@ -4977,6 +5609,7 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
   var cv = document.getElementById('map');
   var ctx = cv.getContext('2d');
   var VW = 1200, VH = 760;              // logical size; the canvas follows the box
+  var DPR = 1;                          // device pixels per logical one
 
   // ---------------------------------------------------------------- the world
   //  The world is what a .folio holds. The layout is where rooms sit on this
@@ -5056,25 +5689,59 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     VH = Math.max(280, Math.round(box.height));
     cv.width = VW * dpr;
     cv.height = VH * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
+    DPR = dpr;                 // draw() composes this with the view; it cannot
+    draw();                    // just be left standing in the context
+
   }
   window.addEventListener('resize', resize);
 
+  //  The canvas shows part of a map that may be much larger than it.
+  //
+  //  Rooms are laid out at a size that can be read, and then the view moves over
+  //  them. The alternative — scaling the positions to fit while the boxes stay
+  //  their original size — is what a small map gets away with and what a large
+  //  one cannot: at eighty rooms the boxes overlap into a solid block. Nothing
+  //  below this line knows about the view; everything works in map coordinates,
+  //  because the transform is applied once here and inverted once in toCanvas.
+  var view = { s: 1, ox: 0, oy: 0 };
+
   function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = C.ink;
     ctx.fillRect(0, 0, VW, VH);
+
+    ctx.setTransform(DPR * view.s, 0, 0, DPR * view.s, DPR * view.ox, DPR * view.oy);
     ctx.strokeStyle = 'rgba(59,68,114,.35)';
-    ctx.lineWidth = 1;
-    for (var gx = 0; gx < VW; gx += 40) {
-      ctx.beginPath(); ctx.moveTo(gx + .5, 0); ctx.lineTo(gx + .5, VH); ctx.stroke();
+    ctx.lineWidth = 1 / view.s;
+    var g = 40;
+    var x0 = Math.floor(-view.ox / view.s / g) * g, x1 = x0 + VW / view.s + g;
+    var y0 = Math.floor(-view.oy / view.s / g) * g, y1 = y0 + VH / view.s + g;
+    for (var gx = x0; gx < x1; gx += g) {
+      ctx.beginPath(); ctx.moveTo(gx, y0); ctx.lineTo(gx, y1); ctx.stroke();
     }
-    for (var gy = 0; gy < VH; gy += 40) {
-      ctx.beginPath(); ctx.moveTo(0, gy + .5); ctx.lineTo(VW, gy + .5); ctx.stroke();
+    for (var gy = y0; gy < y1; gy += g) {
+      ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x1, gy); ctx.stroke();
     }
     drawExits();
     if (dragLink) drawPendingLink();
     for (var i = 0; i < world.rooms.length; i++) drawRoom(world.rooms[i]);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  //  Frame the whole map, never magnifying past life size: a three-room game
+  //  blown up to fill a wall looks like a mistake.
+  function frame() {
+    var xs = [], ys = [];
+    for (var k in layout) { xs.push(layout[k].x); ys.push(layout[k].y); }
+    if (!xs.length) { view = { s: 1, ox: 0, oy: 0 }; return; }
+    var minX = Math.min.apply(null, xs) - ROOM_W, maxX = Math.max.apply(null, xs) + ROOM_W;
+    var minY = Math.min.apply(null, ys) - ROOM_H, maxY = Math.max.apply(null, ys) + ROOM_H;
+    var pad = 30;
+    var s = Math.min(1, (VW - pad * 2) / Math.max(1, maxX - minX),
+      (VH - pad * 2) / Math.max(1, maxY - minY));
+    view = { s: s,
+      ox: (VW - (maxX - minX) * s) / 2 - minX * s,
+      oy: (VH - (maxY - minY) * s) / 2 - minY * s };
   }
 
   function drawExits() {
@@ -5173,6 +5840,25 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
       findingsEl.innerHTML = '<p class="pdim">Put a room down to begin.</p>';
       return;
     }
+    //  A survey is a map read off a compiled game, so the checks do not apply to
+    //  it. It has no items and no rules, not because it is a bad game but because
+    //  those live in machine code this never ran. Reporting an empty world here
+    //  would be measuring the surveyor rather than the game.
+    if (world.surveyed) {
+      var s = world.survey || {};
+      badge.className = 'badge'; badge.textContent = 'surveyed';
+      findingsEl.innerHTML =
+        '<div class="f"><code>MAP</code>' + s.rooms + ' rooms and ' + s.exits +
+        ' exits, read from the story file without running it.</div>' +
+        '<div class="f"><code>FIT</code>' + Math.round((s.reciprocity || 0) * 100) +
+        '% of passages lead back the way they came, which is how the directions ' +
+        'were worked out.</div>' +
+        '<div class="f warn"><code>READ ONLY</code>The rooms are all there is. ' +
+        'This game\'s things, prose and puzzles are compiled code, not data, so ' +
+        'there is nothing here to edit and nothing to save.</div>';
+      return;
+    }
+
     var found = [];
     var shape = F.schema.validateWorld(stripLayout(world));
     if (!shape.ok) {
@@ -5285,7 +5971,22 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     var r = selected && byId(selected);
     if (!r) {
       inspector.innerHTML = '<p class="ptitle">Nothing selected</p>' +
-        '<p class="pdim">Click the canvas to put a room down, or click a room to edit it.</p>';
+        '<p class="pdim">' + (readOnly
+          ? 'Drag to move about the map, scroll to zoom, and click a room to see ' +
+            'where it leads.'
+          : 'Click the canvas to put a room down, or click a room to edit it.') +
+        '</p>';
+      return;
+    }
+    if (readOnly) {
+      inspector.innerHTML = '<p class="ptitle">' + esc(r.name || r.id) + '</p>' +
+        '<p class="pdim"><code>' + esc(r.id) + '</code></p>' +
+        ((r.exits || []).length
+          ? '<div class="findings">' + r.exits.map(function (x) {
+              return '<div class="f"><code>' + esc(x.dir) + '</code>' + esc(x.to) + '</div>';
+            }).join('') + '</div>'
+          : '<p class="pdim">No way out that the story file states plainly. ' +
+            'A passage decided at runtime does not appear here.</p>');
       return;
     }
     var html = '';
@@ -5757,17 +6458,36 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
   }
 
   // -------------------------------------------------------------- interaction
-  var drag = null, dragLink = null, downAt = null;
+  var drag = null, dragLink = null, downAt = null, readOnly = false;
 
   function toCanvas(e) {
     var r = cv.getBoundingClientRect();
-    return { x: (e.clientX - r.left) * VW / r.width, y: (e.clientY - r.top) * VH / r.height };
+    var sx = (e.clientX - r.left) * VW / r.width, sy = (e.clientY - r.top) * VH / r.height;
+    return { x: (sx - view.ox) / view.s, y: (sy - view.oy) / view.s };
   }
+
+  var pan = null;
+
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = cv.getBoundingClientRect();
+    var sx = (e.clientX - r.left) * VW / r.width, sy = (e.clientY - r.top) * VH / r.height;
+    var before = { x: (sx - view.ox) / view.s, y: (sy - view.oy) / view.s };
+    var s = Math.max(0.2, Math.min(2, view.s * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    // Keep whatever sits under the pointer under the pointer.
+    view = { s: s, ox: sx - before.x * s, oy: sy - before.y * s };
+    draw();
+  }, { passive: false });
 
   cv.addEventListener('mousedown', function (e) {
     var p = toCanvas(e), r = roomAt(p.x, p.y);
     downAt = p;
-    if (!r) return;
+    if (!r) {
+      var b = cv.getBoundingClientRect();
+      pan = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, box: b, moved: false };
+      return;
+    }
+    if (readOnly) { selected = r.id; showInspector(); draw(); return; }
     selected = r.id;
     showInspector();
     if (e.shiftKey) dragLink = { from: r.id, x: p.x, y: p.y };
@@ -5776,13 +6496,27 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
   });
 
   cv.addEventListener('mousemove', function (e) {
+    if (pan) {
+      var dx = (e.clientX - pan.x) * VW / pan.box.width;
+      var dy = (e.clientY - pan.y) * VH / pan.box.height;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) pan.moved = true;
+      view.ox = pan.ox + dx; view.oy = pan.oy + dy;
+      draw();
+      cv.style.cursor = 'grabbing';
+      return;
+    }
     var p = toCanvas(e);
     if (drag) { layout[drag.id] = { x: p.x - drag.dx, y: p.y - drag.dy }; draw(); }
     else if (dragLink) { dragLink.x = p.x; dragLink.y = p.y; draw(); }
-    cv.style.cursor = roomAt(p.x, p.y) ? 'move' : 'crosshair';
+    cv.style.cursor = roomAt(p.x, p.y) ? 'move' : readOnly ? 'grab' : 'crosshair';
   });
 
   window.addEventListener('mouseup', function (e) {
+    if (pan) {
+      var wasPan = pan.moved;
+      pan = null; cv.style.cursor = 'crosshair';
+      if (wasPan) { downAt = null; return; }   // a drag of the view is not a click
+    }
     var p = toCanvas(e);
     if (dragLink) {
       var t = roomAt(p.x, p.y);
@@ -5791,7 +6525,7 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     }
     if (drag) { relabel(); drag = null; redraw(); return; }
     if (downAt && Math.abs(downAt.x - p.x) < 4 && Math.abs(downAt.y - p.y) < 4 &&
-        !roomAt(p.x, p.y) && p.x > 0 && p.y > 0 && p.x < VW && p.y < VH) addRoom(p.x, p.y);
+        !roomAt(p.x, p.y) && !readOnly) addRoom(p.x, p.y);
     downAt = null;
   });
 
@@ -5946,11 +6680,35 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     if (!file) return;
     file.arrayBuffer()
       .then(function (b) { return window.FolioZip.readFolio(new Uint8Array(b)); })
-      .then(function (files) { adopt(JSON.parse(new TextDecoder().decode(files['logic/world.json']))); })
+      .then(function (files) { adopt(worldFrom(files)); })
       .catch(function (err) {
         findingsEl.innerHTML = '<div class="f err"><code>OPEN</code>' + esc(err.message) + '</div>';
       });
   });
+
+  //  A .folio holds one of two things, and only one of them is editable.
+  //
+  //  A world is data: rooms, things, rules, all of it declared, all of it
+  //  something this editor can change and hand back. A story file is a compiled
+  //  program. Its map is not written down anywhere — the rooms are objects in a
+  //  memory image and the puzzles are machine code — so there is nothing here to
+  //  edit, and an editor that pretended otherwise would be lying about what it
+  //  could save.
+  //
+  //  But the map can still be read. Calibration already works out which objects
+  //  are rooms and which property holds which direction, statically, without
+  //  running a single instruction. So a compiled game opens as a survey: the map
+  //  drawn, correctly, and locked.
+  function worldFrom(files) {
+    var world = files['logic/world.json'];
+    if (world) return JSON.parse(new TextDecoder().decode(world));
+
+    var story = null;
+    for (var k in files) if (/^logic\/.*\.z[1-8]$/.test(k)) { story = files[k]; break; }
+    if (!story) throw new Error('this .folio holds neither a world nor a story file');
+    if (!window.Folio.calibrate) throw new Error('no surveyor in this build');
+    return window.Folio.calibrate.survey(story);
+  }
   document.getElementById('sample').addEventListener('click', function () {
     fetch('/games/cellar-door.folio').then(function (r) { return r.arrayBuffer(); })
       .then(function (b) { return window.FolioZip.readFolio(new Uint8Array(b)); })
@@ -5967,64 +6725,93 @@ module.exports = { validateWorld, vocabulary, check, WORLD_SCHEMA };
     walkthrough = (w.meta && w.meta.editorWalkthrough) || '';
     if (w.meta) { delete w.meta.editorLayout; delete w.meta.editorWalkthrough; }
     selected = null;
+    lock(!!w.surveyed);
+    frame();
     redraw();
+  }
+
+  //  A surveyed map is shown, not offered for editing. The controls that would
+  //  write go dead rather than disappearing, because a control that vanishes
+  //  leaves you wondering whether you imagined it.
+  function lock(on) {
+    readOnly = on;
+    ['addRoom', 'delRoom', 'findWalk', 'exportFolio', 'exportWorld'].forEach(function (id) {
+      document.getElementById(id).disabled = on;
+    });
+    document.getElementById('hint').textContent = on
+      ? 'A map read from a compiled game. You can look and drag rooms about to ' +
+        'read it more easily, but this game is a program, so there is nothing to edit.'
+      : 'Click the canvas to put a room down. Drag a room to move it. Drag from ' +
+        'one room to another to join them: the direction comes from where you put ' +
+        'them, so the map is the map.';
   }
 
   //  A world that has never been laid out gets a map by walking outward from the
   //  start room, putting each room where its exit claims it is. A game written
   //  entirely as JSON can then be understood at a glance, and anything impossible
   //  about it is visible immediately.
+  //  Rooms are placed on a grid of cells the size of a room, so two of them can
+  //  never land on the same spot. Each exit puts its destination in the cell the
+  //  direction points at; if that cell is taken, the room spirals out to the
+  //  nearest free one, which keeps it near where it belongs rather than sliding
+  //  away down a diagonal. The map may end up larger than the canvas, and that
+  //  is what the view is for.
   function autoLayout(w) {
-    var pos = {}, step = 150;
+    var CW = ROOM_W + 42, CH = ROOM_H + 46;
     var VEC = { NORTH: [0, -1], SOUTH: [0, 1], EAST: [1, 0], WEST: [-1, 0],
       NE: [1, -1], NW: [-1, -1], SE: [1, 1], SW: [-1, 1],
-      UP: [1, -1], DOWN: [-1, 1], IN: [1, 0], OUT: [-1, 0] };
-    var start = (w.meta && w.meta.start) || (w.rooms[0] && w.rooms[0].id);
+      UP: [0, -1], DOWN: [0, 1], IN: [1, 0], OUT: [-1, 0] };
+    var start = (w.meta && (w.meta.start || w.meta.layoutRoot)) ||
+      (w.rooms[0] && w.rooms[0].id);
     if (!start) return {};
-    pos[start] = { x: VW / 2, y: VH / 2 };
+
+    var taken = {}, cell = {};
+    function claim(id, cx, cy) {
+      for (var ring = 0; ring < 40; ring++) {
+        for (var dx = -ring; dx <= ring; dx++) {
+          for (var dy = -ring; dy <= ring; dy++) {
+            if (ring && Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+            var k = (cx + dx) + ',' + (cy + dy);
+            if (taken[k]) continue;
+            taken[k] = id; cell[id] = { cx: cx + dx, cy: cy + dy };
+            return;
+          }
+        }
+      }
+    }
+
+    claim(start, 0, 0);
     var queue = [start], guard = 0;
-    while (queue.length && guard++ < 600) {
+    while (queue.length && guard++ < 4000) {
       var id = queue.shift(), room = null;
       for (var i = 0; i < w.rooms.length; i++) if (w.rooms[i].id === id) room = w.rooms[i];
       if (!room) continue;
       for (var j = 0; j < (room.exits || []).length; j++) {
         var ex = room.exits[j];
-        if (pos[ex.to]) continue;
+        if (cell[ex.to] || !byIdIn(w, ex.to)) continue;
         var v = VEC[ex.dir] || [1, 0];
-        var p = { x: pos[id].x + v[0] * step, y: pos[id].y + v[1] * step };
-        var spin = 0;
-        while (occupied(pos, p) && spin++ < 40) { p.x += 34; p.y += 26; }
-        pos[ex.to] = p;
+        claim(ex.to, cell[id].cx + v[0], cell[id].cy + v[1]);
         queue.push(ex.to);
       }
     }
-    var loose = 0;
-    for (var k = 0; k < w.rooms.length; k++) {
-      if (pos[w.rooms[k].id]) continue;
-      pos[w.rooms[k].id] = { x: 100 + (loose % 7) * 145, y: VH - 70 - Math.floor(loose / 7) * 80 };
+
+    // Anything no exit leads to still has to go somewhere it can be seen.
+    var loose = 0, floor = 0;
+    for (var c in cell) floor = Math.max(floor, cell[c].cy);
+    for (var k2 = 0; k2 < w.rooms.length; k2++) {
+      var rid = w.rooms[k2].id;
+      if (cell[rid]) continue;
+      claim(rid, (loose % 8) - 4, floor + 2 + Math.floor(loose / 8));
       loose++;
     }
-    return fit(pos);
-  }
-  function occupied(pos, p) {
-    for (var k in pos) {
-      if (Math.abs(pos[k].x - p.x) < ROOM_W + 14 && Math.abs(pos[k].y - p.y) < ROOM_H + 16) return true;
-    }
-    return false;
-  }
-  function fit(pos) {
-    var xs = [], ys = [];
-    for (var k in pos) { xs.push(pos[k].x); ys.push(pos[k].y); }
-    if (!xs.length) return pos;
-    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
-    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
-    var pad = 78;
-    var s = Math.min(1, (VW - pad * 2) / Math.max(1, maxX - minX),
-      (VH - pad * 2) / Math.max(1, maxY - minY));
-    for (var id in pos) {
-      pos[id] = { x: pad + (pos[id].x - minX) * s, y: pad + (pos[id].y - minY) * s };
-    }
+
+    var pos = {};
+    for (var id2 in cell) pos[id2] = { x: cell[id2].cx * CW, y: cell[id2].cy * CH };
     return pos;
+  }
+  function byIdIn(w, id) {
+    for (var i = 0; i < w.rooms.length; i++) if (w.rooms[i].id === id) return w.rooms[i];
+    return null;
   }
 
   function example() {
