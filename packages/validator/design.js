@@ -84,9 +84,29 @@ function audit(world, opts) {
   // graph distinguishes the two — a tree scores 1, a looping map scores higher.
   // Shared with the corpus profiler, because these two used to disagree about
   // the same file and only a probe told the author which one the audit believed.
+  //
+  // Connections that cross a region are left out, and that correction matters
+  // more than it sounds. An adaptation of a film scored 0.53 loops per room, the
+  // best map score of any game built on this engine, BECAUSE its author had to
+  // invent adjacency to make a scene list walkable. Twenty-nine of its exits
+  // crossed continents. The measure was rewarding the exact failure W512 exists
+  // to report, and a narrative defect was manufacturing a mechanical pass.
   const shape = require('./mapshape.js');
-  const conns = shape.connections(shape.passagesOf(world));
-  const loops = shape.loops(conns.size, rooms.length);
+  const regionOf = {};
+  let regioned = false;
+  for (const rm of rooms) if (rm.region) { regionOf[rm.id] = rm.region; regioned = true; }
+  const passages = shape.passagesOf(world).filter(p => {
+    if (!regioned) return true;
+    const a = regionOf[p[0]], b = regionOf[p[1]];
+    return !a || !b || a === b;
+  });
+  const conns = shape.connections(passages);
+  // Circulation is only meaningful inside a region. Ten rooms in one place with
+  // three ways round is a place; ten rooms on four continents is an itinerary.
+  const loopRooms = regioned
+    ? new Set([...conns].flatMap(k => k.split(' '))).size || rooms.length
+    : rooms.length;
+  const loops = shape.loops(conns.size, loopRooms);
 
   // -------------------------------------------------------- 4. gate separation
   //
@@ -127,7 +147,7 @@ function audit(world, opts) {
     roomUtility,
     mapLoops: loops,
     mapConnections: conns.size,
-    loopsPerRoom: rooms.length ? Math.round((loops / rooms.length) * 100) / 100 : 0,
+    loopsPerRoom: loopRooms ? Math.round((loops / loopRooms) * 100) / 100 : 0,
     meanGateDistance,
     scoringMoments: scoringRules,
     hasDeathState: hasDeath
